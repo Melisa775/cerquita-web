@@ -4,7 +4,7 @@ Juegos en español para parejas a distancia. Uno crea una sala, le envía el có
 
 <!-- Agrega aquí un GIF jugando una ronda y el enlace a la demo en vivo -->
 
-Este repositorio es el frontend. El backend está en [cerquita-api](https://github.com/TU_USUARIO/cerquita-api).
+Este repositorio es el frontend. El backend está en [cerquita-api](https://github.com/Melisa775/cerquita-api).
 
 ## Por qué existe
 
@@ -73,4 +73,4 @@ src/
 - [ ] Ahorcado y Wordle a dúo
 - [ ] Sopa de letras compartida
 - [ ] Control compartido para ver películas al mismo tiempo
-- [ ] Despliegue público
+- [x] Despliegue público
