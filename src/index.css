@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@theme {
+  --color-stone: #E7E8EB;   /* fondo neutro: no tiñe la percepción del color */
+  --color-paper: #F6F6F7;   /* superficies */
+  --color-ink: #22252E;     /* texto */
+  --color-muted: #6B6F7B;   /* texto secundario */
+  --color-line: #CDCFD5;    /* bordes */
+  --color-p1: #0F6E6A;      /* jugador 1 */
+  --color-p2: #B23A5A;      /* jugador 2 */
+  --color-danger: #A23B1F;
+
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html { background: var(--color-stone); color: var(--color-ink); }
+  body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+  h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
+  :focus-visible { outline: 3px solid var(--color-ink); outline-offset: 3px; border-radius: 6px; }
+}
+
+/* Deslizadores de color: la pista muestra el gradiente real del canal */
+.hsb-range {
+  appearance: none;
+  width: 100%;
+  height: 2.5rem;
+  border-radius: 999px;
+  background: var(--track);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  cursor: pointer;
+}
+.hsb-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 2.25rem; height: 2.25rem;
+  border-radius: 50%;
+  background: var(--thumb);
+  border: 4px solid white;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+.hsb-range::-moz-range-thumb {
+  width: 1.75rem; height: 1.75rem;
+  border-radius: 50%;
+  background: var(--thumb);
+  border: 4px solid white;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 0.25);
+}
+.hsb-range:focus-visible { outline-offset: 4px; }
+
+/* El único momento de movimiento: el color inunda la pantalla */
+@keyframes flood {
+  from { clip-path: circle(0% at 50% 50%); }
+  to { clip-path: circle(150% at 50% 50%); }
+}
+.flood { animation: flood 600ms cubic-bezier(.2,.7,.2,1) both; }
+
+@keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .flood { animation: none; }
+  .timer-bar { animation: none !important; }
+}
