@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ColorSliders from '../components/ColorSliders'
+import TimerBar from '../components/TimerBar'
 import { useCountdown } from '../hooks/useCountdown'
 import { hsbToCss, inkFor } from '../lib/color'
 
@@ -9,7 +10,7 @@ export default function ColorGame({ room, me, send, colorOf }) {
 
   if (game.phase === 'memorize') return <Memorize game={game} left={left} />
   if (game.phase === 'guess') {
-    return <Guess key={game.round} game={game} me={me} send={send} left={left} colorOf={colorOf} />
+    return <Guess key={game.round} game={game} me={me} send={send} left={left} msLeft={room.phaseEndsInMs} colorOf={colorOf} />
   }
   return <Reveal game={game} send={send} colorOf={colorOf} />
 }
@@ -36,7 +37,7 @@ function Memorize({ game, left }) {
   )
 }
 
-function Guess({ game, me, send, left, colorOf }) {
+function Guess({ game, me, send, left, msLeft, colorOf }) {
   // Punto de partida al azar para no favorecer ningún color
   const [color, setColor] = useState(() => ({
     h: Math.floor(Math.random() * 360),
@@ -52,7 +53,7 @@ function Guess({ game, me, send, left, colorOf }) {
         <RoundLabel game={game} />
         <span className="tabular-nums">{left ?? game.guessSeconds} s</span>
       </div>
-      <TimerBar seconds={game.guessSeconds} round={game.round} />
+      <TimerBar seconds={game.guessSeconds} resetKey={game.round} msLeft={msLeft} />
 
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_1.1fr] md:items-start">
         <div
@@ -86,18 +87,6 @@ function Guess({ game, me, send, left, colorOf }) {
           </ul>
         </div>
       </div>
-    </div>
-  )
-}
-
-function TimerBar({ seconds, round }) {
-  return (
-    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-line" aria-hidden="true">
-      <div
-        key={round}
-        className="timer-bar h-full origin-left bg-ink"
-        style={{ animation: `drain ${seconds}s linear forwards` }}
-      />
     </div>
   )
 }

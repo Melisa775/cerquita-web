@@ -2,9 +2,13 @@ import { useState } from 'react'
 import { useRoom } from '../hooks/useRoom'
 import { Logo } from './Home'
 import ColorGame from '../games/ColorGame'
+import StopGame from '../games/StopGame'
+import TooLateGame from '../games/TooLateGame'
+import StopCard from '../components/StopCard'
 import { PLAYER_COLORS } from '../lib/color'
 
-const UPCOMING = ['Stop', 'Ahorcado', 'Wordle a dúo', 'Sopa de letras']
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame }
+const UPCOMING = ['Ahorcado', 'Wordle a dúo', 'Sopa de letras']
 
 export default function Room({ code, name, onExit }) {
   const { room, status, error, fatal, send } = useRoom(code, name)
@@ -27,6 +31,7 @@ export default function Room({ code, name, onExit }) {
 
   const players = room.players
   const colorOf = (player) => PLAYER_COLORS[Math.max(0, players.findIndex((p) => p.name === player))]
+  const GameView = room.game ? GAME_VIEWS[room.game.name] : null
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -52,8 +57,18 @@ export default function Room({ code, name, onExit }) {
       )}
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-12">
-        {room.game ? (
-          <ColorGame room={room} me={name} send={send} colorOf={colorOf} />
+        {GameView ? (
+          <>
+            <GameView room={room} me={name} send={send} colorOf={colorOf} />
+            {room.game.phase !== 'finished' && (
+              <button
+                onClick={() => send({ type: 'back_to_lobby' })}
+                className="mt-10 text-sm font-semibold text-muted underline underline-offset-2 hover:text-ink"
+              >
+                Salir de este juego
+              </button>
+            )}
+          </>
         ) : (
           <Lobby room={room} send={send} />
         )}
@@ -64,7 +79,6 @@ export default function Room({ code, name, onExit }) {
 }
 
 function Lobby({ room, send }) {
-  const [rounds, setRounds] = useState(5)
   const [copied, setCopied] = useState(false)
   const alone = room.players.length < 2
   const link = `${window.location.origin}${window.location.pathname}?sala=${room.code}`
@@ -102,47 +116,52 @@ function Lobby({ room, send }) {
       </section>
 
       <h2 className="mt-10 text-2xl font-bold">Juegos</h2>
-      <div className="mt-4 grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-        <article className="overflow-hidden rounded-3xl bg-paper">
-          <div className="grid h-28 grid-cols-3" aria-hidden="true">
-            <div style={{ background: 'hsl(14 78% 58%)' }} />
-            <div style={{ background: 'hsl(46 85% 62%)' }} />
-            <div style={{ background: 'hsl(190 60% 45%)' }} />
-          </div>
-          <div className="p-6">
-            <h3 className="text-2xl font-bold">Color de memoria</h3>
-            <p className="mt-1 text-muted">
-              Verán un color por 5 segundos. Después, cada uno lo recrea de memoria. Gana quien quede más cerca.
-            </p>
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-2 text-sm font-semibold">
-                Rondas
-                <select
-                  value={rounds}
-                  onChange={(e) => setRounds(Number(e.target.value))}
-                  className="rounded-xl border border-line bg-stone px-3 py-2"
-                >
-                  {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </label>
-              <button
-                onClick={() => send({ type: 'start_game', game: 'color', rounds })}
-                className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white"
-              >
-                {alone ? 'Practicar mientras llega' : 'Jugar'}
-              </button>
-            </div>
-          </div>
-        </article>
-
-        <aside className="rounded-3xl border border-dashed border-line p-6">
-          <h3 className="text-lg font-bold">En camino</h3>
-          <ul className="mt-3 space-y-2 text-muted">
-            {UPCOMING.map((g) => <li key={g}>{g}</li>)}
-          </ul>
-        </aside>
+      <div className="mt-4 grid items-start gap-4 md:grid-cols-2">
+        <ColorCard send={send} alone={alone} />
+        <StopCard send={send} alone={alone} />
       </div>
+
+      <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">
+        <span className="font-semibold text-ink">En camino:</span> {UPCOMING.join(' · ')}
+      </p>
     </div>
+  )
+}
+
+function ColorCard({ send, alone }) {
+  const [rounds, setRounds] = useState(5)
+  return (
+    <article className="overflow-hidden rounded-3xl bg-paper">
+      <div className="grid h-28 grid-cols-3" aria-hidden="true">
+        <div style={{ background: 'hsl(14 78% 58%)' }} />
+        <div style={{ background: 'hsl(46 85% 62%)' }} />
+        <div style={{ background: 'hsl(190 60% 45%)' }} />
+      </div>
+      <div className="p-6">
+        <h3 className="text-2xl font-bold">Color de memoria</h3>
+        <p className="mt-1 text-muted">
+          Verán un color por 5 segundos. Después, cada uno lo recrea de memoria. Gana quien quede más cerca.
+        </p>
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 text-sm font-semibold">
+            Rondas
+            <select
+              value={rounds}
+              onChange={(e) => setRounds(Number(e.target.value))}
+              className="rounded-xl border border-line bg-stone px-3 py-2"
+            >
+              {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </label>
+          <button
+            onClick={() => send({ type: 'start_game', game: 'color', rounds })}
+            className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white"
+          >
+            {alone ? 'Practicar mientras llega' : 'Jugar'}
+          </button>
+        </div>
+      </div>
+    </article>
   )
 }
 
