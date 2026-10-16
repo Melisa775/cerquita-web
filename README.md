@@ -17,6 +17,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Color de memoria: ven un color 5 segundos y cada uno lo recrea de memoria | Disponible |
 | Stop clásico: sale una letra y llenan nombre, apellido, ciudad, fruta, color, animal y cosa; el primero que termina canta ¡Stop! | Disponible |
 | Stop contrarreloj (estilo Too Late): por turnos dicen una palabra de la categoría y tocan su letra antes de que se acabe el tiempo | Disponible |
+| Enredo de letras (estilo Boggle): unen letras vecinas en un tablero de dados para armar palabras contra el reloj | Disponible |
 | Ahorcado | Próximamente |
 | Wordle a dúo | Próximamente |
 | Sopa de letras | Próximamente |
@@ -29,6 +30,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 - **Selector de color propio.** Tres deslizadores (tono, saturación, brillo) cuya pista muestra el gradiente real del canal según los otros dos valores.
 - **Diseño con identidad por jugador.** Cada persona tiene su color en toda la interfaz; el fondo es un gris neutro para no alterar la percepción del color en el juego.
 - **Stop sin trampas ni pérdidas.** Mientras escriben, el servidor solo cuenta cuántas casillas lleva cada uno; las respuestas se ven al cerrar la ronda. Cuando alguien canta ¡Stop!, los clientes bloquean sus casillas y mandan lo último que escribieron, y el borrador se guarda en el navegador por si se recarga la página.
+- **Tablero táctil.** En Enredo de letras se arrastra el dedo por las letras o se tocan una por una; la zona sensible de cada dado es un círculo interior para que los movimientos en diagonal no marquen vecinos sin querer. En computador también se puede escribir la palabra y el tablero resalta el camino.
 - **La sala vive en la URL** (`?sala=ABCDE`), así el enlace se puede compartir y funciona en cualquier hosting estático sin reglas de reescritura.
 
 ## Stack
@@ -63,8 +65,8 @@ src/
   pages/        inicio y sala
   games/        un componente por juego
   hooks/        conexión en tiempo real y cuenta regresiva
-  components/   selector de color, tarjeta de Stop, barra de tiempo
-  lib/          API, colores, letras, almacenamiento local
+  components/   selector de color, tarjetas del lobby, barra de tiempo
+  lib/          API, colores, letras, caminos del tablero, almacenamiento local
 ```
 
 ## Hoja de ruta
@@ -72,6 +74,7 @@ src/
 - [x] Salas con código y enlace para compartir
 - [x] Color de memoria
 - [x] Stop clásico y Stop contrarreloj
+- [x] Enredo de letras
 - [ ] Ahorcado y Wordle a dúo
 - [ ] Sopa de letras compartida
 - [ ] Control compartido para ver películas al mismo tiempo

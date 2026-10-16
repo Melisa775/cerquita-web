@@ -4,10 +4,12 @@ import { Logo } from './Home'
 import ColorGame from '../games/ColorGame'
 import StopGame from '../games/StopGame'
 import TooLateGame from '../games/TooLateGame'
+import BoggleGame from '../games/BoggleGame'
 import StopCard from '../components/StopCard'
+import BoggleCard from '../components/BoggleCard'
 import { PLAYER_COLORS } from '../lib/color'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame }
 const UPCOMING = ['Ahorcado', 'Wordle a dúo', 'Sopa de letras']
 
 export default function Room({ code, name, onExit }) {
@@ -119,6 +121,7 @@ function Lobby({ room, send }) {
       <div className="mt-4 grid items-start gap-4 md:grid-cols-2">
         <ColorCard send={send} alone={alone} />
         <StopCard send={send} alone={alone} />
+        <BoggleCard send={send} alone={alone} />
       </div>
 
       <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">
