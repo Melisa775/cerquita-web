@@ -9,6 +9,7 @@ export default function ColorGame({ room, me, send, colorOf }) {
   const left = useCountdown(room)
 
   if (game.phase === 'memorize') return <Memorize game={game} left={left} />
+  if (game.phase === 'distract') return <Distract game={game} />
   if (game.phase === 'guess') {
     return <Guess key={game.round} game={game} me={me} send={send} left={left} msLeft={room.phaseEndsInMs} colorOf={colorOf} />
   }
@@ -16,7 +17,27 @@ export default function ColorGame({ room, me, send, colorOf }) {
 }
 
 function RoundLabel({ game }) {
-  return <span>Ronda {game.round} de {game.totalRounds}</span>
+  return (
+    <span>
+      Ronda {game.round} de {game.totalRounds}
+      {game.level !== 'normal' && <> · Nivel {game.levelLabel}</>}
+    </span>
+  )
+}
+
+// Experto: otro color tapa el recuerdo del primero
+function Distract({ game }) {
+  return (
+    <div
+      className="flood fixed inset-0 z-20 flex flex-col items-center justify-center gap-3 p-6 text-center"
+      style={{ background: hsbToCss(game.distractor), color: inkFor(game.distractor) }}
+      role="status"
+      aria-live="polite"
+    >
+      <h1 className="text-4xl font-extrabold sm:text-6xl">Este no es</h1>
+      <p className="text-lg font-semibold">No dejes que te confunda</p>
+    </div>
+  )
 }
 
 function Memorize({ game, left }) {
@@ -68,7 +89,7 @@ function Guess({ game, me, send, left, msLeft, colorOf }) {
             {sent ? 'Ya no puedes cambiarlo.' : 'Muévete por los tres deslizadores hasta que se parezca.'}
           </p>
           <div className="mt-6">
-            <ColorSliders value={color} onChange={setColor} disabled={sent} />
+            <ColorSliders value={color} onChange={setColor} disabled={sent} hints={game.hints} />
           </div>
           <button
             onClick={() => send({ type: 'color_guess', color })}
@@ -140,7 +161,7 @@ function Reveal({ game, send, colorOf }) {
           <History game={game} players={players} />
           <div className="mt-6 flex flex-wrap gap-3">
             <button
-              onClick={() => send({ type: 'start_game', game: 'color', rounds: game.totalRounds })}
+              onClick={() => send({ type: 'start_game', game: 'color', ...game.options })}
               className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white"
             >
               Jugar otra vez

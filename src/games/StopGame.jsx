@@ -197,6 +197,7 @@ function Review({ game, send, colorOf }) {
           <p className="text-muted">
             Toquen una respuesta para anularla o darla por buena. {game.points.unique} si es única,{' '}
             {game.points.shared} si repiten, 0 si está vacía o no vale.
+            {game.spellChecked.length > 0 && ' Se revisó la ortografía de todo menos nombre y apellido.'}
           </p>
         </div>
       </div>
@@ -216,6 +217,8 @@ function Review({ game, send, colorOf }) {
               <AnswerCell
                 key={p}
                 cell={game.results[p][c.key]}
+                letter={game.letter}
+                isCity={c.key === 'ciudad'}
                 color={colorOf(p)}
                 onToggle={() => send({ type: 'stop_toggle', player: p, category: c.key })}
               />
@@ -252,28 +255,42 @@ function Row({ label, children }) {
   )
 }
 
-function AnswerCell({ cell, color, onToggle }) {
+function issueNote(cell, letter, isCity) {
+  if (cell.valid) return cell.overridden ? 'aceptada por ustedes' : null
+  if (cell.overridden) return 'anulada por ustedes'
+  if (cell.issue === 'letter') return `no empieza por ${letter}`
+  if (cell.issue === 'spelling') {
+    if (cell.suggestion) return `¿Quisiste decir «${cell.suggestion}»?`
+    return isCity ? 'no encontramos esa ciudad' : 'no está en el diccionario'
+  }
+  return null
+}
+
+function AnswerCell({ cell, letter, isCity, color, onToggle }) {
   if (!cell.answer) {
     return <span className="flex items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-sm text-muted">Vacía</span>
   }
+  const note = issueNote(cell, letter, isCity)
   return (
     <button
       onClick={onToggle}
       aria-pressed={!cell.valid}
-      aria-label={`${cell.answer}: ${cell.valid ? 'vale' : 'no vale'}. Tocar para cambiar`}
+      aria-label={`${cell.answer}: ${cell.valid ? 'vale' : 'no vale'}${note ? `, ${note}` : ''}. Tocar para cambiar`}
       className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 rounded-xl border px-3 py-2.5 text-left"
       style={{ borderColor: cell.valid ? color : 'var(--color-line)' }}
     >
       <span className={`break-words ${cell.valid ? '' : 'text-muted line-through'}`}>{cell.answer}</span>
-      <span className="ml-auto flex items-center gap-1.5">
-        {cell.overridden && <span className="text-xs text-muted">corregida</span>}
-        <span
-          className="rounded-lg px-2 py-0.5 text-sm font-bold tabular-nums"
-          style={cell.points ? { background: color, color: 'white' } : { color: 'var(--color-muted)' }}
-        >
-          {cell.points}
-        </span>
+      <span
+        className="ml-auto rounded-lg px-2 py-0.5 text-sm font-bold tabular-nums"
+        style={cell.points ? { background: color, color: 'white' } : { color: 'var(--color-muted)' }}
+      >
+        {cell.points}
       </span>
+      {note && (
+        <span className={`basis-full text-xs ${cell.issue === 'spelling' && !cell.valid ? 'font-medium text-danger' : 'text-muted'}`}>
+          {note}
+        </span>
+      )}
     </button>
   )
 }

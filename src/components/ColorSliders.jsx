@@ -1,7 +1,12 @@
 import { hsbToCss } from '../lib/color'
 
-/** Tres deslizadores (tono, saturación, brillo) cuya pista muestra el color real. */
-export default function ColorSliders({ value, onChange, disabled = false }) {
+/**
+ * Tres deslizadores (tono, saturación, brillo) cuya pista muestra el color real.
+ * Sin pistas (nivel Experto) las barras son grises y hay que guiarse solo por el resultado.
+ */
+const PLAIN = 'linear-gradient(to right, #C9CBD1, #C9CBD1)'
+
+export default function ColorSliders({ value, onChange, disabled = false, hints = true }) {
   const { h, s, b } = value
   const hues = [0, 60, 120, 180, 240, 300, 360].map((x) => hsbToCss({ h: x, s, b })).join(', ')
 
@@ -25,7 +30,7 @@ export default function ColorSliders({ value, onChange, disabled = false }) {
             disabled={disabled}
             onChange={(e) => onChange({ ...value, [c.key]: Number(e.target.value) })}
             className="hsb-range mt-2 disabled:cursor-not-allowed disabled:opacity-60"
-            style={{ '--track': c.track, '--thumb': hsbToCss(value) }}
+            style={{ '--track': hints ? c.track : PLAIN, '--thumb': hints ? hsbToCss(value) : '#6B6F7B' }}
           />
         </label>
       ))}

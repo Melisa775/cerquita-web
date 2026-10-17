@@ -14,8 +14,8 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 
 | Juego | Estado |
 | --- | --- |
-| Color de memoria: ven un color 5 segundos y cada uno lo recrea de memoria | Disponible |
-| Stop clásico: sale una letra y llenan nombre, apellido, ciudad, fruta, color, animal y cosa; el primero que termina canta ¡Stop! | Disponible |
+| Color de memoria: ven un color unos segundos y cada uno lo recrea de memoria; niveles Normal, Difícil y Experto | Disponible |
+| Stop clásico: sale una letra y llenan nombre, apellido, ciudad, fruta, color, animal y cosa; el primero que termina canta ¡Stop! Revisa la ortografía y sugiere correcciones | Disponible |
 | Stop contrarreloj (estilo Too Late): por turnos dicen una palabra de la categoría y tocan su letra antes de que se acabe el tiempo | Disponible |
 | Enredo de letras (estilo Boggle): unen letras vecinas en un tablero de dados para armar palabras contra el reloj | Disponible |
 | Ahorcado | Próximamente |

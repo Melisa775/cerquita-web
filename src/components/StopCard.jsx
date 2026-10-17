@@ -4,6 +4,7 @@ import { ALPHABET, DEFAULT_LETTERS, MIN_LETTERS, TURN_CHOICES } from '../lib/let
 
 const LETTERS_KEY = 'cerquita:toolate:letters'
 const MODE_KEY = 'cerquita:stop:mode'
+const SPELLING_KEY = 'cerquita:stop:spelling'
 
 function loadLetters() {
   try {
@@ -19,6 +20,7 @@ function loadLetters() {
 export default function StopCard({ send, alone }) {
   const [mode, setMode] = useState(() => (storage.get(MODE_KEY) === 'toolate' ? 'toolate' : 'classic'))
   const [rounds, setRounds] = useState(5)
+  const [spelling, setSpelling] = useState(() => storage.get(SPELLING_KEY) !== 'off')
   const [turnSeconds, setTurnSeconds] = useState(10)
   const [letters, setLetters] = useState(loadLetters)
 
@@ -41,7 +43,7 @@ export default function StopCard({ send, alone }) {
   }
 
   function start() {
-    if (mode === 'classic') send({ type: 'start_game', game: 'stop', rounds })
+    if (mode === 'classic') send({ type: 'start_game', game: 'stop', rounds, spelling })
     else send({ type: 'start_game', game: 'toolate', rounds, turnSeconds, letters })
   }
 
@@ -63,7 +65,10 @@ export default function StopCard({ send, alone }) {
         <h3 className="text-2xl font-bold">Stop</h3>
 
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Modo de juego">
-          {[['classic', 'Clásico'], ['toolate', 'Contrarreloj']].map(([key, label]) => (
+          {[
+            ['classic', 'Clásico'],
+            ['toolate', 'Contrarreloj'],
+          ].map(([key, label]) => (
             <button
               key={key}
               onClick={() => chooseMode(key)}
@@ -76,10 +81,29 @@ export default function StopCard({ send, alone }) {
         </div>
 
         {mode === 'classic' ? (
-          <p className="mt-4 text-muted">
-            Sale una letra y cada uno llena nombre, apellido, ciudad, fruta, color, animal y cosa. El primero que
-            termine canta <strong className="text-ink">¡Stop!</strong> 100 puntos por respuesta única, 50 si repiten.
-          </p>
+          <>
+            <p className="mt-4 text-muted">
+              Sale una letra y cada uno llena nombre, apellido, ciudad, fruta, color, animal y cosa. El primero que
+              termine canta <strong className="text-ink">¡Stop!</strong> 100 puntos por respuesta única, 50 si repiten.
+            </p>
+            <label className="mt-4 flex items-start gap-3 rounded-2xl bg-stone px-4 py-3">
+              <input
+                type="checkbox"
+                checked={spelling}
+                onChange={(e) => {
+                  setSpelling(e.target.checked)
+                  storage.set(SPELLING_KEY, e.target.checked ? 'on' : 'off')
+                }}
+                className="mt-1 h-4 w-4 accent-[var(--color-ink)]"
+              />
+              <span>
+                <span className="font-semibold">Revisar ortografía</span>
+                <span className="block text-sm text-muted">
+                  Ciudad, fruta, color, animal y cosa deben estar bien escritas. Nombre y apellido no se revisan.
+                </span>
+              </span>
+            </label>
+          </>
         ) : (
           <>
             <p className="mt-4 text-muted">
@@ -88,7 +112,8 @@ export default function StopCard({ send, alone }) {
             </p>
             <fieldset className="mt-4">
               <legend className="text-sm font-semibold">
-                Letras del tablero <span className="font-normal text-muted">· {letters.length} activas, toca para quitar</span>
+                Letras del tablero{' '}
+                <span className="font-normal text-muted">· {letters.length} activas, toca para quitar</span>
               </legend>
               <div className="mt-2 grid grid-cols-7 gap-1.5 sm:grid-cols-9">
                 {ALPHABET.map((l) => {
@@ -109,7 +134,10 @@ export default function StopCard({ send, alone }) {
                 })}
               </div>
               <div className="mt-2 flex gap-3 text-sm">
-                <button onClick={() => saveLetters(DEFAULT_LETTERS)} className="font-semibold underline underline-offset-2">
+                <button
+                  onClick={() => saveLetters(DEFAULT_LETTERS)}
+                  className="font-semibold underline underline-offset-2"
+                >
                   Recomendadas
                 </button>
                 <button onClick={() => saveLetters(ALPHABET)} className="font-semibold underline underline-offset-2">
@@ -128,7 +156,11 @@ export default function StopCard({ send, alone }) {
               onChange={(e) => setRounds(Number(e.target.value))}
               className="rounded-xl border border-line bg-stone px-3 py-2"
             >
-              {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+              {[3, 5, 7, 10].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
             </select>
           </label>
           {mode === 'toolate' && (
@@ -139,7 +171,11 @@ export default function StopCard({ send, alone }) {
                 onChange={(e) => setTurnSeconds(Number(e.target.value))}
                 className="rounded-xl border border-line bg-stone px-3 py-2"
               >
-                {TURN_CHOICES.map((n) => <option key={n} value={n}>{n}</option>)}
+                {TURN_CHOICES.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </label>
           )}

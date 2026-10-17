@@ -8,6 +8,7 @@ import BoggleGame from '../games/BoggleGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import { PLAYER_COLORS } from '../lib/color'
+import { storage } from '../lib/api'
 
 const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame }
 const UPCOMING = ['Ahorcado', 'Wordle a dúo', 'Sopa de letras']
@@ -131,8 +132,22 @@ function Lobby({ room, send }) {
   )
 }
 
+const COLOR_LEVELS = [
+  ['normal', 'Normal', '5 s para mirar y 30 s para responder.'],
+  ['dificil', 'Difícil', '3 s para mirar, 20 s para responder, colores más apagados y puntaje más exigente.'],
+  ['experto', 'Experto', '2 s para mirar, 15 s para responder, un color que te confunde y barras sin pistas.'],
+]
+
 function ColorCard({ send, alone }) {
   const [rounds, setRounds] = useState(5)
+  const [level, setLevel] = useState(() => storage.get('cerquita:color:level') || 'normal')
+  const current = COLOR_LEVELS.find(([key]) => key === level) ?? COLOR_LEVELS[0]
+
+  function chooseLevel(key) {
+    setLevel(key)
+    storage.set('cerquita:color:level', key)
+  }
+
   return (
     <article className="overflow-hidden rounded-3xl bg-paper">
       <div className="grid h-28 grid-cols-3" aria-hidden="true">
@@ -143,8 +158,21 @@ function ColorCard({ send, alone }) {
       <div className="p-6">
         <h3 className="text-2xl font-bold">Color de memoria</h3>
         <p className="mt-1 text-muted">
-          Verán un color por 5 segundos. Después, cada uno lo recrea de memoria. Gana quien quede más cerca.
+          Verán un color unos segundos. Después, cada uno lo recrea de memoria. Gana quien quede más cerca.
         </p>
+        <div className="mt-4 grid grid-cols-3 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Nivel">
+          {COLOR_LEVELS.map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => chooseLevel(key)}
+              aria-pressed={level === key}
+              className={`rounded-xl px-2 py-2 font-semibold ${level === key ? 'bg-paper shadow-sm' : 'text-muted'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="mt-2 text-sm text-muted">{current[2]}</p>
         <div className="mt-5 flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm font-semibold">
             Rondas
@@ -157,7 +185,7 @@ function ColorCard({ send, alone }) {
             </select>
           </label>
           <button
-            onClick={() => send({ type: 'start_game', game: 'color', rounds })}
+            onClick={() => send({ type: 'start_game', game: 'color', rounds, level: current[0] })}
             className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white"
           >
             {alone ? 'Practicar mientras llega' : 'Jugar'}
