@@ -121,7 +121,7 @@ function Lobby({ room, send }) {
       </section>
 
       <h2 className="mt-10 text-2xl font-bold">Juegos</h2>
-      <div className="mt-4 grid items-start gap-4 md:grid-cols-2">
+      <div className="mt-4 grid gap-4 md:grid-cols-2">
         <ColorCard send={send} alone={alone} />
         <StopCard send={send} alone={alone} />
         <BoggleCard send={send} alone={alone} />
@@ -152,18 +152,15 @@ function ColorCard({ send, alone }) {
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl bg-paper">
+    <article className="flex flex-col overflow-hidden rounded-3xl bg-paper">
       <div className="grid h-28 grid-cols-3" aria-hidden="true">
         <div style={{ background: 'hsl(14 78% 58%)' }} />
         <div style={{ background: 'hsl(46 85% 62%)' }} />
         <div style={{ background: 'hsl(190 60% 45%)' }} />
       </div>
-      <div className="p-6">
+      <div className="flex flex-1 flex-col p-6">
         <h3 className="text-2xl font-bold">Color de memoria</h3>
-        <p className="mt-1 text-muted">
-          Verán un color unos segundos. Después, cada uno lo recrea de memoria. Gana quien quede más cerca.
-        </p>
-        <div className="mt-4 grid grid-cols-3 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Nivel">
+        <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Nivel">
           {COLOR_LEVELS.map(([key, label]) => (
             <button
               key={key}
@@ -175,24 +172,31 @@ function ColorCard({ send, alone }) {
             </button>
           ))}
         </div>
-        <p className="mt-2 text-sm text-muted">{current[2]}</p>
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm font-semibold">
-            Rondas
-            <select
-              value={rounds}
-              onChange={(e) => setRounds(Number(e.target.value))}
-              className="rounded-xl border border-line bg-stone px-3 py-2"
+        <p className="mt-4 text-muted">
+          Verán un color unos segundos. Después, cada uno lo recrea de memoria. Gana quien quede más cerca.
+        </p>
+        <p className="mt-2 text-sm text-muted">
+          <span className="font-semibold text-ink">{current[1]}:</span> {current[2]}
+        </p>
+        <div className="mt-auto pt-6">
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
+            <label className="flex items-center gap-2 text-sm font-semibold">
+              Rondas
+              <select
+                value={rounds}
+                onChange={(e) => setRounds(Number(e.target.value))}
+                className="rounded-xl border border-line bg-stone px-3 py-2"
+              >
+                {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select>
+            </label>
+            <button
+              onClick={() => send({ type: 'start_game', game: 'color', rounds, level: current[0] })}
+              className="w-full rounded-2xl bg-ink px-5 py-3 font-semibold text-white"
             >
-              {[3, 5, 7, 10].map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
-          </label>
-          <button
-            onClick={() => send({ type: 'start_game', game: 'color', rounds, level: current[0] })}
-            className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white"
-          >
-            {alone ? 'Practicar mientras llega' : 'Jugar'}
-          </button>
+              {alone ? 'Practicar mientras llega' : 'Jugar'}
+            </button>
+          </div>
         </div>
       </div>
     </article>

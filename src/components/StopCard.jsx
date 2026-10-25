@@ -48,7 +48,7 @@ export default function StopCard({ send, alone }) {
   }
 
   return (
-    <article className="overflow-hidden rounded-3xl bg-paper">
+    <article className="flex flex-col overflow-hidden rounded-3xl bg-paper">
       <div className="grid h-28 grid-cols-4" aria-hidden="true">
         {['S', 'T', 'O', 'P'].map((l, i) => (
           <div
@@ -61,7 +61,7 @@ export default function StopCard({ send, alone }) {
         ))}
       </div>
 
-      <div className="p-6">
+      <div className="flex flex-1 flex-col p-6">
         <h3 className="text-2xl font-bold">Stop</h3>
 
         <div className="mt-3 grid grid-cols-2 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Modo de juego">
@@ -148,40 +148,42 @@ export default function StopCard({ send, alone }) {
           </>
         )}
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
-          <label className="flex items-center gap-2 text-sm font-semibold">
-            Rondas
-            <select
-              value={rounds}
-              onChange={(e) => setRounds(Number(e.target.value))}
-              className="rounded-xl border border-line bg-stone px-3 py-2"
-            >
-              {[3, 5, 7, 10].map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          </label>
-          {mode === 'toolate' && (
+        <div className="mt-auto pt-6">
+          <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
             <label className="flex items-center gap-2 text-sm font-semibold">
-              Segundos por turno
+              Rondas
               <select
-                value={turnSeconds}
-                onChange={(e) => setTurnSeconds(Number(e.target.value))}
+                value={rounds}
+                onChange={(e) => setRounds(Number(e.target.value))}
                 className="rounded-xl border border-line bg-stone px-3 py-2"
               >
-                {TURN_CHOICES.map((n) => (
+                {[3, 5, 7, 10].map((n) => (
                   <option key={n} value={n}>
                     {n}
                   </option>
                 ))}
               </select>
             </label>
-          )}
-          <button onClick={start} className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white">
-            {alone ? 'Practicar mientras llega' : 'Jugar'}
-          </button>
+            {mode === 'toolate' && (
+              <label className="flex items-center gap-2 text-sm font-semibold">
+                Segundos por turno
+                <select
+                  value={turnSeconds}
+                  onChange={(e) => setTurnSeconds(Number(e.target.value))}
+                  className="rounded-xl border border-line bg-stone px-3 py-2"
+                >
+                  {TURN_CHOICES.map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <button onClick={start} className="w-full rounded-2xl bg-ink px-5 py-3 font-semibold text-white">
+              {alone ? 'Practicar mientras llega' : 'Jugar'}
+            </button>
+          </div>
         </div>
       </div>
     </article>
