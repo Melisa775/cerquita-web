@@ -23,6 +23,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Sopa de letras: la misma sopa para los dos, en carrera o juntos contra el reloj, con tres niveles | Disponible |
 | Adivina quién: 24 personajes propios; las preguntas de la lista las responde la app y las escritas las responde la pareja | Disponible |
 | Pinturillo: uno dibuja y el otro adivina; el dibujo se ve en vivo y al final quedan todos los dibujos | Disponible |
+| Caras y gestos: uno actúa frente a la cámara y el otro adivina en voz alta, contra el reloj | Disponible |
 
 ## Decisiones técnicas
 
@@ -87,5 +88,6 @@ src/
 - [x] Sopa de letras compartida
 - [x] Adivina quién
 - [x] Pinturillo
+- [x] Caras y gestos
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
