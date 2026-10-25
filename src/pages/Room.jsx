@@ -6,17 +6,19 @@ import StopGame from '../games/StopGame'
 import TooLateGame from '../games/TooLateGame'
 import BoggleGame from '../games/BoggleGame'
 import HangmanGame from '../games/HangmanGame'
+import WordleGame from '../games/WordleGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
+import WordleCard from '../components/WordleCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame }
-const UPCOMING = ['Wordle a dúo', 'Sopa de letras']
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame }
+const UPCOMING = ['Sopa de letras']
 
 export default function Room({ code, name, onExit }) {
-  const { room, status, error, fatal, send } = useRoom(code, name)
+  const { room, status, error, errorId, fatal, send } = useRoom(code, name)
 
   if (fatal) {
     return (
@@ -64,7 +66,7 @@ export default function Room({ code, name, onExit }) {
       <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-12">
         {GameView ? (
           <>
-            <GameView room={room} me={name} send={send} colorOf={colorOf} />
+            <GameView room={room} me={name} send={send} colorOf={colorOf} error={error} errorId={errorId} />
             {room.game.phase !== 'finished' && (
               <button
                 onClick={() => send({ type: 'back_to_lobby' })}
@@ -77,7 +79,9 @@ export default function Room({ code, name, onExit }) {
         ) : (
           <Lobby room={room} send={send} />
         )}
-        {error && <p role="alert" className="mt-4 text-center font-medium text-danger">{error}</p>}
+        {error && !GameView?.showsErrors && (
+          <p role="alert" className="mt-4 text-center font-medium text-danger">{error}</p>
+        )}
       </main>
     </div>
   )
@@ -126,6 +130,7 @@ function Lobby({ room, send }) {
         <StopCard send={send} alone={alone} />
         <BoggleCard send={send} alone={alone} />
         <HangmanCard send={send} alone={alone} />
+        <WordleCard send={send} alone={alone} />
       </div>
 
       <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">

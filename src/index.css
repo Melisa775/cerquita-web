@@ -67,7 +67,17 @@
 @keyframes shake { 0%, 100% { translate: 0; } 25% { translate: -6px; } 75% { translate: 6px; } }
 .shake { animation: shake 280ms ease-in-out; }
 
+/* Wordle: la ficha gira y cambia de color a mitad de giro */
+@keyframes flip {
+  0% { transform: rotateX(0); background: var(--from); color: var(--color-ink); border-color: var(--color-line); }
+  49% { background: var(--from); color: var(--color-ink); border-color: var(--color-line); }
+  50% { transform: rotateX(90deg); background: var(--to); color: white; border-color: var(--to); }
+  100% { transform: rotateX(0); background: var(--to); color: white; border-color: var(--to); }
+}
+.flip { animation: flip 520ms ease-in-out both; }
+
 @media (prefers-reduced-motion: reduce) {
+  .flip { animation: none; }
   .flood { animation: none; }
   .timer-bar { animation: none !important; }
   .hm-draw > * { animation: none; stroke-dashoffset: 0; }

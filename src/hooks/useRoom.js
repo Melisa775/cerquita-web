@@ -10,6 +10,7 @@ export function useRoom(code, name) {
   const [room, setRoom] = useState(null)
   const [status, setStatus] = useState('connecting') // connecting | open | reconnecting | closed
   const [error, setError] = useState(null)
+  const [errorId, setErrorId] = useState(0) // cambia con cada error, aunque el texto se repita
   const [fatal, setFatal] = useState(null)
   const wsRef = useRef(null)
 
@@ -37,6 +38,7 @@ export function useRoom(code, name) {
             setFatal(msg.message)
           } else {
             setError(msg.message)
+            setErrorId((n) => n + 1)
           }
         }
       }
@@ -64,5 +66,5 @@ export function useRoom(code, name) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
   }, [])
 
-  return { room, status, error, fatal, send }
+  return { room, status, error, errorId, fatal, send }
 }

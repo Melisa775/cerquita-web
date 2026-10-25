@@ -19,7 +19,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Stop contrarreloj (estilo Too Late): por turnos dicen una palabra de la categoría y tocan su letra antes de que se acabe el tiempo | Disponible |
 | Enredo de letras (estilo Boggle): unen letras vecinas en un tablero de dados para armar palabras contra el reloj | Disponible |
 | Ahorcado: se turnan para elegir una palabra con pista, o Cerquita elige una al azar y la adivinan juntos | Disponible |
-| Wordle a dúo | Próximamente |
+| Wordle a dúo: en duelo (la misma palabra, cada uno en su tablero) o juntos (un tablero, por turnos) | Disponible |
 | Sopa de letras | Próximamente |
 
 ## Decisiones técnicas
@@ -32,6 +32,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 - **Stop sin trampas ni pérdidas.** Mientras escriben, el servidor solo cuenta cuántas casillas lleva cada uno; las respuestas se ven al cerrar la ronda. Cuando alguien canta ¡Stop!, los clientes bloquean sus casillas y mandan lo último que escribieron, y el borrador se guarda en el navegador por si se recarga la página.
 - **Tablero táctil.** En Enredo de letras se arrastra el dedo por las letras o se tocan una por una; la zona sensible de cada dado es un círculo interior para que los movimientos en diagonal no marquen vecinos sin querer. En computador también se puede escribir la palabra y el tablero resalta el camino.
 - **Ahorcado dibujado a mano en SVG.** Cada error traza una parte del muñeco (se anima el trazo con `pathLength`), la cara cambia según las vidas que quedan y, si adivinan, el muñeco se baja de la horca y celebra. Quien eligió la palabra la ve completa, con las letras que faltan en tenue; quien adivina solo ve las que ya encontró.
+- **Wordle en tiempo real.** En duelo, cada uno ve los colores del tablero del otro mientras juega, pero no sus letras. Juntos, el que no tiene el turno ve en vivo lo que el otro va escribiendo. Las fichas giran al revelar los colores y la fila tiembla si la palabra no existe.
 - **La sala vive en la URL** (`?sala=ABCDE`), así el enlace se puede compartir y funciona en cualquier hosting estático sin reglas de reescritura.
 
 ## Stack
@@ -77,7 +78,7 @@ src/
 - [x] Stop clásico y Stop contrarreloj
 - [x] Enredo de letras
 - [x] Ahorcado
-- [ ] Wordle a dúo
+- [x] Wordle a dúo
 - [ ] Sopa de letras compartida
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
