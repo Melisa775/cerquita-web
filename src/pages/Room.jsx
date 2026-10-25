@@ -9,20 +9,22 @@ import HangmanGame from '../games/HangmanGame'
 import WordleGame from '../games/WordleGame'
 import WordSearchGame from '../games/WordSearchGame'
 import GuessWhoGame from '../games/GuessWhoGame'
+import PinturilloGame from '../games/PinturilloGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
 import WordleCard from '../components/WordleCard'
 import WordSearchCard from '../components/WordSearchCard'
 import GuessWhoCard from '../components/GuessWhoCard'
+import PinturilloCard from '../components/PinturilloCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame }
 const UPCOMING = []
 
 export default function Room({ code, name, onExit }) {
-  const { room, status, error, errorId, fatal, send } = useRoom(code, name)
+  const { room, status, error, errorId, fatal, send, subscribe } = useRoom(code, name)
 
   if (fatal) {
     return (
@@ -70,7 +72,15 @@ export default function Room({ code, name, onExit }) {
       <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-12">
         {GameView ? (
           <>
-            <GameView room={room} me={name} send={send} colorOf={colorOf} error={error} errorId={errorId} />
+            <GameView
+              room={room}
+              me={name}
+              send={send}
+              colorOf={colorOf}
+              error={error}
+              errorId={errorId}
+              subscribe={subscribe}
+            />
             {room.game.phase !== 'finished' && (
               <button
                 onClick={() => send({ type: 'back_to_lobby' })}
@@ -137,6 +147,7 @@ function Lobby({ room, send }) {
         <WordleCard send={send} alone={alone} />
         <WordSearchCard send={send} alone={alone} />
         <GuessWhoCard send={send} alone={alone} />
+        <PinturilloCard send={send} alone={alone} />
       </div>
 
       {UPCOMING.length > 0 && (

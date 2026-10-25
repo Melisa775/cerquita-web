@@ -13,6 +13,7 @@ export function useRoom(code, name) {
   const [errorId, setErrorId] = useState(0) // cambia con cada error, aunque el texto se repita
   const [fatal, setFatal] = useState(null)
   const wsRef = useRef(null)
+  const listeners = useRef(new Set()) // eventos pequeños de los juegos (p. ej. trazos)
 
   useEffect(() => {
     let stopped = false
@@ -32,6 +33,8 @@ export function useRoom(code, name) {
         if (msg.type === 'room_state') {
           setRoom(msg)
           setError(null)
+        } else if (msg.type === 'game_event') {
+          listeners.current.forEach((fn) => fn(msg.event))
         } else if (msg.type === 'error') {
           if (msg.fatal) {
             stopped = true
@@ -66,5 +69,10 @@ export function useRoom(code, name) {
     if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
   }, [])
 
-  return { room, status, error, errorId, fatal, send }
+  const subscribe = useCallback((fn) => {
+    listeners.current.add(fn)
+    return () => listeners.current.delete(fn)
+  }, [])
+
+  return { room, status, error, errorId, fatal, send, subscribe }
 }
