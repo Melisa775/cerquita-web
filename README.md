@@ -24,6 +24,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Adivina quién: 24 personajes propios; las preguntas de la lista las responde la app y las escritas las responde la pareja | Disponible |
 | Pinturillo: uno dibuja y el otro adivina; el dibujo se ve en vivo y al final quedan todos los dibujos | Disponible |
 | Caras y gestos: uno actúa frente a la cámara y el otro adivina en voz alta, contra el reloj | Disponible |
+| Murdoku: sudoku con asesinato; ubican a los sospechosos en el plano según las pistas para descubrir al asesino | Disponible |
 
 ## Decisiones técnicas
 
@@ -89,5 +90,6 @@ src/
 - [x] Adivina quién
 - [x] Pinturillo
 - [x] Caras y gestos
+- [x] Murdoku
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
