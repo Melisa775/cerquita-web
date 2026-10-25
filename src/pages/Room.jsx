@@ -7,15 +7,17 @@ import TooLateGame from '../games/TooLateGame'
 import BoggleGame from '../games/BoggleGame'
 import HangmanGame from '../games/HangmanGame'
 import WordleGame from '../games/WordleGame'
+import WordSearchGame from '../games/WordSearchGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
 import WordleCard from '../components/WordleCard'
+import WordSearchCard from '../components/WordSearchCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame }
-const UPCOMING = ['Sopa de letras']
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame }
+const UPCOMING = []
 
 export default function Room({ code, name, onExit }) {
   const { room, status, error, errorId, fatal, send } = useRoom(code, name)
@@ -131,11 +133,14 @@ function Lobby({ room, send }) {
         <BoggleCard send={send} alone={alone} />
         <HangmanCard send={send} alone={alone} />
         <WordleCard send={send} alone={alone} />
+        <WordSearchCard send={send} alone={alone} />
       </div>
 
-      <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">
-        <span className="font-semibold text-ink">En camino:</span> {UPCOMING.join(' · ')}
-      </p>
+      {UPCOMING.length > 0 && (
+        <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">
+          <span className="font-semibold text-ink">En camino:</span> {UPCOMING.join(' · ')}
+        </p>
+      )}
     </div>
   )
 }
