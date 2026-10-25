@@ -5,13 +5,15 @@ import ColorGame from '../games/ColorGame'
 import StopGame from '../games/StopGame'
 import TooLateGame from '../games/TooLateGame'
 import BoggleGame from '../games/BoggleGame'
+import HangmanGame from '../games/HangmanGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
+import HangmanCard from '../components/HangmanCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame }
-const UPCOMING = ['Ahorcado', 'Wordle a dúo', 'Sopa de letras']
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame }
+const UPCOMING = ['Wordle a dúo', 'Sopa de letras']
 
 export default function Room({ code, name, onExit }) {
   const { room, status, error, fatal, send } = useRoom(code, name)
@@ -123,6 +125,7 @@ function Lobby({ room, send }) {
         <ColorCard send={send} alone={alone} />
         <StopCard send={send} alone={alone} />
         <BoggleCard send={send} alone={alone} />
+        <HangmanCard send={send} alone={alone} />
       </div>
 
       <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">
