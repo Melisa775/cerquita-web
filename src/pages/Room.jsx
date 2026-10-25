@@ -8,15 +8,17 @@ import BoggleGame from '../games/BoggleGame'
 import HangmanGame from '../games/HangmanGame'
 import WordleGame from '../games/WordleGame'
 import WordSearchGame from '../games/WordSearchGame'
+import GuessWhoGame from '../games/GuessWhoGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
 import WordleCard from '../components/WordleCard'
 import WordSearchCard from '../components/WordSearchCard'
+import GuessWhoCard from '../components/GuessWhoCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame }
 const UPCOMING = []
 
 export default function Room({ code, name, onExit }) {
@@ -134,6 +136,7 @@ function Lobby({ room, send }) {
         <HangmanCard send={send} alone={alone} />
         <WordleCard send={send} alone={alone} />
         <WordSearchCard send={send} alone={alone} />
+        <GuessWhoCard send={send} alone={alone} />
       </div>
 
       {UPCOMING.length > 0 && (

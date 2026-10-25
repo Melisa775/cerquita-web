@@ -21,6 +21,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Ahorcado: se turnan para elegir una palabra con pista, o Cerquita elige una al azar y la adivinan juntos | Disponible |
 | Wordle a dúo: en duelo (la misma palabra, cada uno en su tablero) o juntos (un tablero, por turnos) | Disponible |
 | Sopa de letras: la misma sopa para los dos, en carrera o juntos contra el reloj, con tres niveles | Disponible |
+| Adivina quién: 24 personajes propios; las preguntas de la lista las responde la app y las escritas las responde la pareja | Disponible |
 
 ## Decisiones técnicas
 
@@ -34,6 +35,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 - **Ahorcado dibujado a mano en SVG.** Cada error traza una parte del muñeco (se anima el trazo con `pathLength`), la cara cambia según las vidas que quedan y, si adivinan, el muñeco se baja de la horca y celebra. Quien eligió la palabra la ve completa, con las letras que faltan en tenue; quien adivina solo ve las que ya encontró.
 - **Wordle en tiempo real.** En duelo, cada uno ve los colores del tablero del otro mientras juega, pero no sus letras. Juntos, el que no tiene el turno ve en vivo lo que el otro va escribiendo. Las fichas giran al revelar los colores y la fila tiembla si la palabra no existe.
 - **Sopa de letras compartida.** Se marca arrastrando de una punta a la otra (la línea se ajusta sola a horizontal, vertical o diagonal) o tocando las dos puntas. Mientras uno arrastra, el otro ve en vivo por dónde va. Las palabras encontradas quedan resaltadas con una cápsula en SVG del color de quien las encontró.
+- **Personajes dibujados con código.** Los 24 personajes de Adivina quién son originales: cada uno es un SVG que se arma a partir de sus rasgos (pelo, color de ojos, gafas, gorra o sombrero vueltiao, barba, aretes, pecas). Las cartas se voltean en 3D al bajarlas.
 - **La sala vive en la URL** (`?sala=ABCDE`), así el enlace se puede compartir y funciona en cualquier hosting estático sin reglas de reescritura.
 
 ## Stack
@@ -81,5 +83,6 @@ src/
 - [x] Ahorcado
 - [x] Wordle a dúo
 - [x] Sopa de letras compartida
+- [x] Adivina quién
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
