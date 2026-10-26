@@ -32,6 +32,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Parqués: a la colombiana, con dos dados, salida con pares, seguros, comer fichas y premio al tercer par | Disponible |
 | Palabras cruzadas (estilo Scrabble): siete letras cada uno, tablero con premios, comodines y revisión con diccionario | Disponible |
 | Una (estilo UNO): cartas propias, especiales, comodines, «¡Una!» con castigo si te pillan y opción de acumular | Disponible |
+| Mini golf (estilo Plato): se jala para tirar, nueve hoyos con bumpers, arena, agua, rampas y portal; la pareja ve el apuntado en vivo | Disponible |
 
 ## Decisiones técnicas
 
@@ -105,6 +106,7 @@ src/
 - [x] Parqués
 - [x] Palabras cruzadas
 - [x] Una
+- [x] Mini golf
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
 
