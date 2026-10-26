@@ -29,6 +29,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Ajedrez: partida completa con piezas propias, arrastrar o tocar, reloj opcional, tablas, deshacer y revancha | Disponible |
 | Batalla naval: cada uno ubica su flota en secreto y se turnan los disparos hasta hundir la del otro | Disponible |
 | Dominó: doble seis para dos, con o sin pozo, manos hasta llegar a la meta de puntos | Disponible |
+| Parqués: a la colombiana, con dos dados, salida con pares, seguros, comer fichas y premio al tercer par | Disponible |
 
 ## Decisiones técnicas
 
@@ -99,5 +100,6 @@ src/
 - [x] Ajedrez
 - [x] Batalla naval
 - [x] Dominó
+- [x] Parqués
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
