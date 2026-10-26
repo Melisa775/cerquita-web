@@ -64,6 +64,8 @@
 .pop { animation: pop 320ms cubic-bezier(.2,.8,.3,1.2) both; }
 @keyframes rise { 0% { opacity: 0; translate: 0 6px; } 30% { opacity: 1; } 100% { opacity: 0; translate: 0 -26px; } }
 .hm-heart { animation: rise 1800ms ease-out infinite; transform-box: fill-box; }
+@keyframes chess-slide { from { translate: var(--dx) var(--dy); } to { translate: 0 0; } }
+.chess-slide { animation: chess-slide 200ms ease-out; }
 @keyframes shake { 0%, 100% { translate: 0; } 25% { translate: -6px; } 75% { translate: 6px; } }
 .shake { animation: shake 280ms ease-in-out; }
 
@@ -81,5 +83,5 @@
   .flood { animation: none; }
   .timer-bar { animation: none !important; }
   .hm-draw > * { animation: none; stroke-dashoffset: 0; }
-  .pop, .hm-heart, .shake { animation: none; }
+  .pop, .hm-heart, .shake, .chess-slide { animation: none; }
 }

@@ -26,6 +26,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Caras y gestos: uno actúa frente a la cámara y el otro adivina en voz alta, contra el reloj | Disponible |
 | Murdoku: sudoku con asesinato; ubican a los sospechosos en el plano según las pistas para descubrir al asesino | Disponible |
 | Trivia (estilo Preguntados): ruleta de seis categorías y tres niveles; por turnos juntando coronas o en duelo de rapidez | Disponible |
+| Ajedrez: partida completa con piezas propias, arrastrar o tocar, reloj opcional, tablas, deshacer y revancha | Disponible |
 
 ## Decisiones técnicas
 
@@ -93,5 +94,6 @@ src/
 - [x] Caras y gestos
 - [x] Murdoku
 - [x] Trivia
+- [x] Ajedrez
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
