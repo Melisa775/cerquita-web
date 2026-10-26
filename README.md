@@ -31,6 +31,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Dominó: doble seis para dos, con o sin pozo, manos hasta llegar a la meta de puntos | Disponible |
 | Parqués: a la colombiana, con dos dados, salida con pares, seguros, comer fichas y premio al tercer par | Disponible |
 | Palabras cruzadas (estilo Scrabble): siete letras cada uno, tablero con premios, comodines y revisión con diccionario | Disponible |
+| Una (estilo UNO): cartas propias, especiales, comodines, «¡Una!» con castigo si te pillan y opción de acumular | Disponible |
 
 ## Decisiones técnicas
 
@@ -103,6 +104,7 @@ src/
 - [x] Dominó
 - [x] Parqués
 - [x] Palabras cruzadas
+- [x] Una
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
 

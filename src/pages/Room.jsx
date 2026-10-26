@@ -19,6 +19,7 @@ import BattleshipGame from '../games/BattleshipGame'
 import DominoGame from '../games/DominoGame'
 import ParquesGame from '../games/ParquesGame'
 import CrosswordsGame from '../games/CrosswordsGame'
+import UnaGame from '../games/UnaGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
@@ -34,10 +35,11 @@ import BattleshipCard from '../components/BattleshipCard'
 import DominoCard from '../components/DominoCard'
 import ParquesCard from '../components/ParquesCard'
 import CrosswordsCard from '../components/CrosswordsCard'
+import UnaLobbyCard from '../components/UnaLobbyCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame }
 const UPCOMING = []
 
 export default function Room({ code, name, onExit }) {
@@ -173,6 +175,7 @@ function Lobby({ room, send }) {
         <DominoCard send={send} alone={alone} />
         <ParquesCard send={send} alone={alone} />
         <CrosswordsCard send={send} alone={alone} />
+        <UnaLobbyCard send={send} alone={alone} />
       </div>
 
       <Credit className="mt-10 text-center" />
