@@ -28,6 +28,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Trivia (estilo Preguntados): ruleta de seis categorías y tres niveles; por turnos juntando coronas o en duelo de rapidez | Disponible |
 | Ajedrez: partida completa con piezas propias, arrastrar o tocar, reloj opcional, tablas, deshacer y revancha | Disponible |
 | Batalla naval: cada uno ubica su flota en secreto y se turnan los disparos hasta hundir la del otro | Disponible |
+| Dominó: doble seis para dos, con o sin pozo, manos hasta llegar a la meta de puntos | Disponible |
 
 ## Decisiones técnicas
 
@@ -97,5 +98,6 @@ src/
 - [x] Trivia
 - [x] Ajedrez
 - [x] Batalla naval
+- [x] Dominó
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
