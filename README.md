@@ -25,6 +25,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Pinturillo: uno dibuja y el otro adivina; el dibujo se ve en vivo y al final quedan todos los dibujos | Disponible |
 | Caras y gestos: uno actúa frente a la cámara y el otro adivina en voz alta, contra el reloj | Disponible |
 | Murdoku: sudoku con asesinato; ubican a los sospechosos en el plano según las pistas para descubrir al asesino | Disponible |
+| Trivia (estilo Preguntados): ruleta de seis categorías y tres niveles; por turnos juntando coronas o en duelo de rapidez | Disponible |
 
 ## Decisiones técnicas
 
@@ -91,5 +92,6 @@ src/
 - [x] Pinturillo
 - [x] Caras y gestos
 - [x] Murdoku
+- [x] Trivia
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
