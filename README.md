@@ -30,6 +30,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Batalla naval: cada uno ubica su flota en secreto y se turnan los disparos hasta hundir la del otro | Disponible |
 | Dominó: doble seis para dos, con o sin pozo, manos hasta llegar a la meta de puntos | Disponible |
 | Parqués: a la colombiana, con dos dados, salida con pares, seguros, comer fichas y premio al tercer par | Disponible |
+| Palabras cruzadas (estilo Scrabble): siete letras cada uno, tablero con premios, comodines y revisión con diccionario | Disponible |
 
 ## Decisiones técnicas
 
@@ -101,5 +102,10 @@ src/
 - [x] Batalla naval
 - [x] Dominó
 - [x] Parqués
+- [x] Palabras cruzadas
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
+
+## Autora
+
+Desarrollado por **Melisa Gomez Gomez** ([@Melisa775](https://github.com/Melisa775)).

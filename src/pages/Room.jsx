@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useRoom } from '../hooks/useRoom'
 import { Logo } from './Home'
+import Credit from '../components/Credit'
 import ColorGame from '../games/ColorGame'
 import StopGame from '../games/StopGame'
 import TooLateGame from '../games/TooLateGame'
@@ -17,6 +18,7 @@ import ChessGame from '../games/ChessGame'
 import BattleshipGame from '../games/BattleshipGame'
 import DominoGame from '../games/DominoGame'
 import ParquesGame from '../games/ParquesGame'
+import CrosswordsGame from '../games/CrosswordsGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
@@ -31,10 +33,11 @@ import ChessCard from '../components/ChessCard'
 import BattleshipCard from '../components/BattleshipCard'
 import DominoCard from '../components/DominoCard'
 import ParquesCard from '../components/ParquesCard'
+import CrosswordsCard from '../components/CrosswordsCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame }
 const UPCOMING = []
 
 export default function Room({ code, name, onExit }) {
@@ -169,7 +172,10 @@ function Lobby({ room, send }) {
         <BattleshipCard send={send} alone={alone} />
         <DominoCard send={send} alone={alone} />
         <ParquesCard send={send} alone={alone} />
+        <CrosswordsCard send={send} alone={alone} />
       </div>
+
+      <Credit className="mt-10 text-center" />
 
       {UPCOMING.length > 0 && (
         <p className="mt-6 rounded-3xl border border-dashed border-line px-6 py-4 text-muted">

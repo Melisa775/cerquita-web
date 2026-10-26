@@ -1,3 +1,4 @@
+import Credit from '../components/Credit'
 import { useState } from 'react'
 import { checkRoom, createRoom, storage } from '../lib/api'
 
@@ -101,6 +102,7 @@ export default function Home({ initialCode = '', onEnter }) {
       </div>
 
       {error && <p role="alert" className="mt-5 font-medium text-danger">{error}</p>}
+      <Credit className="mt-12" />
     </main>
   )
 }
