@@ -14,6 +14,7 @@ import CharadesGame from '../games/CharadesGame'
 import MurdokuGame from '../games/MurdokuGame'
 import TriviaGame from '../games/TriviaGame'
 import ChessGame from '../games/ChessGame'
+import BattleshipGame from '../games/BattleshipGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
@@ -25,10 +26,11 @@ import CharadesCard from '../components/CharadesCard'
 import MurdokuCard from '../components/MurdokuCard'
 import TriviaCard from '../components/TriviaCard'
 import ChessCard from '../components/ChessCard'
+import BattleshipCard from '../components/BattleshipCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame }
 const UPCOMING = []
 
 export default function Room({ code, name, onExit }) {
@@ -160,6 +162,7 @@ function Lobby({ room, send }) {
         <MurdokuCard send={send} alone={alone} />
         <TriviaCard send={send} alone={alone} />
         <ChessCard send={send} alone={alone} />
+        <BattleshipCard send={send} alone={alone} />
       </div>
 
       {UPCOMING.length > 0 && (
