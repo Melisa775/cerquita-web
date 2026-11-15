@@ -36,6 +36,7 @@ The games themselves are in Spanish; the names below are the ones shown in the a
 | Una (UNO-style): original cards, action cards, wild cards, "¡Una!" with a penalty if you get caught, and optional stacking | Available |
 | Mini golf (Plato-style): pull back to shoot, nine holes with bumpers, sand, water, slopes and portals; the partner sees the aim live | Available |
 | Colonos (Catan-style): random island, build roads, settlements and cities, robber, trading and development cards | Available |
+| Más cerca: question cards to know each other better and connect, in three levels (icebreaker, deep and deeper) plus wildcards; going deeper needs both to agree, and it ends with a letter to each other that's revealed at the same time | Available |
 
 ## Technical decisions
 
@@ -51,6 +52,7 @@ The games themselves are in Spanish; the names below are the ones shown in the a
 - **Shared word search.** You mark a word by dragging from one end to the other (the line snaps to horizontal, vertical or diagonal) or by tapping both ends. While one player drags, the other sees the selection live. Found words are highlighted with an SVG capsule in the color of whoever found them.
 - **Characters drawn in code.** The 24 Guess Who characters are originals: each one is an SVG built from its traits (hair, eye color, glasses, cap or sombrero vueltiao, beard, earrings, freckles). Cards flip in 3D when you flip them down.
 - **Real-time drawing.** In Pinturillo, strokes are sent in small batches every 50 ms and the other player sees them appear on a `<canvas>` scaled to the screen's pixel density. Coordinates travel in a fixed 1000×750 space, so the drawing looks the same on a phone and on a computer.
+- **Más cerca, a game without winners.** No score and no clock: a dealt card with the level's color, who answers, and a short listening tip for the other player ("no hace falta arreglar nada"). Moving to a deeper level or ending only happens when both players vote, and the closing letters stay sealed on the server until both are sent.
 - **The room lives in the URL** (`?sala=ABCDE`), so the link can be shared and it works on any static host without rewrite rules.
 
 ## Stack
@@ -111,6 +113,7 @@ src/
 - [x] Una
 - [x] Mini golf
 - [x] Colonos
+- [x] Más cerca
 - [x] Public deployment
 
 ## Author
