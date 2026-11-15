@@ -33,6 +33,7 @@ Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos 
 | Palabras cruzadas (estilo Scrabble): siete letras cada uno, tablero con premios, comodines y revisión con diccionario | Disponible |
 | Una (estilo UNO): cartas propias, especiales, comodines, «¡Una!» con castigo si te pillan y opción de acumular | Disponible |
 | Mini golf (estilo Plato): se jala para tirar, nueve hoyos con bumpers, arena, agua, rampas y portal; la pareja ve el apuntado en vivo | Disponible |
+| Colonos (estilo Catan): isla al azar, construir caminos, pueblos y ciudades, ladrón, comercio y cartas de desarrollo | Disponible |
 
 ## Decisiones técnicas
 
@@ -107,6 +108,7 @@ src/
 - [x] Palabras cruzadas
 - [x] Una
 - [x] Mini golf
+- [x] Colonos
 - [ ] Control compartido para ver películas al mismo tiempo
 - [x] Despliegue público
 
