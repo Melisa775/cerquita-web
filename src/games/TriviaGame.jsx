@@ -7,7 +7,7 @@ import { CATEGORIES, CATEGORY_META, CategoryIcon, CrownBadge, WHEEL } from '../l
 const OK = 'hsl(148 48% 34%)'
 const BAD = 'var(--color-danger)'
 const LETTERS = ['A', 'B', 'C', 'D']
-const LEVEL_LABEL = { facil: 'fácil', medio: 'medio', dificil: 'difícil' }
+const LEVEL_LABEL = { easy: 'fácil', medium: 'medio', hard: 'difícil' }
 
 export default function TriviaGame({ room, me, send, colorOf }) {
   const game = room.game
@@ -22,10 +22,10 @@ export default function TriviaGame({ room, me, send, colorOf }) {
   )
 }
 
-/* --- marcador ----------------------------------------------------------- */
+/* --- scoreboard --------------------------------------------------------- */
 
 function Scoreboard({ game, me, colorOf }) {
-  if (game.mode === 'duelo') {
+  if (game.mode === 'duel') {
     return (
       <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
         <span>
@@ -65,7 +65,7 @@ function Scoreboard({ game, me, colorOf }) {
               {goalCats
                 ? goalCats.map((c) => <CrownBadge key={c} category={c} won={crowns.includes(c)} />)
                 : Array.from({ length: game.goal }, (_, i) =>
-                    crowns[i] ? <CrownBadge key={i} category={crowns[i]} /> : <CrownBadge key={i} category="corona" won={false} title="Corona pendiente" />,
+                    crowns[i] ? <CrownBadge key={i} category={crowns[i]} /> : <CrownBadge key={i} category="crown" won={false} title="Corona pendiente" />,
                   )}
             </div>
           </div>
@@ -81,12 +81,12 @@ function Meter({ value, max, color }) {
       {Array.from({ length: max }, (_, i) => (
         <span key={i} className="h-2.5 w-5 rounded-full" style={{ background: i < value ? color : 'var(--color-line)' }} />
       ))}
-      <CategoryIcon category="corona" className="ml-0.5 h-4 w-4" color={value >= max ? color : 'var(--color-line)'} />
+      <CategoryIcon category="crown" className="ml-0.5 h-4 w-4" color={value >= max ? color : 'var(--color-line)'} />
     </span>
   )
 }
 
-/* --- ruleta ------------------------------------------------------------- */
+/* --- wheel -------------------------------------------------------------- */
 
 const STEP = 360 / WHEEL.length
 const R = 94
@@ -96,7 +96,7 @@ function point(angle, r) {
   return [100 + r * Math.sin(a), 100 - r * Math.cos(a)]
 }
 
-/** Giro con el que la casilla elegida queda bajo la flecha. Crece con cada giro. */
+/** Rotation that puts the chosen slot under the pointer. Grows with every spin. */
 function rotationFor(spinId, slot) {
   if (!spinId || !slot) return 0
   const i = WHEEL.indexOf(slot)
@@ -108,12 +108,12 @@ export function Wheel({ spinId, slot, seconds = 3.2, className = '' }) {
   const rotation = rotationFor(spinId, slot)
   return (
     <div className={`relative mx-auto aspect-square w-full max-w-[22rem] ${className}`}>
-      {/* flecha */}
+      {/* pointer */}
       <svg viewBox="0 0 40 40" className="absolute left-1/2 top-0 z-10 h-10 w-10 -translate-x-1/2 -translate-y-1" aria-hidden="true">
         <path d="M8 4h24L20 30z" fill="var(--color-ink)" stroke="white" strokeWidth="3" strokeLinejoin="round" />
       </svg>
-      {/* Al girar, las esquinas (transparentes) del cuadro de la ruleta se salen
-          y tapaban el botón de girar: por eso no recibe clics. */}
+      {/* While spinning, the (transparent) corners of the wheel's box stick out
+          and covered the spin button: that's why it ignores clicks. */}
       <svg
         viewBox="0 0 200 200"
         className="pointer-events-none h-full w-full drop-shadow-sm"
@@ -145,7 +145,7 @@ export function Wheel({ spinId, slot, seconds = 3.2, className = '' }) {
 
 function Spin({ game, me, send, colorOf }) {
   const spinning = game.phase === 'spinning'
-  const canSpin = !spinning && (game.mode === 'duelo' || game.current === me)
+  const canSpin = !spinning && (game.mode === 'duel' || game.current === me)
   const who = game.current
   const landed = spinning ? null : game.slot
 
@@ -164,15 +164,15 @@ function Spin({ game, me, send, colorOf }) {
 
   let title
   if (spinning) title = 'Girando…'
-  else if (game.mode === 'duelo') title = game.asked ? 'Siguiente pregunta' : 'Giren la ruleta'
+  else if (game.mode === 'duel') title = game.asked ? 'Siguiente pregunta' : 'Giren la ruleta'
   else title = who === me ? 'Te toca girar' : `Le toca a ${who}`
 
   return (
     <section className="mt-4 rounded-[2rem] bg-paper p-6 text-center sm:p-8">
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl" style={game.mode === 'coronas' ? { color: colorOf(who) } : undefined}>
+      <h1 className="font-display text-3xl font-extrabold sm:text-4xl" style={game.mode === 'crowns' ? { color: colorOf(who) } : undefined}>
         {title}
       </h1>
-      {!spinning && game.mode === 'coronas' && (
+      {!spinning && game.mode === 'crowns' && (
         <p className="mt-1 text-muted">
           {who === me
             ? 'Acierta para seguir jugando; tres seguidas y juegas por una corona.'
@@ -192,16 +192,16 @@ function Spin({ game, me, send, colorOf }) {
   )
 }
 
-/* --- elegir corona ------------------------------------------------------ */
+/* --- pick a crown ------------------------------------------------------- */
 
 function CrownPick({ game, me, send }) {
   const mine = game.current === me
   const missing = CATEGORIES.filter((c) => !(game.crowns[game.current] ?? []).includes(c))
-  const viaWheel = game.slot === 'corona'
+  const viaWheel = game.slot === 'crown'
   return (
-    <section className="pop mt-4 rounded-[2rem] p-6 text-white sm:p-8" style={{ background: CATEGORY_META.corona.color }}>
+    <section className="pop mt-4 rounded-[2rem] p-6 text-white sm:p-8" style={{ background: CATEGORY_META.crown.color }}>
       <div className="flex items-center gap-3">
-        <CategoryIcon category="corona" className="h-12 w-12" />
+        <CategoryIcon category="crown" className="h-12 w-12" />
         <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
           {mine ? '¡Juegas por una corona!' : `${game.current} juega por una corona`}
         </h1>
@@ -227,7 +227,7 @@ function CrownPick({ game, me, send }) {
   )
 }
 
-/* --- pregunta y respuesta ----------------------------------------------- */
+/* --- question and answer ------------------------------------------------ */
 
 function Question({ room, me, send, colorOf }) {
   const game = room.game
@@ -236,8 +236,8 @@ function Question({ room, me, send, colorOf }) {
   const meta = CATEGORY_META[q.category]
   const reveal = game.phase === 'reveal'
   const results = game.last?.results ?? {}
-  const myTurn = game.mode === 'duelo' || game.current === me
-  const answeredMine = game.mode === 'duelo' ? game.answered.includes(me) : false
+  const myTurn = game.mode === 'duel' || game.current === me
+  const answeredMine = game.mode === 'duel' ? game.answered.includes(me) : false
   const canAnswer = !reveal && myTurn && !answeredMine
   const myChoice = reveal ? results[me]?.choice : game.myChoice
 
@@ -268,7 +268,7 @@ function Question({ room, me, send, colorOf }) {
             )}
             {game.forCrown && (
               <span className="ml-1 flex items-center gap-1 rounded-full bg-white/25 px-2.5 py-0.5 text-sm">
-                <CategoryIcon category="corona" className="h-4 w-4" /> por la corona
+                <CategoryIcon category="crown" className="h-4 w-4" /> por la corona
               </span>
             )}
           </span>
@@ -341,7 +341,7 @@ function Question({ room, me, send, colorOf }) {
 }
 
 function Waiting({ game, me, colorOf }) {
-  if (game.mode === 'coronas') {
+  if (game.mode === 'crowns') {
     if (game.current === me) return <p className="mt-4 hidden text-xs text-muted sm:block">Atajos: teclas 1 a 4 o A a D.</p>
     return (
       <p className="mt-5 text-muted">
@@ -369,7 +369,7 @@ function Outcome({ game, me, send, colorOf }) {
   const results = game.last.results
   let title
   let color = 'var(--color-ink)'
-  if (game.mode === 'duelo') {
+  if (game.mode === 'duel') {
     const mine = results[me]
     title = mine?.ok ? `¡Correcto! +${mine.points}` : mine?.choice == null ? 'Se te acabó el tiempo' : 'Esta no era'
     color = mine?.ok ? OK : BAD
@@ -388,15 +388,15 @@ function Outcome({ game, me, send, colorOf }) {
       color = BAD
     }
   }
-  const lastDuel = game.mode === 'duelo' && game.asked >= game.totalQuestions
-  const wonGame = game.mode === 'coronas' && (game.crowns[game.last.by] ?? []).length >= game.goal
-  const passes = game.mode === 'coronas' && !results[game.last.by].ok && !wonGame
+  const lastDuel = game.mode === 'duel' && game.asked >= game.totalQuestions
+  const wonGame = game.mode === 'crowns' && (game.crowns[game.last.by] ?? []).length >= game.goal
+  const passes = game.mode === 'crowns' && !results[game.last.by].ok && !wonGame
 
   return (
     <div className="pop mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-line pt-5">
       <div>
         <p className="font-display text-2xl font-extrabold" style={{ color }}>{title}</p>
-        {game.mode === 'duelo' && (
+        {game.mode === 'duel' && (
           <p className="mt-1 text-sm text-muted">
             {game.players
               .filter((p) => p !== me)
@@ -424,7 +424,7 @@ function Outcome({ game, me, send, colorOf }) {
   )
 }
 
-/* --- final -------------------------------------------------------------- */
+/* --- end ---------------------------------------------------------------- */
 
 function Final({ game, me, send, colorOf }) {
   const title = game.winner ? `¡Ganó ${game.winner}!` : 'Empate perfecto'
@@ -432,7 +432,7 @@ function Final({ game, me, send, colorOf }) {
     <div className="mt-4">
       <h1 className="text-4xl font-extrabold" style={game.winner ? { color: colorOf(game.winner) } : undefined}>{title}</h1>
       <p className="mt-1 text-muted">
-        {game.mode === 'coronas'
+        {game.mode === 'crowns'
           ? `${game.winner ?? 'Alguien'} juntó ${game.goal} coronas en ${game.asked} preguntas.`
           : `${game.totalQuestions} preguntas, a ver quién sabía más.`}
       </p>
@@ -440,7 +440,7 @@ function Final({ game, me, send, colorOf }) {
         {game.players.map((p) => (
           <div key={p} className="rounded-3xl bg-paper p-5">
             <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-            {game.mode === 'coronas' ? (
+            {game.mode === 'crowns' ? (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {(game.crowns[p] ?? []).map((c) => <CrownBadge key={c} category={c} />)}
                 {!(game.crowns[p] ?? []).length && <span className="text-muted">Sin coronas esta vez</span>}
@@ -457,7 +457,7 @@ function Final({ game, me, send, colorOf }) {
       <ol className="mt-3 space-y-2">
         {game.history.map((h) => {
           const meta = CATEGORY_META[h.question.category]
-          const players = game.mode === 'coronas' ? [h.by] : game.players
+          const players = game.mode === 'crowns' ? [h.by] : game.players
           return (
             <li key={h.n} className="flex gap-3 rounded-2xl bg-paper px-4 py-3">
               <CrownBadge category={h.question.category} size="h-8 w-8" title={meta.label} />

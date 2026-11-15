@@ -1,4 +1,4 @@
-// Debe coincidir con app/games/toolate.py en el backend
+// Must match app/games/toolate.py in the backend
 export const ALPHABET = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('')
 export const DEFAULT_OFF = ['K', 'Ñ', 'Q', 'W', 'X', 'Y', 'Z']
 export const DEFAULT_LETTERS = ALPHABET.filter((l) => !DEFAULT_OFF.includes(l))

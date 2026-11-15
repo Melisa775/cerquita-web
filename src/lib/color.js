@@ -1,4 +1,4 @@
-// HSB (tono 0–360, saturación 0–100, brillo 0–100) -> CSS
+// HSB (hue 0–360, saturation 0–100, brightness 0–100) -> CSS
 export function hsbToRgb({ h, s, b }) {
   const sv = s / 100
   const v = b / 100
@@ -12,7 +12,7 @@ export function hsbToCss(color) {
   return `rgb(${r} ${g} ${b})`
 }
 
-// Texto legible encima de un color cualquiera
+// Readable text on top of any color
 export function inkFor(color) {
   const [r, g, b] = hsbToRgb(color)
   const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b

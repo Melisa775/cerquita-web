@@ -1,4 +1,4 @@
-/** Crédito de la autora, al pie del inicio y de la sala. */
+/** Author credit, at the bottom of the home page and the room. */
 export default function Credit({ className = '' }) {
   return (
     <p className={`text-sm text-muted ${className}`}>

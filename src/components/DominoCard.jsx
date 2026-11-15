@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import DominoTile from './DominoTile'
 
-/** Tarjeta del lobby para el dominó. */
+/** Lobby card for dominoes. */
 export default function DominoCard({ send, alone }) {
   const [goal, setGoal] = useState(100)
   const [boneyard, setBoneyard] = useState(true)

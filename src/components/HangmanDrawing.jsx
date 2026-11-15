@@ -1,9 +1,9 @@
 import { cloneElement } from 'react'
 
 /**
- * Dibujo del ahorcado. Las partes aparecen trazándose una por una según los
- * errores. Con más vidas, primero se va armando la horca; con 6 ya está lista.
- * Si adivinan, el muñeco se baja de la horca y celebra.
+ * Hangman drawing. Parts are drawn in one by one as mistakes pile up. With
+ * more lives the gallows is built first; with 6 it is already standing.
+ * If they guess the word, the figure climbs down from the gallows and celebrates.
  */
 const GALLOWS = [
   <line key="base" x1="20" y1="205" x2="120" y2="205" />,
@@ -24,13 +24,13 @@ const BODY_ORDER = ['head', 'body', 'armL', 'armR', 'legL', 'legR']
 const TOTAL_PARTS = GALLOWS.length + BODY_ORDER.length
 
 export default function HangmanDrawing({ misses, lives, state = 'playing', color = 'var(--color-ink)' }) {
-  const pre = TOTAL_PARTS - lives // partes que ya vienen dibujadas
+  const pre = TOTAL_PARTS - lives // parts that start already drawn
   const shown = Math.min(TOTAL_PARTS, pre + misses)
   const won = state === 'won'
   const lost = state === 'lost'
   const left = lives - misses
 
-  // Al ganar se dibuja el muñeco completo, sin cuerda, en el piso.
+  // On a win the full figure is drawn on the ground, without the rope.
   const bodyParts = won ? BODY_ORDER : BODY_ORDER.slice(0, Math.max(0, shown - GALLOWS.length))
   const gallowsParts = GALLOWS.slice(0, won ? 3 : Math.min(shown, GALLOWS.length))
 
@@ -78,7 +78,7 @@ export default function HangmanDrawing({ misses, lives, state = 'playing', color
 }
 
 function withLength(el) {
-  // pathLength=1 permite animar el trazo sin conocer el largo real
+  // pathLength=1 lets the stroke animate without knowing its real length
   return cloneElement(el, { pathLength: 1 })
 }
 

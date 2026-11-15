@@ -4,12 +4,12 @@ import { storage } from '../lib/api'
 const MODE_KEY = 'cerquita:wordsearch:mode'
 const BAND = ['RTLAMORPZE', 'OSUEÑOBCAN', 'MIELUNAGTD']
 const LEVELS = [
-  ['facil', 'Fácil · 10×10'],
+  ['easy', 'Fácil · 10×10'],
   ['normal', 'Normal · 12×12'],
-  ['dificil', 'Difícil · 14×14'],
+  ['hard', 'Difícil · 14×14'],
 ]
 
-/** Tarjeta del lobby para la Sopa de letras. */
+/** Lobby card for word search. */
 export default function WordSearchCard({ send, alone }) {
   const [mode, setMode] = useState(() => (storage.get(MODE_KEY) === 'team' ? 'team' : 'race'))
   const [level, setLevel] = useState('normal')

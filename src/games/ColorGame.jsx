@@ -25,7 +25,7 @@ function RoundLabel({ game }) {
   )
 }
 
-// Experto: otro color tapa el recuerdo del primero
+// Expert: another color overwrites the memory of the first one
 function Distract({ game }) {
   return (
     <div
@@ -59,7 +59,7 @@ function Memorize({ game, left }) {
 }
 
 function Guess({ game, me, send, left, msLeft, colorOf }) {
-  // Punto de partida al azar para no favorecer ningún color
+  // Random starting point so no color is favored
   const [color, setColor] = useState(() => ({
     h: Math.floor(Math.random() * 360),
     s: 30 + Math.floor(Math.random() * 40),

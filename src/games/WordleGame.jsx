@@ -14,7 +14,7 @@ export default function WordleGame({ room, me, send, colorOf, error, errorId }) 
   if (game.phase === 'finished') return <Final game={game} me={me} send={send} colorOf={colorOf} />
   return <Play game={game} me={me} send={send} colorOf={colorOf} error={error} errorId={errorId} />
 }
-WordleGame.showsErrors = true // los errores se muestran junto al tablero
+WordleGame.showsErrors = true // errors are shown next to the board
 
 function Play({ game, me, send, colorOf, error, errorId }) {
   const team = game.mode === 'team'
@@ -31,7 +31,7 @@ function Play({ game, me, send, colorOf, error, errorId }) {
   const rowsSeen = useRef(myRows.length)
   const errorsSeen = useRef(errorId)
 
-  // Cuando el servidor acepta la palabra, se limpia lo escrito
+  // When the server accepts the word, the input is cleared
   useEffect(() => {
     if (myRows.length !== rowsSeen.current) {
       rowsSeen.current = myRows.length
@@ -39,7 +39,7 @@ function Play({ game, me, send, colorOf, error, errorId }) {
     }
   }, [myRows.length])
 
-  // Palabra rechazada: la fila tiembla y aparece el motivo
+  // Word rejected: the row shakes and the reason appears
   useEffect(() => {
     if (errorId === errorsSeen.current) return
     errorsSeen.current = errorId

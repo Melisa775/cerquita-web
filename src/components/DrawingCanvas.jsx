@@ -25,14 +25,14 @@ function drawStroke(ctx, stroke, scale, from = 0) {
 }
 
 /**
- * Lienzo del Pinturillo. Pinta los trazos del servidor y, si `subscribe`
- * está, los eventos en vivo del otro. Si `tool` está, se puede dibujar.
+ * Pinturillo canvas. Paints the server's strokes and, if `subscribe` is set,
+ * the partner's live events. If `tool` is set, you can draw.
  */
 export default function DrawingCanvas({ strokes, subscribe, tool, onStroke, onPoints, onEnd, className = '' }) {
   const canvasRef = useRef(null)
-  const local = useRef([]) // trazos que se ven ahora mismo
+  const local = useRef([]) // strokes visible right now
   const scaleRef = useRef(1)
-  const drawing = useRef(null) // trazo propio en curso
+  const drawing = useRef(null) // own stroke in progress
 
   function redraw() {
     const canvas = canvasRef.current
@@ -44,7 +44,7 @@ export default function DrawingCanvas({ strokes, subscribe, tool, onStroke, onPo
     for (const s of local.current) drawStroke(ctx, s, scaleRef.current)
   }
 
-  // Tamaño real según el ancho en pantalla y la densidad de píxeles
+  // Real size from the on-screen width and the pixel density
   useEffect(() => {
     const canvas = canvasRef.current
     const fit = () => {
@@ -61,14 +61,14 @@ export default function DrawingCanvas({ strokes, subscribe, tool, onStroke, onPo
     return () => ro.disconnect()
   }, [])
 
-  // La foto del servidor manda (salvo mientras uno mismo está trazando)
+  // The server snapshot wins (except while you are drawing yourself)
   useEffect(() => {
     if (drawing.current) return
     local.current = strokes.map((s) => ({ ...s, points: [...s.points] }))
     redraw()
   }, [strokes])
 
-  // Trazos en vivo de la pareja
+  // Partner's live strokes
   useEffect(() => {
     if (!subscribe) return
     return subscribe((ev) => {

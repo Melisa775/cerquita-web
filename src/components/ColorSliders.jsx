@@ -1,8 +1,8 @@
 import { hsbToCss } from '../lib/color'
 
 /**
- * Tres deslizadores (tono, saturación, brillo) cuya pista muestra el color real.
- * Sin pistas (nivel Experto) las barras son grises y hay que guiarse solo por el resultado.
+ * Three sliders (hue, saturation, brightness) whose track shows the real color.
+ * Without hints (Expert level) the bars are gray and you can only go by the result.
  */
 const PLAIN = 'linear-gradient(to right, #C9CBD1, #C9CBD1)'
 

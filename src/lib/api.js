@@ -1,4 +1,4 @@
-// En desarrollo VITE_API_URL queda vacío y Vite hace de proxy hacia FastAPI.
+// In development VITE_API_URL is empty and Vite proxies to FastAPI.
 const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '')
 
 export async function createRoom() {
@@ -22,8 +22,8 @@ export function socketUrl(code, name) {
   return url.toString()
 }
 
-// localStorage puede fallar (modo privado, almacenamiento bloqueado)
+// localStorage can fail (private mode, blocked storage)
 export const storage = {
   get(key) { try { return localStorage.getItem(key) } catch { return null } },
-  set(key, value) { try { localStorage.setItem(key, value) } catch { /* sin almacenamiento */ } },
+  set(key, value) { try { localStorage.setItem(key, value) } catch { /* no storage */ } },
 }

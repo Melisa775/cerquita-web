@@ -1,4 +1,4 @@
-/** Cartas del juego Una, dibujadas en SVG (diseño propio). */
+/** Cards for Una, drawn in SVG (original design). */
 export const CARD_COLORS = {
   r: { fill: 'hsl(2 72% 52%)', name: 'Rojo' },
   y: { fill: 'hsl(44 96% 52%)', name: 'Amarillo' },
@@ -34,7 +34,7 @@ function Symbol({ value, size, fill }) {
 }
 
 function Quadrants({ rx, ry }) {
-  // óvalo partido en los cuatro colores
+  // oval split into the four colors
   const order = ['r', 'b', 'y', 'g']
   return (
     <g>

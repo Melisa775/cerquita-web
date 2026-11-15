@@ -1,4 +1,4 @@
-/** Ayudas de la batalla naval: casillas de un barco, choques y flota al azar. */
+/** Battleship helpers: a ship's cells, collisions and a random fleet. */
 
 export const COLS = 'ABCDEFGHIJ'
 
@@ -10,7 +10,7 @@ export function cellsOf(ship, length) {
 
 const key = (r, c) => `${r},${c}`
 
-/** Ids de los barcos mal ubicados (fuera, encima de otro o tocándose si la regla lo prohíbe). */
+/** Ids of misplaced ships (out of bounds, overlapping, or touching when the rule forbids it). */
 export function problems(placed, lengths, size, noTouch) {
   const owner = new Map()
   const bad = new Set()
@@ -42,7 +42,7 @@ export function problems(placed, lengths, size, noTouch) {
   return bad
 }
 
-/** Flota válida al azar (reintenta si se encierra). */
+/** Random valid fleet (retries if it gets stuck). */
 export function randomFleet(fleet, size, noTouch) {
   for (let attempt = 0; attempt < 200; attempt++) {
     const placed = []
@@ -74,7 +74,7 @@ export function randomFleet(fleet, size, noTouch) {
   return []
 }
 
-/** Mueve el inicio de un barco para que quepa en el tablero. */
+/** Shifts a ship's start so it fits on the board. */
 export function clampShip(row, col, dir, length, size) {
   if (dir === 'h') return { row, col: Math.min(col, size - length), dir }
   return { row: Math.min(row, size - length), col, dir }

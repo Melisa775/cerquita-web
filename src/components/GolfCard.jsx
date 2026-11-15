@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-/** Tarjeta del lobby para el mini golf. */
+/** Lobby card for mini golf. */
 export default function GolfCard({ send, alone }) {
   const [holes, setHoles] = useState(9)
   return (

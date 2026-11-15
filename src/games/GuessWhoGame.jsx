@@ -16,7 +16,7 @@ function Play({ game, me, send, colorOf }) {
   const myTurn = playing && game.turn === me && !game.pending
   const [guessing, setGuessing] = useState(false)
   const [picked, setPicked] = useState(null)
-  // Bajar personajes se siente al instante; el servidor confirma después
+  // Flipping characters down feels instant; the server confirms afterwards
   const [flipped, setFlipped] = useState(() => new Set(game.flipped))
 
   useEffect(() => setFlipped(new Set(game.flipped)), [game.flipped.join(',')]) // eslint-disable-line react-hooks/exhaustive-deps

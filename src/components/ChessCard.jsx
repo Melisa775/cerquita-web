@@ -2,7 +2,7 @@ import { useState } from 'react'
 import ChessPiece from './ChessPiece'
 
 const CONTROLS = [
-  ['libre', 'Sin reloj'],
+  ['none', 'Sin reloj'],
   ['3+2', '3 min + 2 s'],
   ['5+3', '5 min + 3 s'],
   ['10+0', '10 min'],
@@ -10,9 +10,9 @@ const CONTROLS = [
 ]
 const PREVIEW = ['r', 'n', 'b', 'q', 'K', 'B', 'N', 'R']
 
-/** Tarjeta del lobby para el ajedrez. */
+/** Lobby card for chess. */
 export default function ChessCard({ send, alone }) {
-  const [timeControl, setTimeControl] = useState('libre')
+  const [timeControl, setTimeControl] = useState('none')
   const [hints, setHints] = useState(true)
 
   return (

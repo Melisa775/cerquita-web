@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
-/** Tarjeta del lobby para Caras y gestos. */
+/** Lobby card for Caras y gestos (charades). */
 export default function CharadesCard({ send, alone }) {
-  const [level, setLevel] = useState('mezcla')
+  const [level, setLevel] = useState('mixed')
   const [seconds, setSeconds] = useState(90)
   const [rounds, setRounds] = useState(2)
   const [showCategory, setShowCategory] = useState(true)
@@ -10,7 +10,7 @@ export default function CharadesCard({ send, alone }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-3xl bg-paper">
       <div className="flex h-28 items-center justify-center gap-5" style={{ background: 'hsl(258 32% 46%)' }} aria-hidden="true">
-        {/* Dos máscaras de teatro: una feliz y una triste */}
+        {/* Two theater masks: one happy and one sad */}
         {[1, -1].map((mood) => (
           <svg key={mood} viewBox="0 0 60 70" className="h-20" style={{ transform: `rotate(${mood * -10}deg)` }}>
             <path d="M6 8 Q30 0 54 8 Q56 40 30 66 Q4 40 6 8 Z" fill="white" />
@@ -29,7 +29,7 @@ export default function CharadesCard({ send, alone }) {
         <h3 className="text-2xl font-bold">Caras y gestos</h3>
 
         <div className="mt-3 grid grid-cols-3 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Dificultad">
-          {[['facil', 'Fácil'], ['mezcla', 'Mezcla'], ['dificil', 'Difícil']].map(([key, label]) => (
+          {[['easy', 'Fácil'], ['mixed', 'Mezcla'], ['hard', 'Difícil']].map(([key, label]) => (
             <button
               key={key}
               onClick={() => setLevel(key)}

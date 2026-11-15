@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import Home from './pages/Home'
 import Room from './pages/Room'
 
-// La sala vive en la URL (?sala=ABCDE) para que el enlace se pueda compartir
-// y funcione en cualquier hosting estático sin reglas de reescritura.
+// The room lives in the URL (?sala=ABCDE) so the link can be shared
+// and works on any static host without rewrite rules.
 function readCode() {
   return (new URLSearchParams(window.location.search).get('sala') || '').toUpperCase()
 }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-/** Segundos restantes de la fase actual, a partir de lo que reporta el servidor. */
+/** Seconds left in the current phase, based on what the server reports. */
 export function useCountdown(room) {
   const ms = room?.phaseEndsInMs
   const [deadline, setDeadline] = useState(null)
