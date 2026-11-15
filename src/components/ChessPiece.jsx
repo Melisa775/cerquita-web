@@ -1,6 +1,6 @@
 /**
- * Piezas de ajedrez propias, dibujadas en una caja de 45×45.
- * `piece` usa letras FEN: mayúsculas blancas (PNBRQK), minúsculas negras.
+ * Custom chess pieces, drawn in a 45×45 box.
+ * `piece` uses FEN letters: uppercase is white (PNBRQK), lowercase is black.
  */
 const LIGHT = { fill: '#F7F5EF', stroke: '#22252E', detail: '#22252E' }
 const DARK = { fill: '#2A2D36', stroke: '#2A2D36', detail: '#F7F5EF' }

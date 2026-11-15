@@ -1,8 +1,8 @@
 import { useState } from 'react'
 
 /**
- * Barra que se vacía durante la fase. Si se monta a mitad de fase (por
- * ejemplo al reconectarse), arranca desde donde va según `msLeft`.
+ * Bar that empties during the phase. If it mounts mid-phase (for example
+ * after reconnecting), it starts from where it should be per `msLeft`.
  */
 export default function TimerBar({ seconds, resetKey, msLeft, color = 'var(--color-ink)', track = 'bg-line' }) {
   return (

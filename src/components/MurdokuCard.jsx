@@ -1,14 +1,14 @@
 import { useState } from 'react'
 import { ROOM_COLORS, FurnitureIcon } from '../games/MurdokuGame'
 
-// Un plano chiquito para la franja de la tarjeta
+// A tiny floor plan for the card's banner
 const PLAN = ['00112', '00112', '33122', '33444']
-const PROPS = { '0-1': 'planta', '1-3': 'mesa', '3-4': 'estante', '2-0': 'silla' }
+const PROPS = { '0-1': 'plant', '1-3': 'table', '3-4': 'shelf', '2-0': 'chair' }
 
-/** Tarjeta del lobby para Murdoku. */
+/** Lobby card for Murdoku. */
 export default function MurdokuCard({ send, alone }) {
   const [mode, setMode] = useState('team')
-  const [level, setLevel] = useState('facil')
+  const [level, setLevel] = useState('easy')
   const [rounds, setRounds] = useState(1)
 
   return (
@@ -56,7 +56,7 @@ export default function MurdokuCard({ send, alone }) {
             <label className="flex items-center gap-2 text-sm font-semibold">
               Nivel
               <select value={level} onChange={(e) => setLevel(e.target.value)} className="rounded-xl border border-line bg-stone px-3 py-2">
-                <option value="facil">Fácil · 5×5</option>
+                <option value="easy">Fácil · 5×5</option>
                 <option value="normal">Normal · 6×6</option>
               </select>
             </label>

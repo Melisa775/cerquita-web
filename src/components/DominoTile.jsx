@@ -1,6 +1,6 @@
 /**
- * Ficha de dominó. Horizontal mide 2×1 unidades y vertical 1×2.
- * `a` va a la izquierda (o arriba) y `b` a la derecha (o abajo).
+ * Domino tile. Horizontal it measures 2×1 units and vertical 1×2.
+ * `a` goes on the left (or top) and `b` on the right (or bottom).
  */
 const PIPS = {
   0: [],
@@ -19,7 +19,7 @@ export default function DominoTile({ a, b, vertical = false, unit = 28, faceDown
   const vh = vertical ? 200 : 100
   const half = (value, offX, offY) =>
     PIPS[value].map(([x, y], i) => {
-      // en vertical el 6 se dibuja en dos columnas de tres, igual que en horizontal girado
+      // vertically the 6 is drawn as two columns of three, same as the rotated horizontal one
       const [px, py] = vertical ? [x, y] : [y, x]
       return <circle key={i} cx={offX + px * 100} cy={offY + py * 100} r="9.5" fill="#22252E" />
     })

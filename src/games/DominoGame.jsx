@@ -8,7 +8,7 @@ const sameTile = (t, u) => t && u && t[0] === u[0] && t[1] === u[1]
 export default function DominoGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
   const other = game.players.find((p) => p !== me)
-  const [selected, setSelected] = useState(null) // ficha que pega por los dos lados
+  const [selected, setSelected] = useState(null) // tile that fits on both ends
   const [flash, setFlash] = useState(null)
 
   useEffect(() => setSelected(null), [game.line.length, game.phase, game.handNo])
@@ -27,7 +27,7 @@ export default function DominoGame({ room, me, send, colorOf, error, errorId }) 
   function choose(tile) {
     const m = moveOf(tile)
     if (!m) return
-    // Si los dos extremos tienen el mismo número, da igual el lado: no se pregunta
+    // If both ends show the same number, the side doesn't matter: don't ask
     if (m.sides.length === 1 || game.ends[0] === game.ends[1]) send({ type: 'dm_play', tile, side: m.sides[m.sides.length - 1] })
     else setSelected(sameTile(selected, tile) ? null : tile)
   }
@@ -115,7 +115,7 @@ function OpponentHand({ game, other }) {
   )
 }
 
-/* --- la mesa: la línea va en serpiente para que quepa ------------------- */
+/* --- the table: the line snakes so it fits ----------------------------- */
 
 function useWidth(ref) {
   const [w, setW] = useState(0)
@@ -129,7 +129,7 @@ function useWidth(ref) {
 }
 
 function layoutRows(line, capacity) {
-  // Cada ficha ocupa 2 unidades (o 1 si es doble, que va atravesada)
+  // Each tile takes 2 units (or 1 if it's a double, placed crosswise)
   const rows = []
   let row = []
   let used = 0
@@ -204,7 +204,7 @@ function Table({ game, selected, onPlace }) {
   )
 }
 
-/* --- estado, avisos y botones ------------------------------------------- */
+/* --- status, notices and buttons ---------------------------------------- */
 
 function describe(entry, me) {
   if (!entry) return null

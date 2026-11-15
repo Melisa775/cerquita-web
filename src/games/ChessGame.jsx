@@ -42,20 +42,20 @@ export default function ChessGame({ room, me, send, colorOf: playerColor, error,
 }
 ChessGame.showsErrors = true
 
-/* --- tablero ------------------------------------------------------------ */
+/* --- board -------------------------------------------------------------- */
 
 function Board({ game, me, myColor, myTurn, send }) {
   const boardRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const [promo, setPromo] = useState(null) // { from, to }
   const [drag, setDrag] = useState(null) // { from, x, y, moved }
-  const dropped = useRef(null) // jugada hecha arrastrando: no se anima
+  const dropped = useRef(null) // move made by dragging: not animated
   const flipped = myColor === 'b'
   const legal = myTurn ? game.legal : {}
   const targets = selected ? legal[selected] ?? [] : []
   const hints = game.options.hints
 
-  // Al cambiar la posición se limpia la selección
+  // The selection is cleared when the position changes
   const ply = game.moves.length
   useEffect(() => {
     setSelected(null)
@@ -78,7 +78,7 @@ function Board({ game, me, myColor, myTurn, send }) {
     send({ type: 'ch_move', from, to })
   }
 
-  // Seleccionar piezas lo manejan los eventos de puntero; el clic solo mueve o suelta
+  // Pointer events handle selecting pieces; the click only moves or deselects
   function clickSquare(name) {
     if (promo) return
     if (selected && targets.includes(name)) attempt(selected, name)
@@ -113,7 +113,7 @@ function Board({ game, me, myColor, myTurn, send }) {
     const d = drag
     setDrag(null)
     if (!d.moved) {
-      // fue un clic sobre la pieza: un segundo clic la suelta
+      // it was a click on the piece: a second click deselects it
       if (d.wasSelected) setSelected(null)
       return
     }
@@ -250,7 +250,7 @@ function ResultOverlay({ game, me }) {
   )
 }
 
-/* --- jugadores y reloj -------------------------------------------------- */
+/* --- players and clock -------------------------------------------------- */
 
 function PlayerBar({ game, player, color, playerColor, me }) {
   const captured = game.captured[color] ?? []
@@ -314,7 +314,7 @@ function Clock({ game, color, active }) {
   )
 }
 
-/* --- panel lateral ------------------------------------------------------ */
+/* --- side panel --------------------------------------------------------- */
 
 function Side({ game, me, send, playerColor }) {
   const finished = game.phase === 'finished'
@@ -403,7 +403,7 @@ function Side({ game, me, send, playerColor }) {
         <div className="mt-4 grid gap-2">
           <button
             onClick={() => {
-              // revancha: se cambian los colores
+              // rematch: colors are swapped
               const black = Object.keys(game.colors).find((p) => game.colors[p] === 'b')
               send({ type: 'start_game', game: 'chess', ...game.options, white: black })
             }}

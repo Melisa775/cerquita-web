@@ -20,17 +20,17 @@ function clock(seconds) {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }
 
-// --- Tablero --------------------------------------------------------------
+// --- Board ----------------------------------------------------------------
 /**
- * Tablero de dados. Se puede arrastrar el dedo por las letras (se envía al
- * soltar) o tocarlas una por una (tocar la última otra vez envía la palabra).
- * La zona sensible de cada dado es un círculo interior para que al moverse
- * en diagonal no se marque un vecino sin querer.
+ * Dice board. You can drag a finger across the letters (sent on release) or
+ * tap them one by one (tapping the last one again sends the word). Each
+ * die's hit area is an inner circle so that moving diagonally doesn't select
+ * a neighbor by accident.
  */
 function Board({ game, path = [], color, interactive = false, compact = false, onPath, onSubmit }) {
   const ref = useRef(null)
   const drag = useRef({ active: false, moved: false, submitOnUp: false })
-  const live = useRef(path) // el camino más reciente, aunque React aún no haya repintado
+  const live = useRef(path) // the latest path, even if React hasn't re-rendered yet
   live.current = path
   const size = game.size
 
@@ -66,7 +66,7 @@ function Board({ game, path = [], color, interactive = false, compact = false, o
     const last = path.at(-1)
     if (idx == null || idx === last) return
     if (path.length >= 2 && idx === path.at(-2)) {
-      setPath(path.slice(0, -1)) // devolverse arrastrando
+      setPath(path.slice(0, -1)) // dragging back
       drag.current.moved = true
     } else if (!path.includes(idx) && areNeighbors(last, idx, size)) {
       setPath([...path, idx])
@@ -135,7 +135,7 @@ function Board({ game, path = [], color, interactive = false, compact = false, o
   )
 }
 
-// --- Jugar ----------------------------------------------------------------
+// --- Play -----------------------------------------------------------------
 function Play({ room, me, send, colorOf }) {
   const game = room.game
   const left = useCountdown(room)
@@ -307,7 +307,7 @@ function Play({ room, me, send, colorOf }) {
   )
 }
 
-// --- Revisar --------------------------------------------------------------
+// --- Review ---------------------------------------------------------------
 const STATUS_NOTE = {
   shared: 'los dos',
   invalid: 'no está en el diccionario',
@@ -406,7 +406,7 @@ function Review({ game, send, colorOf }) {
   )
 }
 
-// --- Final ----------------------------------------------------------------
+// --- End ------------------------------------------------------------------
 function Final({ game, send, colorOf }) {
   const players = Object.keys(game.totals)
   return (

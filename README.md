@@ -1,117 +1,118 @@
 # Cerquita
 
-Juegos en español para parejas a distancia. Uno crea una sala, le envía el código a su pareja y juegan sincronizados en tiempo real mientras hablan por videollamada. Gratis, sin descargas y sin cuentas.
+Spanish-language games for long-distance couples. One person creates a room, sends the code to their partner, and they play in real-time sync while talking on a video call. Free, with no downloads and no accounts.
 
-<!-- Agrega aquí un GIF jugando una ronda y el enlace a la demo en vivo -->
+<!-- Add a GIF of a round being played and the link to the live demo here -->
 
-Este repositorio es el frontend. El backend está en [cerquita-api](https://github.com/Melisa775/cerquita-api).
+This repository is the frontend. The backend lives in [cerquita-api](https://github.com/Melisa775/cerquita-api).
 
-## Por qué existe
+## Why it exists
 
-Tengo una relación a distancia. Las páginas de "citas virtuales" que probamos eran listas de enlaces a otros sitios: varios juegos no cargaban, otros pedían pago y casi nada estaba en español. Juegos sencillos como recordar un color, Stop o un Wordle para dos no se podían jugar juntos en línea. Cerquita es el lugar donde esos juegos funcionan.
+I'm in a long-distance relationship. The "virtual date" pages we tried were lists of links to other sites: several games didn't load, others asked for payment, and almost nothing was in Spanish. Simple games like remembering a color, Stop or a two-player Wordle couldn't be played together online. Cerquita is the place where those games work.
 
-## Juegos
+## Games
 
-| Juego | Estado |
+The games themselves are in Spanish; the names below are the ones shown in the app.
+
+| Game | Status |
 | --- | --- |
-| Color de memoria: ven un color unos segundos y cada uno lo recrea de memoria; niveles Normal, Difícil y Experto | Disponible |
-| Stop clásico: sale una letra y llenan nombre, apellido, ciudad, fruta, color, animal y cosa; el primero que termina canta ¡Stop! Revisa la ortografía y sugiere correcciones | Disponible |
-| Stop contrarreloj (estilo Too Late): por turnos dicen una palabra de la categoría y tocan su letra antes de que se acabe el tiempo | Disponible |
-| Enredo de letras (estilo Boggle): unen letras vecinas en un tablero de dados para armar palabras contra el reloj | Disponible |
-| Ahorcado: se turnan para elegir una palabra con pista, o Cerquita elige una al azar y la adivinan juntos | Disponible |
-| Wordle a dúo: en duelo (la misma palabra, cada uno en su tablero) o juntos (un tablero, por turnos) | Disponible |
-| Sopa de letras: la misma sopa para los dos, en carrera o juntos contra el reloj, con tres niveles | Disponible |
-| Adivina quién: 24 personajes propios; las preguntas de la lista las responde la app y las escritas las responde la pareja | Disponible |
-| Pinturillo: uno dibuja y el otro adivina; el dibujo se ve en vivo y al final quedan todos los dibujos | Disponible |
-| Caras y gestos: uno actúa frente a la cámara y el otro adivina en voz alta, contra el reloj | Disponible |
-| Murdoku: sudoku con asesinato; ubican a los sospechosos en el plano según las pistas para descubrir al asesino | Disponible |
-| Trivia (estilo Preguntados): ruleta de seis categorías y tres niveles; por turnos juntando coronas o en duelo de rapidez | Disponible |
-| Ajedrez: partida completa con piezas propias, arrastrar o tocar, reloj opcional, tablas, deshacer y revancha | Disponible |
-| Batalla naval: cada uno ubica su flota en secreto y se turnan los disparos hasta hundir la del otro | Disponible |
-| Dominó: doble seis para dos, con o sin pozo, manos hasta llegar a la meta de puntos | Disponible |
-| Parqués: a la colombiana, con dos dados, salida con pares, seguros, comer fichas y premio al tercer par | Disponible |
-| Palabras cruzadas (estilo Scrabble): siete letras cada uno, tablero con premios, comodines y revisión con diccionario | Disponible |
-| Una (estilo UNO): cartas propias, especiales, comodines, «¡Una!» con castigo si te pillan y opción de acumular | Disponible |
-| Mini golf (estilo Plato): se jala para tirar, nueve hoyos con bumpers, arena, agua, rampas y portal; la pareja ve el apuntado en vivo | Disponible |
-| Colonos (estilo Catan): isla al azar, construir caminos, pueblos y ciudades, ladrón, comercio y cartas de desarrollo | Disponible |
+| Color de memoria (color memory): you see a color for a few seconds and each player recreates it from memory; Normal, Hard and Expert levels | Available |
+| Stop clásico: a letter comes up and you fill in first name, surname, city, fruit, color, animal and thing; whoever finishes first calls Stop! Checks spelling and suggests corrections | Available |
+| Stop contrarreloj (Too Late-style): take turns saying a word from the category and tapping its letter before time runs out | Available |
+| Enredo de letras (Boggle-style): link neighboring letters on a dice board to make words against the clock | Available |
+| Ahorcado (hangman): take turns choosing a word with a hint, or Cerquita picks one at random and you guess it together | Available |
+| Wordle a dúo: as a duel (same word, each on their own board) or as a team (one board, taking turns) | Available |
+| Sopa de letras (word search): the same puzzle for both, racing or together against the clock, with three levels | Available |
+| Adivina quién (Guess Who): 24 original characters; the app answers questions from the list and the partner answers free-text ones | Available |
+| Pinturillo: one draws and the other guesses; the drawing is shown live and all drawings are kept at the end | Available |
+| Caras y gestos (charades): one acts in front of the camera and the other guesses out loud, against the clock | Available |
+| Murdoku: sudoku with a murder; place the suspects on the floor plan following the clues to find the murderer | Available |
+| Trivia (Preguntados-style): a wheel with six categories and three levels; take turns collecting crowns or race in a duel | Available |
+| Ajedrez (chess): full game with custom pieces, drag or tap, optional clock, draws, undo and rematch | Available |
+| Batalla naval (battleship): each player hides their fleet and you take turns firing until one fleet is sunk | Available |
+| Dominó: double-six for two, with or without drawing from the boneyard, hands until someone reaches the goal | Available |
+| Parqués: Colombian-style, with two dice, leaving jail on doubles, safe squares, capturing pieces and a reward for the third double | Available |
+| Palabras cruzadas (Scrabble-style): seven letters each, a board with premium squares, blank tiles and dictionary checking | Available |
+| Una (UNO-style): original cards, action cards, wild cards, "¡Una!" with a penalty if you get caught, and optional stacking | Available |
+| Mini golf (Plato-style): pull back to shoot, nine holes with bumpers, sand, water, slopes and portals; the partner sees the aim live | Available |
+| Colonos (Catan-style): random island, build roads, settlements and cities, robber, trading and development cards | Available |
 
-## Decisiones técnicas
+## Technical decisions
 
-- **El cliente solo pinta.** El servidor envía una foto completa del estado de la sala en cada cambio; el frontend no calcula reglas del juego, solo las muestra. Eso elimina toda una clase de errores de sincronización.
-- **Reconexión automática** con espera exponencial si se cae la conexión (`src/hooks/useRoom.js`).
-- **Cuenta regresiva sin depender del reloj del otro.** El servidor envía cuántos milisegundos quedan, no una hora absoluta, así funciona aunque los relojes de los dos computadores no coincidan.
-- **Selector de color propio.** Tres deslizadores (tono, saturación, brillo) cuya pista muestra el gradiente real del canal según los otros dos valores.
-- **Diseño con identidad por jugador.** Cada persona tiene su color en toda la interfaz; el fondo es un gris neutro para no alterar la percepción del color en el juego.
-- **Stop sin trampas ni pérdidas.** Mientras escriben, el servidor solo cuenta cuántas casillas lleva cada uno; las respuestas se ven al cerrar la ronda. Cuando alguien canta ¡Stop!, los clientes bloquean sus casillas y mandan lo último que escribieron, y el borrador se guarda en el navegador por si se recarga la página.
-- **Tablero táctil.** En Enredo de letras se arrastra el dedo por las letras o se tocan una por una; la zona sensible de cada dado es un círculo interior para que los movimientos en diagonal no marquen vecinos sin querer. En computador también se puede escribir la palabra y el tablero resalta el camino.
-- **Ahorcado dibujado a mano en SVG.** Cada error traza una parte del muñeco (se anima el trazo con `pathLength`), la cara cambia según las vidas que quedan y, si adivinan, el muñeco se baja de la horca y celebra. Quien eligió la palabra la ve completa, con las letras que faltan en tenue; quien adivina solo ve las que ya encontró.
-- **Wordle en tiempo real.** En duelo, cada uno ve los colores del tablero del otro mientras juega, pero no sus letras. Juntos, el que no tiene el turno ve en vivo lo que el otro va escribiendo. Las fichas giran al revelar los colores y la fila tiembla si la palabra no existe.
-- **Sopa de letras compartida.** Se marca arrastrando de una punta a la otra (la línea se ajusta sola a horizontal, vertical o diagonal) o tocando las dos puntas. Mientras uno arrastra, el otro ve en vivo por dónde va. Las palabras encontradas quedan resaltadas con una cápsula en SVG del color de quien las encontró.
-- **Personajes dibujados con código.** Los 24 personajes de Adivina quién son originales: cada uno es un SVG que se arma a partir de sus rasgos (pelo, color de ojos, gafas, gorra o sombrero vueltiao, barba, aretes, pecas). Las cartas se voltean en 3D al bajarlas.
-- **Dibujo en tiempo real.** En el Pinturillo los trazos se mandan en paquetitos cada 50 ms y el otro los ve aparecer en un `<canvas>` escalado a la densidad de la pantalla. Las coordenadas viajan en un espacio fijo de 1000×750, así el dibujo se ve igual en un celular y en un computador.
-- **La sala vive en la URL** (`?sala=ABCDE`), así el enlace se puede compartir y funciona en cualquier hosting estático sin reglas de reescritura.
+- **The client only renders.** The server sends a full snapshot of the room state on every change; the frontend doesn't compute game rules, it only displays them. That removes a whole class of sync bugs.
+- **Automatic reconnection** with exponential backoff if the connection drops (`src/hooks/useRoom.js`).
+- **Countdowns that don't rely on the other player's clock.** The server sends how many milliseconds are left, not an absolute time, so it works even if the two computers' clocks disagree.
+- **Custom color picker.** Three sliders (hue, saturation, brightness) whose track shows the channel's real gradient given the other two values.
+- **Per-player identity in the design.** Each person has their own color throughout the interface; the background is a neutral gray so it doesn't affect color perception in the game.
+- **Stop without cheating or lost answers.** While players write, the server only counts how many boxes each one has filled; answers are shown when the round closes. When someone calls Stop!, clients lock their boxes and send whatever they last typed, and the draft is saved in the browser in case the page reloads.
+- **Touch-friendly board.** In Enredo de letras you drag a finger across the letters or tap them one by one; each die's hit area is an inner circle so diagonal moves don't select neighbors by accident. On a computer you can also type the word and the board highlights the path.
+- **Hand-drawn hangman in SVG.** Each mistake draws in a part of the figure (the stroke is animated with `pathLength`), the face changes with the lives left and, on a win, the figure climbs down from the gallows and celebrates. Whoever chose the word sees it in full, with the missing letters faded; the guesser only sees the letters already found.
+- **Real-time Wordle.** In duel mode, each player sees the colors of the other's board while playing, but not their letters. In team mode, the player not on turn sees live what the other is typing. Tiles flip when the colors are revealed and the row shakes if the word doesn't exist.
+- **Shared word search.** You mark a word by dragging from one end to the other (the line snaps to horizontal, vertical or diagonal) or by tapping both ends. While one player drags, the other sees the selection live. Found words are highlighted with an SVG capsule in the color of whoever found them.
+- **Characters drawn in code.** The 24 Guess Who characters are originals: each one is an SVG built from its traits (hair, eye color, glasses, cap or sombrero vueltiao, beard, earrings, freckles). Cards flip in 3D when you flip them down.
+- **Real-time drawing.** In Pinturillo, strokes are sent in small batches every 50 ms and the other player sees them appear on a `<canvas>` scaled to the screen's pixel density. Coordinates travel in a fixed 1000×750 space, so the drawing looks the same on a phone and on a computer.
+- **The room lives in the URL** (`?sala=ABCDE`), so the link can be shared and it works on any static host without rewrite rules.
 
 ## Stack
 
-React 19, Vite, Tailwind CSS v4, WebSockets nativos.
+React 19, Vite, Tailwind CSS v4, native WebSockets.
 
-## Correrlo en local
+## Running locally
 
-Necesitas Node 20+ y el backend [cerquita-api](https://github.com/TU_USUARIO/cerquita-api) corriendo en `localhost:8000`.
+You need Node 20+ and the [cerquita-api](https://github.com/Melisa775/cerquita-api) backend running on `localhost:8000`.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Abre http://localhost:5173 en dos ventanas (una en incógnito) para jugar como dos personas. En desarrollo, Vite redirige `/api` y `/ws` al backend local.
+Open http://localhost:5173 in two windows (one incognito) to play as two people. In development, Vite proxies `/api` and `/ws` to the local backend.
 
-## Desplegar
+## Deploying
 
-Es un sitio estático (Vercel, Netlify, Cloudflare Pages):
+It's a static site (Vercel, Netlify, Cloudflare Pages):
 
-- **Comando de build:** `npm run build`
-- **Carpeta de salida:** `dist`
-- **Variable de entorno:** `VITE_API_URL` con la URL pública del backend, por ejemplo `https://cerquita-api.onrender.com`
+- **Build command:** `npm run build`
+- **Output folder:** `dist`
+- **Environment variable:** `VITE_API_URL` with the backend's public URL, for example `https://cerquita-api.onrender.com`
 
-Recuerda poner la URL del frontend en `CORS_ORIGINS` del backend.
+Remember to add the frontend's URL to the backend's `CORS_ORIGINS`.
 
-## Estructura
+## Structure
 
 ```
 src/
-  pages/        inicio y sala
-  games/        un componente por juego
-  hooks/        conexión en tiempo real y cuenta regresiva
-  components/   selector de color, tarjetas del lobby, barra de tiempo
-  lib/          API, colores, letras, caminos del tablero, almacenamiento local
+  pages/        home and room
+  games/        one component per game
+  hooks/        real-time connection and countdown
+  components/   color picker, lobby cards, timer bar
+  lib/          API, colors, letters, board paths, local storage
 ```
 
-## Hoja de ruta
+## Roadmap
 
-- [x] Salas con código y enlace para compartir
-- [x] Color de memoria
-- [x] Stop clásico y Stop contrarreloj
+- [x] Rooms with a code and a shareable link
+- [x] Color memory
+- [x] Classic Stop and timed Stop
 - [x] Enredo de letras
-- [x] Ahorcado
-- [x] Wordle a dúo
-- [x] Sopa de letras compartida
-- [x] Adivina quién
+- [x] Hangman
+- [x] Two-player Wordle
+- [x] Shared word search
+- [x] Guess Who
 - [x] Pinturillo
 - [x] Caras y gestos
 - [x] Murdoku
 - [x] Trivia
-- [x] Ajedrez
-- [x] Batalla naval
-- [x] Dominó
+- [x] Chess
+- [x] Battleship
+- [x] Dominoes
 - [x] Parqués
-- [x] Palabras cruzadas
+- [x] Crosswords
 - [x] Una
 - [x] Mini golf
 - [x] Colonos
-- [ ] Control compartido para ver películas al mismo tiempo
-- [x] Despliegue público
+- [x] Public deployment
 
-## Autora
+## Author
 
-Desarrollado por **Melisa Gomez Gomez** ([@Melisa775](https://github.com/Melisa775)).
+Built by **Melisa Gomez Gomez** ([@Melisa775](https://github.com/Melisa775)).

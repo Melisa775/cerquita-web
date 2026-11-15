@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-/** Tarjeta del lobby para el Pinturillo. */
+/** Lobby card for Pinturillo. */
 export default function PinturilloCard({ send, alone }) {
   const [seconds, setSeconds] = useState(90)
   const [rounds, setRounds] = useState(2)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-/** Tarjeta del lobby para la batalla naval. */
+/** Lobby card for Battleship. */
 export default function BattleshipCard({ send, alone }) {
   const [size, setSize] = useState(10)
   const [noTouch, setNoTouch] = useState(true)

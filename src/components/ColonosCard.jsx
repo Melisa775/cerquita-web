@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { TERRAIN, TerrainArt } from '../lib/colonos'
 
-const PREVIEW = ['bosque', 'campo', 'cerro', 'pasto', 'montana']
+const PREVIEW = ['forest', 'fields', 'hills', 'pasture', 'mountains']
 
-/** Tarjeta del lobby para Colonos (al estilo Catan). */
+/** Lobby card for Colonos (Catan-style). */
 export default function ColonosCard({ send, alone }) {
   const [goal, setGoal] = useState(10)
   const [friendly, setFriendly] = useState(false)

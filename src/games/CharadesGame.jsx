@@ -73,11 +73,11 @@ function Acting({ room, me, send, colorOf }) {
 
   useEffect(() => setPop((n) => n + 1), [game.hits])
 
-  // En computador: Enter o espacio = adivinó, P = pasar
+  // On desktop: Enter or space = guessed, P = pass
   useEffect(() => {
     if (!mine) return
     const onKey = (e) => {
-      // Ojo: si el foco quedó en "Pasar", Enter lo activaría; por eso se cancela lo nativo
+      // Careful: if focus is on "Pasar", Enter would trigger it; that is why the native action is cancelled
       if (e.target.closest?.('input, textarea, select')) return
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -109,7 +109,7 @@ function Acting({ room, me, send, colorOf }) {
           {game.card?.category && (
             <span className="rounded-full bg-white/20 px-4 py-1 text-sm font-semibold">
               {game.card.category}
-              {game.card.level === 'dificil' && ' · difícil'}
+              {game.card.level === 'hard' && ' · difícil'}
             </span>
           )}
           {mine ? (

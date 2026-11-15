@@ -1,16 +1,16 @@
 import { useState } from 'react'
 import Avatar from './Avatar'
 
-// Algunos personajes para la franja de la tarjeta
+// A few characters for the card's banner
 const PREVIEW = [
-  { id: 'camila', name: 'Camila', pelo: 'largo', color: 'castano', ojos: 'cafes', aretes: true, piel: 1, fondo: '#F6C9D0' },
-  { id: 'nicolas', name: 'Nicolás', pelo: 'corto', color: 'canoso', ojos: 'azules', gafas: true, barba: true, bigote: true, piel: 1, fondo: '#D9EEF0' },
-  { id: 'mariana', name: 'Mariana', pelo: 'corto', color: 'pelirrojo', ojos: 'verdes', sombrero: 'gorra', pecas: true, piel: 0, fondo: '#D5EBD9' },
-  { id: 'tomas', name: 'Tomás', pelo: 'largo', color: 'negro', ojos: 'cafes', sombrero: 'sombrero', piel: 3, fondo: '#FBE3B5' },
-  { id: 'sofia', name: 'Sofía', pelo: 'rizado', color: 'negro', ojos: 'cafes', gafas: true, piel: 3, fondo: '#E6DDF5' },
+  { id: 'camila', name: 'Camila', hair: 'long', hairColor: 'brown', eyes: 'brown', earrings: true, skin: 1, background: '#F6C9D0' },
+  { id: 'nicolas', name: 'Nicolás', hair: 'short', hairColor: 'gray', eyes: 'blue', glasses: true, beard: true, mustache: true, skin: 1, background: '#D9EEF0' },
+  { id: 'mariana', name: 'Mariana', hair: 'short', hairColor: 'red', eyes: 'green', hat: 'cap', freckles: true, skin: 0, background: '#D5EBD9' },
+  { id: 'tomas', name: 'Tomás', hair: 'long', hairColor: 'black', eyes: 'brown', hat: 'hat', skin: 3, background: '#FBE3B5' },
+  { id: 'sofia', name: 'Sofía', hair: 'curly', hairColor: 'black', eyes: 'brown', glasses: true, skin: 3, background: '#E6DDF5' },
 ]
 
-/** Tarjeta del lobby para Adivina quién. */
+/** Lobby card for Guess Who. */
 export default function GuessWhoCard({ send, alone }) {
   const [size, setSize] = useState(24)
   const [rounds, setRounds] = useState(3)

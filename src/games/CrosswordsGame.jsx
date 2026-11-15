@@ -15,15 +15,15 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
   const game = room.game
   const myTurn = game.phase === 'playing' && game.turn === me
   const [pending, setPending] = useState([]) // {r, c, letter, blank, idx}
-  const [selected, setSelected] = useState(null) // índice del atril
+  const [selected, setSelected] = useState(null) // rack index
   const [order, setOrder] = useState(() => game.rack.map((_, i) => i))
   const [blankAsk, setBlankAsk] = useState(null) // {r, c, idx}
-  const [swap, setSwap] = useState(null) // Set de índices para cambiar
+  const [swap, setSwap] = useState(null) // Set of indices to exchange
   const [drag, setDrag] = useState(null) // {idx, x, y}
   const [flash, setFlash] = useState(null)
   const rackKey = game.rack.join('')
 
-  // Si cambia el atril (jugaste, cambiaste o es otra partida) se reinicia lo local
+  // If the rack changes (you played, exchanged, or it's a new game) local state resets
   useEffect(() => {
     setPending([])
     setSelected(null)
@@ -66,7 +66,7 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
     send({ type: 'cw_play', tiles: pending.map(({ r, c, letter, blank }) => ({ r, c, letter, blank })) })
   }
 
-  // arrastrar del atril al tablero
+  // drag from the rack to the board
   function onRackPointerDown(e, idx) {
     if (!myTurn || used.has(idx) || swap) return
     e.currentTarget.setPointerCapture(e.pointerId)
@@ -181,7 +181,7 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
 }
 CrosswordsGame.showsErrors = true
 
-/* --- tablero ------------------------------------------------------------ */
+/* --- board -------------------------------------------------------------- */
 
 function Tile({ letter, value, blank, size = 'h-full w-full', pending, fresh, lifted, dim }) {
   return (
@@ -246,7 +246,7 @@ function Board({ game, pending, onCell, canPlace }) {
   )
 }
 
-/* --- atril y botones ---------------------------------------------------- */
+/* --- rack and buttons --------------------------------------------------- */
 
 function Rack({ game, order, used, selected, swap, onSwapToggle, onPointerDown, onPointerMove, onPointerUp, myTurn }) {
   return (
@@ -303,7 +303,7 @@ function Controls({ game, myTurn, pending, pv, swap, onSubmit, onRecall, onShuff
   )
 }
 
-/* --- panel lateral ------------------------------------------------------ */
+/* --- side panel --------------------------------------------------------- */
 
 function describe(h, me) {
   const you = h.player === me

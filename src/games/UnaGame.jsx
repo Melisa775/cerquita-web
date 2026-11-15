@@ -43,7 +43,7 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
     <div className="mt-4">
       <Scoreboard game={game} me={me} colorOf={colorOf} />
 
-      {/* mano de la pareja */}
+      {/* partner's hand */}
       <div className="mt-4 flex items-center justify-between gap-3">
         <span className="font-semibold" style={{ color: colorOf(other) }}>
           {other} <span className="text-sm font-normal text-muted">· {game.counts[other]} {game.counts[other] === 1 ? 'carta' : 'cartas'}</span>
@@ -56,10 +56,10 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
         ))}
       </div>
 
-      {/* mesa */}
+      {/* table */}
       <Table game={game} me={me} myTurn={myTurn} send={send} colorOf={colorOf} />
 
-      {/* botones */}
+      {/* buttons */}
       {game.phase === 'playing' && (
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           {canSayUna && (

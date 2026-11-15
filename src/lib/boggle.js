@@ -1,6 +1,6 @@
-// Debe coincidir con app/games/boggle.py en el backend
+// Must match app/games/boggle.py in the backend
 
-/** Minúsculas, sin tildes (la ñ se conserva) y solo letras. */
+/** Lowercase, no accents (ñ is kept) and letters only. */
 export function cleanWord(text) {
   return text
     .toLowerCase()
@@ -17,7 +17,7 @@ export function areNeighbors(a, b, size) {
   return a !== b && Math.abs(ra - rb) <= 1 && Math.abs(ca - cb) <= 1
 }
 
-/** Casillas que forman la palabra, o null si no se puede armar en el tablero. */
+/** Cells that form the word, or null if it can't be formed on the board. */
 export function findPath(board, size, word) {
   const tokens = board.map((t) => t.toLowerCase())
   const dfs = (i, rest, used) => {

@@ -32,7 +32,7 @@ export default function BattleshipGame({ room, me, send, colorOf, error, errorId
 }
 BattleshipGame.showsErrors = true
 
-/* --- cuadrícula --------------------------------------------------------- */
+/* --- grid --------------------------------------------------------------- */
 
 function Grid({ size, ships = [], lengths, shots = [], autoWater = [], preview, onCell, onHover, clickable, lastShot, label, compact }) {
   const shotMap = useMemo(() => new Map(shots.map(([r, c, v]) => [`${r},${c}`, v])), [shots])
@@ -59,14 +59,14 @@ function Grid({ size, ships = [], lengths, shots = [], autoWater = [], preview, 
           style={{ background: SEA, boxShadow: `inset 0 0 0 1px ${SEA_LINE}` }}
           onMouseLeave={() => onHover?.(null)}
         >
-          {/* barcos */}
+          {/* ships */}
           {ships.map((s) => {
             const len = s.length ?? lengths[s.id]
             return (
               <Ship key={s.id} ship={s} length={len} cellPct={cellPct} />
             )
           })}
-          {/* vista previa al ubicar */}
+          {/* placement preview */}
           {preview && (
             <div
               className="pointer-events-none absolute rounded-full"
@@ -81,7 +81,7 @@ function Grid({ size, ships = [], lengths, shots = [], autoWater = [], preview, 
               <div className="h-full w-full rounded-full" style={{ background: preview.bad ? 'rgba(214,48,49,.45)' : 'rgba(34,37,46,.35)' }} />
             </div>
           )}
-          {/* casillas */}
+          {/* cells */}
           <div className="absolute inset-0 grid" style={{ gridTemplateColumns: `repeat(${size}, 1fr)`, gridTemplateRows: `repeat(${size}, 1fr)` }}>
             {Array.from({ length: size * size }, (_, i) => {
               const r = Math.floor(i / size)
@@ -152,7 +152,7 @@ function Ship({ ship, length, cellPct }) {
   )
 }
 
-/* --- ubicar la flota ---------------------------------------------------- */
+/* --- fleet placement ---------------------------------------------------- */
 
 function Placement({ game, me, send, colorOf }) {
   const { size, fleet } = game
@@ -185,7 +185,7 @@ function Placement({ game, me, send, colorOf }) {
     if (ready) return
     const hit = placed.find((s) => cellsOf(s, lengths[s.id]).some(([rr, cc]) => rr === r && cc === c))
     if (hit && !selected) {
-      // recoger un barco ya ubicado
+      // pick up an already placed ship
       setPlaced(placed.filter((s) => s.id !== hit.id))
       setSelected(hit.id)
       setDir(hit.dir)
@@ -314,7 +314,7 @@ function Placement({ game, me, send, colorOf }) {
   )
 }
 
-/* --- batalla ------------------------------------------------------------ */
+/* --- battle ------------------------------------------------------------- */
 
 function shotText(last, me, fleet) {
   if (!last) return null

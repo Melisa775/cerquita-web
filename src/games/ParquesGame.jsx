@@ -34,7 +34,7 @@ export default function ParquesGame({ room, me, send, colorOf, error, errorId })
     return () => clearTimeout(id)
   }, [flash])
 
-  // En computador: espacio o Enter para lanzar
+  // On desktop: space or Enter to roll
   useEffect(() => {
     if (!(myTurn && game.phase === 'roll')) return
     const onKey = (e) => {
@@ -102,7 +102,7 @@ export default function ParquesGame({ room, me, send, colorOf, error, errorId })
 }
 ParquesGame.showsErrors = true
 
-/* --- tablero ------------------------------------------------------------ */
+/* --- board -------------------------------------------------------------- */
 
 function Board({ game, me, colorOf, movable, onPiece }) {
   const myArm = game.arms[me]
@@ -115,7 +115,7 @@ function Board({ game, me, colorOf, movable, onPiece }) {
     return { gridRow: r + 1, gridColumn: c + 1 }
   }
 
-  // fichas por casilla del circuito y de la llegada
+  // pieces per square on the track and on the home stretch
   const byCell = new Map()
   const add = (key, entry) => byCell.set(key, [...(byCell.get(key) ?? []), entry])
   for (const p of game.players) {
@@ -150,7 +150,7 @@ function Board({ game, me, colorOf, movable, onPiece }) {
     }
   }
 
-  // cárceles
+  // jails
   const jails = [0, 1, 2, 3].map((k) => {
     const [r0, c0] = jailOrigin(k)
     const a = toView([r0, c0], turns)
@@ -186,7 +186,7 @@ function Board({ game, me, colorOf, movable, onPiece }) {
     )
   })
 
-  // cielo
+  // center (cielo)
   const heaven = game.players.flatMap((p) => game.pieces[p].map((prog, i) => ({ p, i, prog })).filter((x) => x.prog === HOME))
   const ca = toView([8, 8], turns)
   const cb = toView([10, 10], turns)

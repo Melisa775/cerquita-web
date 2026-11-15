@@ -9,7 +9,7 @@ const FAN = [
   { id: 5, color: 'g', value: 'draw2' },
 ]
 
-/** Tarjeta del lobby para Una (al estilo UNO). */
+/** Lobby card for Una (UNO-style). */
 export default function UnaLobbyCard({ send, alone }) {
   const [goal, setGoal] = useState(0)
   const [stacking, setStacking] = useState(false)

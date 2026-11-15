@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { EndActions } from '../components/EndActions'
 import { DEV_META, RESOURCES, RES_META, ResourceIcon, TERRAIN, TerrainArt, pips } from '../lib/colonos'
 
-const S = 46 // tamaño de un hexágono en el dibujo
+const S = 46 // size of a hexagon in the drawing
 const SEA = 'hsl(204 62% 56%)'
 
 const DIE = {
@@ -15,9 +15,9 @@ const DIE = {
 }
 
 const COST_LABEL = {
-  road: ['Camino', { madera: 1, ladrillo: 1 }],
-  settlement: ['Pueblo', { madera: 1, ladrillo: 1, lana: 1, trigo: 1 }],
-  city: ['Ciudad', { trigo: 2, piedra: 3 }],
+  road: ['Camino', { wood: 1, brick: 1 }],
+  settlement: ['Pueblo', { wood: 1, brick: 1, wool: 1, grain: 1 }],
+  city: ['Ciudad', { grain: 2, ore: 3 }],
 }
 
 const canPay = (hand, cost) => hand && Object.entries(cost).every(([r, n]) => hand[r] >= n)
@@ -27,10 +27,10 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
   const other = game.players.find((p) => p !== me)
   const myTurn = game.turn === me && game.phase !== 'finished'
   const [mode, setMode] = useState(null) // 'road' | 'settlement' | 'city'
-  const [picker, setPicker] = useState(null) // 'cosecha' | 'monopolio'
+  const [picker, setPicker] = useState(null) // 'year_of_plenty' | 'monopoly'
   const [flash, setFlash] = useState(null)
 
-  // modo de construcción automático en la colocación inicial y con caminos gratis
+  // automatic build mode during initial placement and with free roads
   const autoMode = myTurn && game.phase === 'setup' ? game.setupNeed : myTurn && game.phase === 'road_building' ? 'road' : null
   const activeMode = autoMode ?? (myTurn && game.phase === 'main' ? mode : null)
 
@@ -92,7 +92,7 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
 }
 ColonosGame.showsErrors = true
 
-/* --- encabezado con los dos jugadores ---------------------------------- */
+/* --- header with both players ------------------------------------------- */
 
 function Header({ game, me, other, colorOf }) {
   return (
@@ -121,7 +121,7 @@ function Header({ game, me, other, colorOf }) {
   )
 }
 
-/* --- tablero ------------------------------------------------------------ */
+/* --- board -------------------------------------------------------------- */
 
 function hexPoints(cx, cy, r) {
   const pts = []
@@ -165,7 +165,7 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
       <rect x={minX} y={-H / 2} width={W} height={H} fill={SEA} />
       <polygon points={hexPoints(0, 0, S * 5.55)} fill="hsl(204 55% 64%)" transform="rotate(30)" />
 
-      {/* puertos */}
+      {/* ports */}
       {b.ports.map((p, i) => {
         const [a, c] = p.vertices.map((v) => V[v])
         const mx = (a[0] + c[0]) / 2
@@ -192,7 +192,7 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
         )
       })}
 
-      {/* hexágonos */}
+      {/* hexagons */}
       {b.hexes.map((h, i) => {
         const [cx, cy] = [h.center[0] * S, h.center[1] * S]
         const t = TERRAIN[h.terrain]
@@ -229,7 +229,7 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
         )
       })}
 
-      {/* caminos */}
+      {/* roads */}
       {Object.entries(game.roads).map(([e, owner]) => {
         const [a, c] = b.edges[e].map((v) => V[v])
         const sx = a[0] + (c[0] - a[0]) * 0.16
@@ -243,7 +243,7 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
           </g>
         )
       })}
-      {/* aristas disponibles */}
+      {/* available edges */}
       {[...legalE].map((e) => {
         const [a, c] = b.edges[e].map((v) => V[v])
         return (
@@ -254,11 +254,11 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
         )
       })}
 
-      {/* pueblos y ciudades */}
+      {/* settlements and cities */}
       {Object.entries(game.buildings).map(([v, bld]) => (
         <House key={v} x={V[v][0]} y={V[v][1]} color={colorOf(bld.owner)} city={bld.kind === 'city'} />
       ))}
-      {/* vértices disponibles */}
+      {/* available vertices */}
       {[...legalV].map((v) => (
         <g key={`lv${v}`} onClick={() => onTarget(mode, v)} className="cursor-pointer">
           <circle cx={V[v][0]} cy={V[v][1]} r="13" fill="transparent" />
@@ -364,7 +364,7 @@ function CostChips({ cost }) {
 
 function Build({ game, mode, setMode, send }) {
   const hand = game.hand
-  const devCost = { lana: 1, trigo: 1, piedra: 1 }
+  const devCost = { wool: 1, grain: 1, ore: 1 }
   return (
     <div className="rounded-[2rem] bg-paper p-4">
       <p className="mb-2 text-sm font-semibold text-muted">Construir</p>
@@ -406,7 +406,7 @@ function Devs({ game, me, myTurn, send, onPicker }) {
     if (!c.fresh) groups[c.kind].ready += 1
   }
   const canPlay = (kind) =>
-    myTurn && !game.devPlayed && kind !== 'punto' && groups[kind].ready > 0 && (game.phase === 'main' || (game.phase === 'roll' && kind === 'soldado'))
+    myTurn && !game.devPlayed && kind !== 'victory_point' && groups[kind].ready > 0 && (game.phase === 'main' || (game.phase === 'roll' && kind === 'knight'))
   return (
     <div className="rounded-[2rem] bg-paper p-4">
       <p className="mb-2 text-sm font-semibold text-muted">Tus cartas de desarrollo</p>
@@ -417,12 +417,12 @@ function Devs({ game, me, myTurn, send, onPicker }) {
               <p className="text-sm font-semibold">
                 {DEV_META[kind].label} {g.n > 1 && `×${g.n}`}
               </p>
-              <p className="text-xs text-muted">{g.ready < g.n && kind !== 'punto' ? 'La de este turno se juega desde el próximo. ' : ''}{DEV_META[kind].text}</p>
+              <p className="text-xs text-muted">{g.ready < g.n && kind !== 'victory_point' ? 'La de este turno se juega desde el próximo. ' : ''}{DEV_META[kind].text}</p>
             </div>
-            {kind !== 'punto' && (
+            {kind !== 'victory_point' && (
               <button
                 disabled={!canPlay(kind)}
-                onClick={() => (kind === 'cosecha' || kind === 'monopolio' ? onPicker(kind) : send({ type: 'co_play_dev', card: kind }))}
+                onClick={() => (kind === 'year_of_plenty' || kind === 'monopoly' ? onPicker(kind) : send({ type: 'co_play_dev', card: kind }))}
                 className="shrink-0 rounded-xl bg-ink px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-35"
               >
                 Jugar
@@ -447,8 +447,8 @@ function Counter({ value, onChange, max }) {
 
 function Trade({ game, me, other, send }) {
   const [tab, setTab] = useState('bank')
-  const [give, setGive] = useState('madera')
-  const [get, setGet] = useState('piedra')
+  const [give, setGive] = useState('wood')
+  const [get, setGet] = useState('ore')
   const [offerGive, setOfferGive] = useState({})
   const [offerGet, setOfferGet] = useState({})
   const hand = game.hand
@@ -588,8 +588,8 @@ function DiscardModal({ game, me, send }) {
 
 function PickerModal({ kind, onClose, send }) {
   const [picks, setPicks] = useState([])
-  const title = kind === 'cosecha' ? 'Elige dos recursos del banco' : '¿Qué recurso le quitas a tu pareja?'
-  const need = kind === 'cosecha' ? 2 : 1
+  const title = kind === 'year_of_plenty' ? 'Elige dos recursos del banco' : '¿Qué recurso le quitas a tu pareja?'
+  const need = kind === 'year_of_plenty' ? 2 : 1
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
       <div className="pop w-full max-w-sm rounded-3xl bg-paper p-5" onClick={(e) => e.stopPropagation()}>
@@ -606,7 +606,7 @@ function PickerModal({ kind, onClose, send }) {
         <button
           disabled={picks.length !== need}
           onClick={() => {
-            send(kind === 'cosecha' ? { type: 'co_play_dev', card: 'cosecha', resources: picks } : { type: 'co_play_dev', card: 'monopolio', resource: picks[0] })
+            send(kind === 'year_of_plenty' ? { type: 'co_play_dev', card: 'year_of_plenty', resources: picks } : { type: 'co_play_dev', card: 'monopoly', resource: picks[0] })
             onClose()
           }}
           className="mt-4 w-full rounded-2xl bg-ink py-3 font-semibold text-white disabled:opacity-40"
@@ -618,7 +618,7 @@ function PickerModal({ kind, onClose, send }) {
   )
 }
 
-/* --- historial ------------------------------------------------------------ */
+/* --- log ------------------------------------------------------------------ */
 
 const WHAT = { road: 'un camino', settlement: 'un pueblo', city: 'una ciudad' }
 

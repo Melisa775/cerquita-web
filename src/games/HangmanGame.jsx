@@ -46,7 +46,7 @@ function Header({ game, colorOf }) {
   )
 }
 
-// --- Elegir la palabra ------------------------------------------------------
+// --- Choose the word --------------------------------------------------------
 function Choosing({ game, me, send, colorOf }) {
   const [word, setWord] = useState('')
   const [hint, setHint] = useState('')
@@ -130,7 +130,7 @@ function Choosing({ game, me, send, colorOf }) {
   )
 }
 
-// --- Adivinar ------------------------------------------------------------
+// --- Guess ---------------------------------------------------------------
 function Board({ game, me, send, colorOf }) {
   const [solving, setSolving] = useState(false)
   const [attempt, setAttempt] = useState('')
@@ -143,13 +143,13 @@ function Board({ game, me, send, colorOf }) {
   const over = game.phase === 'round_over'
   const state = over ? (game.result.won ? 'won' : 'lost') : 'playing'
 
-  // Cada error sacude un poco la palabra
+  // Each mistake shakes the word a little
   useEffect(() => {
     if (game.misses > lastMisses.current) setShakeKey((k) => k + 1)
     lastMisses.current = game.misses
   }, [game.misses])
 
-  // También se juega con el teclado del computador
+  // It can also be played with the computer keyboard
   useEffect(() => {
     if (!canGuess || solving) return
     const onKey = (e) => {
@@ -263,8 +263,8 @@ function Slot({ slot, isSetter, over, color }) {
     return <span className="flex h-12 w-5 items-end justify-center font-display text-3xl font-extrabold sm:h-14">{slot.char}</span>
   }
   const visible = slot.char != null
-  const missed = over && !slot.found // la palabra se revela al final
-  const ghost = isSetter && !slot.found && !over // quien eligió ve las que faltan, en tenue
+  const missed = over && !slot.found // the word is revealed at the end
+  const ghost = isSetter && !slot.found && !over // whoever chose it sees the missing ones, faded
   return (
     <span
       className="flex h-12 w-9 items-end justify-center border-b-4 pb-1 font-display text-3xl font-extrabold uppercase sm:h-14 sm:w-11 sm:text-4xl"
@@ -387,7 +387,7 @@ function RoundOver({ game, me, send, colorOf }) {
   )
 }
 
-// --- Final ----------------------------------------------------------------
+// --- End ------------------------------------------------------------------
 function Final({ game, me, send, colorOf }) {
   const random = game.mode === 'random'
   const total = game.history.length

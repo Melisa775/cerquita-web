@@ -16,7 +16,7 @@ function loadLetters() {
   }
 }
 
-/** Tarjeta del lobby para Stop, con sus dos modos. */
+/** Lobby card for Stop, with its two modes. */
 export default function StopCard({ send, alone }) {
   const [mode, setMode] = useState(() => (storage.get(MODE_KEY) === 'toolate' ? 'toolate' : 'classic'))
   const [rounds, setRounds] = useState(5)

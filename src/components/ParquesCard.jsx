@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 const PREVIEW = ['var(--color-p1)', 'var(--color-p2)']
 
-/** Tarjeta del lobby para el parqués. */
+/** Lobby card for parqués. */
 export default function ParquesCard({ send, alone }) {
   const [pieces, setPieces] = useState(4)
 

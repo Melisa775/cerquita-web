@@ -15,7 +15,7 @@ function clock(ms) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }
 
-/** Tiempo transcurrido, contando desde lo que dijo el servidor. */
+/** Elapsed time, counting from what the server said. */
 function useElapsed(game) {
   const [now, setNow] = useState(() => Date.now())
   const base = useRef({ ms: game.elapsedMs, at: Date.now() })
@@ -128,8 +128,8 @@ function Board({ game, me, send, colorOf, interactive }) {
   const size = game.size
   const inner = useRef(null)
   const drag = useRef(null) // { start, end, moved }
-  const [sel, setSel] = useState(null) // selección propia en curso
-  const [anchor, setAnchor] = useState(null) // primera punta en modo "tocar"
+  const [sel, setSel] = useState(null) // own selection in progress
+  const [anchor, setAnchor] = useState(null) // first endpoint in "tap" mode
   const sent = useRef(null)
 
   function cellAt(e) {
@@ -139,7 +139,7 @@ function Board({ game, me, send, colorOf, interactive }) {
     return [Math.min(size - 1, Math.max(0, r)), Math.min(size - 1, Math.max(0, c))]
   }
 
-  // Ajusta el final a la recta más cercana: horizontal, vertical o diagonal
+  // Snaps the end to the nearest line: horizontal, vertical or diagonal
   function snap(start, cell) {
     let dr = cell[0] - start[0]
     let dc = cell[1] - start[1]
@@ -207,7 +207,7 @@ function Board({ game, me, send, colorOf, interactive }) {
     if (d.moved && !same(d.start, d.end)) {
       mark(d.start, d.end)
     } else if (anchor && same(anchor, d.start)) {
-      setAnchor(null) // tocar la misma letra otra vez cancela
+      setAnchor(null) // tapping the same letter again cancels
       setSel(null)
       share(null, null)
     } else {

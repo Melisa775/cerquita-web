@@ -5,7 +5,7 @@ import { MARK_COLORS } from '../games/WordleGame'
 const MODE_KEY = 'cerquita:wordle:mode'
 const BAND = [['C', 'correct'], ['E', 'absent'], ['R', 'present'], ['C', 'correct'], ['A', 'correct']]
 
-/** Tarjeta del lobby para Wordle a dúo. */
+/** Lobby card for two-player Wordle. */
 export default function WordleCard({ send, alone }) {
   const [mode, setMode] = useState(() => (storage.get(MODE_KEY) === 'team' ? 'team' : 'duel'))
   const [length, setLength] = useState(5)

@@ -5,7 +5,7 @@ const MODE_KEY = 'cerquita:hangman:mode'
 const ROUNDS = { turns: [2, 4, 6], random: [3, 5, 10] }
 const BAND = ['A', null, 'O', 'R', null, 'A', null, 'O'] // A_OR_A_O
 
-/** Tarjeta del lobby para el Ahorcado. */
+/** Lobby card for Hangman. */
 export default function HangmanCard({ send, alone }) {
   const [mode, setMode] = useState(() => (storage.get(MODE_KEY) === 'random' ? 'random' : 'turns'))
   const [lives, setLives] = useState(6)

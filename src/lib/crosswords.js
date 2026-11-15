@@ -1,7 +1,7 @@
 /**
- * Vista previa de una jugada de palabras cruzadas: qué palabras forma y
- * cuántos puntos daría. Es la misma cuenta que hace el servidor, pero sin
- * diccionario (eso lo revisa el servidor al jugar).
+ * Preview of a crosswords move: which words it forms and how many points it
+ * would score. Same calculation the server does, but without the dictionary
+ * (the server checks that when the move is played).
  */
 export const SIZE = 15
 const CENTER = [7, 7]

@@ -1,35 +1,35 @@
-/** Colores, nombres e íconos propios de Colonos. */
-export const RESOURCES = ['madera', 'ladrillo', 'lana', 'trigo', 'piedra']
+/** Colors, names and custom icons for Colonos. */
+export const RESOURCES = ['wood', 'brick', 'wool', 'grain', 'ore']
 
 export const TERRAIN = {
-  bosque: { fill: 'hsl(135 38% 34%)', res: 'madera', label: 'Bosque' },
-  cerro: { fill: 'hsl(14 58% 50%)', res: 'ladrillo', label: 'Cerro' },
-  pasto: { fill: 'hsl(92 48% 58%)', res: 'lana', label: 'Pasto' },
-  campo: { fill: 'hsl(44 82% 58%)', res: 'trigo', label: 'Campo' },
-  montana: { fill: 'hsl(215 12% 56%)', res: 'piedra', label: 'Montaña' },
-  desierto: { fill: 'hsl(38 48% 78%)', res: null, label: 'Desierto' },
+  forest: { fill: 'hsl(135 38% 34%)', res: 'wood', label: 'Bosque' },
+  hills: { fill: 'hsl(14 58% 50%)', res: 'brick', label: 'Cerro' },
+  pasture: { fill: 'hsl(92 48% 58%)', res: 'wool', label: 'Pasto' },
+  fields: { fill: 'hsl(44 82% 58%)', res: 'grain', label: 'Campo' },
+  mountains: { fill: 'hsl(215 12% 56%)', res: 'ore', label: 'Montaña' },
+  desert: { fill: 'hsl(38 48% 78%)', res: null, label: 'Desierto' },
 }
 
 export const RES_META = {
-  madera: { label: 'Madera', terrain: 'bosque' },
-  ladrillo: { label: 'Ladrillo', terrain: 'cerro' },
-  lana: { label: 'Lana', terrain: 'pasto' },
-  trigo: { label: 'Trigo', terrain: 'campo' },
-  piedra: { label: 'Piedra', terrain: 'montana' },
+  wood: { label: 'Madera', terrain: 'forest' },
+  brick: { label: 'Ladrillo', terrain: 'hills' },
+  wool: { label: 'Lana', terrain: 'pasture' },
+  grain: { label: 'Trigo', terrain: 'fields' },
+  ore: { label: 'Piedra', terrain: 'mountains' },
 }
 
 export const DEV_META = {
-  soldado: { label: 'Soldado', text: 'Mueve el ladrón y róbale una carta. Tres o más dan el ejército más grande.' },
-  caminos: { label: 'Constructor', text: 'Pon dos caminos gratis.' },
-  cosecha: { label: 'Cosecha', text: 'Toma dos recursos del banco.' },
-  monopolio: { label: 'Monopolio', text: 'Te llevas todas las cartas de un recurso que tenga tu pareja.' },
-  punto: { label: 'Punto', text: 'Vale un punto de victoria. Cuenta solo, sin jugarla.' },
+  knight: { label: 'Soldado', text: 'Mueve el ladrón y róbale una carta. Tres o más dan el ejército más grande.' },
+  road_building: { label: 'Constructor', text: 'Pon dos caminos gratis.' },
+  year_of_plenty: { label: 'Cosecha', text: 'Toma dos recursos del banco.' },
+  monopoly: { label: 'Monopolio', text: 'Te llevas todas las cartas de un recurso que tenga tu pareja.' },
+  victory_point: { label: 'Punto', text: 'Vale un punto de victoria. Cuenta solo, sin jugarla.' },
 }
 
-/** Dibujo del terreno dentro de una caja de -1..1 (se escala desde afuera). */
+/** Terrain drawing inside a -1..1 box (scaled by the caller). */
 export function TerrainArt({ terrain }) {
   switch (terrain) {
-    case 'bosque':
+    case 'forest':
       return (
         <g fill="hsl(135 45% 22%)">
           <path d="M-0.42 0.28 L-0.22 -0.2 L-0.02 0.28 Z" />
@@ -37,7 +37,7 @@ export function TerrainArt({ terrain }) {
           <path d="M-0.18 0.5 L0.02 0.06 L0.22 0.5 Z" fill="hsl(135 45% 26%)" />
         </g>
       )
-    case 'cerro':
+    case 'hills':
       return (
         <g fill="hsl(14 55% 38%)" stroke="hsl(14 60% 62%)" strokeWidth="0.03">
           <rect x="-0.42" y="-0.12" width="0.4" height="0.18" />
@@ -46,7 +46,7 @@ export function TerrainArt({ terrain }) {
           <rect x="-0.2" y="-0.32" width="0.4" height="0.18" />
         </g>
       )
-    case 'pasto':
+    case 'pasture':
       return (
         <g>
           <ellipse cx="0" cy="0.02" rx="0.32" ry="0.2" fill="white" />
@@ -56,7 +56,7 @@ export function TerrainArt({ terrain }) {
           <path d="M-0.16 0.2 v0.16 M0.14 0.2 v0.16" stroke="hsl(30 15% 25%)" strokeWidth="0.06" strokeLinecap="round" />
         </g>
       )
-    case 'campo':
+    case 'fields':
       return (
         <g stroke="hsl(36 70% 36%)" strokeWidth="0.05" strokeLinecap="round" fill="hsl(36 70% 40%)">
           {[-0.28, 0, 0.28].map((x) => (
@@ -70,7 +70,7 @@ export function TerrainArt({ terrain }) {
           ))}
         </g>
       )
-    case 'montana':
+    case 'mountains':
       return (
         <g>
           <path d="M-0.5 0.32 L-0.12 -0.36 L0.26 0.32 Z" fill="hsl(215 14% 38%)" />
@@ -89,7 +89,7 @@ export function TerrainArt({ terrain }) {
   }
 }
 
-/** Ícono cuadrado de un recurso, para las cartas de la mano. */
+/** Square resource icon, for the cards in hand. */
 export function ResourceIcon({ res, className = 'h-8 w-8' }) {
   const t = RES_META[res].terrain
   return (

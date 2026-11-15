@@ -1,4 +1,4 @@
-/** Título del final de un juego según los puntajes. */
+/** End-of-game title based on the scores. */
 export function winnerTitle(scores, unit = 'puntos') {
   const players = Object.keys(scores)
   const ranking = [...players].sort((a, b) => scores[b] - scores[a])

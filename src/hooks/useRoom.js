@@ -2,18 +2,18 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { socketUrl } from '../lib/api'
 
 /**
- * Conexión en tiempo real con una sala.
- * El servidor envía la foto completa del estado en cada cambio; aquí solo
- * se guarda la última y se reconecta si se cae la conexión.
+ * Real-time connection to a room.
+ * The server sends a full state snapshot on every change; this only keeps
+ * the latest one and reconnects if the connection drops.
  */
 export function useRoom(code, name) {
   const [room, setRoom] = useState(null)
   const [status, setStatus] = useState('connecting') // connecting | open | reconnecting | closed
   const [error, setError] = useState(null)
-  const [errorId, setErrorId] = useState(0) // cambia con cada error, aunque el texto se repita
+  const [errorId, setErrorId] = useState(0) // changes with every error, even if the text repeats
   const [fatal, setFatal] = useState(null)
   const wsRef = useRef(null)
-  const listeners = useRef(new Set()) // eventos pequeños de los juegos (p. ej. trazos)
+  const listeners = useRef(new Set()) // small game events (e.g. strokes)
 
   useEffect(() => {
     let stopped = false

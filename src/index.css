@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 @theme {
-  --color-stone: #E7E8EB;   /* fondo neutro: no tiñe la percepción del color */
-  --color-paper: #F6F6F7;   /* superficies */
-  --color-ink: #22252E;     /* texto */
-  --color-muted: #6B6F7B;   /* texto secundario */
-  --color-line: #CDCFD5;    /* bordes */
-  --color-p1: #0F6E6A;      /* jugador 1 */
-  --color-p2: #B23A5A;      /* jugador 2 */
+  --color-stone: #E7E8EB;   /* neutral background: doesn't tint color perception */
+  --color-paper: #F6F6F7;   /* surfaces */
+  --color-ink: #22252E;     /* text */
+  --color-muted: #6B6F7B;   /* secondary text */
+  --color-line: #CDCFD5;    /* borders */
+  --color-p1: #0F6E6A;      /* player 1 */
+  --color-p2: #B23A5A;      /* player 2 */
   --color-danger: #A23B1F;
 
   --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
@@ -21,7 +21,7 @@
   :focus-visible { outline: 3px solid var(--color-ink); outline-offset: 3px; border-radius: 6px; }
 }
 
-/* Deslizadores de color: la pista muestra el gradiente real del canal */
+/* Color sliders: the track shows the channel's real gradient */
 .hsb-range {
   appearance: none;
   width: 100%;
@@ -48,7 +48,7 @@
 }
 .hsb-range:focus-visible { outline-offset: 4px; }
 
-/* El único momento de movimiento: el color inunda la pantalla */
+/* The only moment of motion: the color floods the screen */
 @keyframes flood {
   from { clip-path: circle(0% at 50% 50%); }
   to { clip-path: circle(150% at 50% 50%); }
@@ -57,7 +57,7 @@
 
 @keyframes drain { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 
-/* Ahorcado: cada parte se traza, las letras aparecen y, si ganan, flotan corazones */
+/* Hangman: each part is drawn in, letters appear and, on a win, hearts float up */
 @keyframes draw { to { stroke-dashoffset: 0; } }
 .hm-draw > * { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 450ms ease-out forwards; }
 @keyframes pop { 0% { transform: scale(.4); opacity: 0; } 70% { transform: scale(1.15); } 100% { transform: scale(1); opacity: 1; } }
@@ -79,7 +79,7 @@
 @keyframes shake { 0%, 100% { translate: 0; } 25% { translate: -6px; } 75% { translate: 6px; } }
 .shake { animation: shake 280ms ease-in-out; }
 
-/* Wordle: la ficha gira y cambia de color a mitad de giro */
+/* Wordle: the tile flips and changes color halfway through */
 @keyframes flip {
   0% { transform: rotateX(0); background: var(--from); color: var(--color-ink); border-color: var(--color-line); }
   49% { background: var(--from); color: var(--color-ink); border-color: var(--color-line); }

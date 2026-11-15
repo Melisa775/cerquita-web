@@ -5,7 +5,7 @@ const W = 100
 const H = 150
 const BALL_R = 2.2
 const HOLE_R = 3.6
-const PULL_MAX = 34 // unidades de arrastre para fuerza máxima
+const PULL_MAX = 34 // drag units for maximum power
 
 const C = {
   rough: 'hsl(140 32% 30%)',
@@ -34,7 +34,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
   const course = game.course
   const [anim, setAnim] = useState(null) // { player, path, i }
   const [label, setLabel] = useState(null)
-  const [aim, setAim] = useState(null) // mi apuntado: { angle, power, px, py }
+  const [aim, setAim] = useState(null) // my aim: { angle, power, px, py }
   const [rivalAim, setRivalAim] = useState(null)
   const [flash, setFlash] = useState(null)
   const seenShot = useRef(game.lastShot?.id ?? 0)
@@ -43,8 +43,8 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
 
   const animating = !!anim
 
-  // Al empezar un hoyo nuevo, si el campo quedó fuera de la pantalla (en el
-  // celular el botón "Siguiente hoyo" queda abajo), se vuelve a mostrar
+  // When a new hole starts, if the course is off screen (on a phone the
+  // "Siguiente hoyo" button sits below it), scroll it back into view
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
@@ -62,7 +62,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
     return () => clearTimeout(id)
   }, [flash])
 
-  // apuntado de la pareja, en vivo
+  // partner's aim, live
   useEffect(
     () =>
       subscribe((ev) => {
@@ -71,8 +71,8 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
     [subscribe],
   )
 
-  // animar cada tiro nuevo. Depende solo del id del tiro: cada actualización de
-  // la sala trae un objeto nuevo y no debe cortar la animación a la mitad.
+  // animate each new shot. Depends only on the shot id: every room update
+  // brings a new object and must not cut the animation short.
   const shotRef = useRef(game.lastShot)
   shotRef.current = game.lastShot
   const shotId = game.lastShot?.id
@@ -87,7 +87,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
     let raf
     let last = performance.now()
     const step = (now) => {
-      // 60 cuadros por segundo, sin importar la tasa de refresco
+      // 60 frames per second, regardless of the refresh rate
       const advance = Math.max(1, Math.round((now - last) / (1000 / 60)))
       last = now
       i = Math.min(shot.path.length - 1, i + advance)
@@ -121,7 +121,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
     const p = pt.matrixTransform(svg.getScreenCTM().inverse())
     return [p.x, p.y]
   }
-  // Se jala desde donde se tocó (no desde la bola): así nunca se sale de la pantalla
+  // You pull from where you touched (not from the ball): that way it never leaves the screen
   function aimFrom(e, origin) {
     const [px, py] = toCourse(e)
     const dx = origin[0] - px
@@ -173,8 +173,8 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
           aria-label={`Hoyo ${game.hole + 1}: ${course.name}`}
         >
           <Course course={course} />
-          {/* bolas */}
-          {/* la bola de quien tira va encima */}
+          {/* balls */}
+          {/* the shooter's ball goes on top */}
           {[...game.players].sort((a, b) => (a === (anim?.player ?? game.turn)) - (b === (anim?.player ?? game.turn))).map((p) => {
             if (game.done[p] && !(anim && anim.player === p)) return null
             const pos = anim && anim.player === p ? anim.pos : game.balls[p]
@@ -186,7 +186,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
               </g>
             )
           })}
-          {/* apuntado */}
+          {/* aim */}
           {showAim && aimBall && !animating && <Aim ball={aimBall} aim={showAim} color={colorOf(aimOwner)} />}
         </svg>
 
@@ -208,7 +208,7 @@ function Aim({ ball, aim, color }) {
   const len = 6 + aim.power * 34
   const ex = ball[0] + Math.cos(aim.angle) * len
   const ey = ball[1] + Math.sin(aim.angle) * len
-  const hue = 120 - aim.power * 120 // verde → rojo
+  const hue = 120 - aim.power * 120 // green → red
   const dots = []
   for (let d = 4; d < len; d += 3.2) dots.push([ball[0] + Math.cos(aim.angle) * d, ball[1] + Math.sin(aim.angle) * d])
   return (
@@ -267,12 +267,12 @@ function Course({ course }) {
           <circle cx={bx} cy={by} r="4" fill="none" stroke={C.portal} strokeWidth="0.9" strokeDasharray="1.4 1.2" />
         </g>
       ))}
-      {/* hoyo y bandera */}
+      {/* hole and flag */}
       <circle cx={hx} cy={hy} r={HOLE_R + 0.6} fill="hsl(112 30% 38%)" />
       <circle cx={hx} cy={hy} r={HOLE_R} fill="#1d2420" />
       <line x1={hx + 0.4} y1={hy} x2={hx + 0.4} y2={hy - 13} stroke="white" strokeWidth="0.7" />
       <path d={`M${hx + 0.7} ${hy - 13} l7 2.2 l-7 2.4 z`} fill="hsl(2 75% 55%)" />
-      {/* salida */}
+      {/* tee */}
       <rect x={course.tee[0] - 3} y={course.tee[1] - 3} width="6" height="6" rx="1.2" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="0.5" />
       {(course.bumpers ?? []).map(([x, y, r], i) => (
         <g key={i}>

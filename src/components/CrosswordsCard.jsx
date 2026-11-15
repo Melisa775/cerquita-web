@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 const WORD = [['C', 3], ['E', 1], ['R', 1], ['C', 3], ['A', 1]]
 
-/** Tarjeta del lobby para las palabras cruzadas. */
+/** Lobby card for crosswords. */
 export default function CrosswordsCard({ send, alone }) {
   const [check, setCheck] = useState(true)
   return (

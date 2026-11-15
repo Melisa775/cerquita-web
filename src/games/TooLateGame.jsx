@@ -24,7 +24,7 @@ function Scores({ game, colorOf }) {
 function Board({ room, me, send, colorOf }) {
   const game = room.game
   const left = useCountdown(room)
-  const [sentFor, setSentFor] = useState(null) // evita mandar dos letras en el mismo turno
+  const [sentFor, setSentFor] = useState(null) // avoids sending two letters in the same turn
   const usedBy = Object.fromEntries(game.used.map((u) => [u.letter, u.player]))
   const lastUsed = game.used.at(-1)
   const myTurn = game.phase === 'playing' && game.turn === me
@@ -36,7 +36,7 @@ function Board({ room, me, send, colorOf }) {
     send({ type: 'tl_pick', letter })
   }
 
-  // En computador también se puede jugar con el teclado
+  // On desktop you can also play with the keyboard
   useEffect(() => {
     if (!canPick) return
     const onKey = (e) => {

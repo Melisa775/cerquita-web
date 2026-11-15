@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-/** Tarjeta del lobby para Enredo de letras. */
+/** Lobby card for Enredo de letras (Boggle). */
 export default function BoggleCard({ send, alone }) {
   const [size, setSize] = useState(4)
   const [minutes, setMinutes] = useState(3)

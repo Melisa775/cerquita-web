@@ -1,20 +1,20 @@
 import { useState } from 'react'
 import { CATEGORIES, CATEGORY_META, CategoryIcon } from '../lib/trivia'
 
-const LEVELS = [['facil', 'Fácil'], ['medio', 'Medio'], ['dificil', 'Difícil'], ['mezcla', 'Mezcla']]
+const LEVELS = [['easy', 'Fácil'], ['medium', 'Medio'], ['hard', 'Difícil'], ['mixed', 'Mezcla']]
 
 const MODES = [
-  ['coronas', 'Coronas', 'Por turnos: giras la ruleta y respondes. Con tres aciertos seguidos juegas por una corona; si fallas, le toca a tu pareja.'],
-  ['duelo', 'Duelo', 'Los dos responden la misma pregunta a la vez. Acertar rápido da más puntos.'],
+  ['crowns', 'Coronas', 'Por turnos: giras la ruleta y respondes. Con tres aciertos seguidos juegas por una corona; si fallas, le toca a tu pareja.'],
+  ['duel', 'Duelo', 'Los dos responden la misma pregunta a la vez. Acertar rápido da más puntos.'],
 ]
 
-/** Tarjeta del lobby para la trivia. */
+/** Lobby card for trivia. */
 export default function TriviaCard({ send, alone }) {
-  const [mode, setMode] = useState('coronas')
+  const [mode, setMode] = useState('crowns')
   const [goal, setGoal] = useState(6)
   const [questions, setQuestions] = useState(10)
   const [seconds, setSeconds] = useState(20)
-  const [level, setLevel] = useState('mezcla')
+  const [level, setLevel] = useState('mixed')
   const current = MODES.find(([key]) => key === mode)
 
   return (
@@ -62,7 +62,7 @@ export default function TriviaCard({ send, alone }) {
 
         <div className="mt-auto pt-6">
           <div className="flex flex-wrap items-center gap-3 border-t border-line pt-5">
-            {mode === 'coronas' ? (
+            {mode === 'crowns' ? (
               <label className="flex items-center gap-2 text-sm font-semibold">
                 Meta
                 <select value={goal} onChange={(e) => setGoal(Number(e.target.value))} className="rounded-xl border border-line bg-stone px-3 py-2">

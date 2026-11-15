@@ -51,7 +51,7 @@ function Play({ game, me, send, colorOf }) {
     if (!canEdit) return
     const key = `${r}-${c}`
     const kind = objects[key]
-    if (['mesa', 'planta', 'estante'].includes(kind)) return
+    if (['table', 'plant', 'shelf'].includes(kind)) return
     const who = placedAt[key]
     if (selected != null) {
       if (who === selected) {
@@ -130,7 +130,7 @@ function Play({ game, me, send, colorOf }) {
                   <p className="flex items-center gap-2">
                     <span className="font-bold">{p.name}</span>
                     {p.role === 'victim' && <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-white">víctima</span>}
-                    {placed && <span className="text-xs text-muted">✓ ubicad{p.genero === 'mujer' ? 'a' : 'o'}</span>}
+                    {placed && <span className="text-xs text-muted">✓ ubicad{p.gender === 'woman' ? 'a' : 'o'}</span>}
                   </p>
                   <ul className="mt-0.5 space-y-0.5 text-sm">
                     {p.clues.map((cl) => (
@@ -165,7 +165,7 @@ function Play({ game, me, send, colorOf }) {
   )
 }
 
-/** En el celular: los sospechosos en una fila debajo del plano, para no tener que bajar. */
+/** On phones: the suspects in a row below the floor plan, so there's no need to scroll. */
 function QuickPick({ game, selected, setSelected, violated }) {
   const person = selected != null ? game.people[selected] : null
   return (
@@ -284,17 +284,17 @@ function Board({ game, placedAt, objects, notes, selected, onCell, colorOf }) {
   )
 }
 
-/** Muebles dibujados a mano. */
+/** Hand-drawn furniture. */
 export function FurnitureIcon({ kind }) {
   const common = { className: 'absolute inset-[14%] h-[72%] w-[72%]', viewBox: '0 0 40 40', 'aria-hidden': true }
-  if (kind === 'planta')
+  if (kind === 'plant')
     return (
       <svg {...common}>
         <path d="M20 22 C10 20 8 10 12 6 C16 10 18 14 20 22 Z M20 22 C30 20 32 10 28 6 C24 10 22 14 20 22 Z M20 22 C18 12 20 6 20 4 C21 8 22 14 20 22 Z" fill="#3E9460" />
         <path d="M12 22 H28 L26 34 H14 Z" fill="#C46F42" />
       </svg>
     )
-  if (kind === 'mesa')
+  if (kind === 'table')
     return (
       <svg {...common}>
         <rect x="5" y="12" width="30" height="7" rx="2" fill="#8A5A3B" />
@@ -302,7 +302,7 @@ export function FurnitureIcon({ kind }) {
         <rect x="28.5" y="19" width="3.5" height="14" rx="1" fill="#6E4630" />
       </svg>
     )
-  if (kind === 'estante')
+  if (kind === 'shelf')
     return (
       <svg {...common}>
         <rect x="8" y="4" width="24" height="32" rx="2" fill="#8A5A3B" />
@@ -315,7 +315,7 @@ export function FurnitureIcon({ kind }) {
         <rect x="20" y="28" width="3" height="5" fill="#D08A2E" />
       </svg>
     )
-  if (kind === 'silla')
+  if (kind === 'chair')
     return (
       <svg {...common} className="absolute inset-[22%] h-[56%] w-[56%] opacity-70">
         <rect x="11" y="4" width="18" height="16" rx="3" fill="#B07A52" />
@@ -324,7 +324,7 @@ export function FurnitureIcon({ kind }) {
         <rect x="27" y="25" width="3" height="11" fill="#6E4630" />
       </svg>
     )
-  if (kind === 'alfombra')
+  if (kind === 'rug')
     return (
       <svg {...common} className="absolute inset-[8%] h-[84%] w-[84%] opacity-60">
         <rect x="3" y="8" width="34" height="24" rx="4" fill="#B23A5A" />
@@ -352,7 +352,7 @@ function Reveal({ game, me, victim, send, colorOf }) {
         <p className="text-sm font-semibold text-white/80">¡Caso resuelto en {clock(game.result.seconds * 1000)}!</p>
         <p className="font-display text-3xl font-extrabold">Fue {murderer.name}</p>
         <p className="text-white/85">
-          Era {murderer.genero === 'mujer' ? 'la única' : 'el único'} en {withArticle(roomName)} con {victim.name}.
+          Era {murderer.gender === 'woman' ? 'la única' : 'el único'} en {withArticle(roomName)} con {victim.name}.
           {winner && ` ${winner === me ? 'Lo resolviste' : `${winner} lo resolvió`} primero.`}
         </p>
         <button onClick={() => send({ type: 'next_round' })} className="mt-3 rounded-xl bg-white px-4 py-2 font-semibold text-ink">

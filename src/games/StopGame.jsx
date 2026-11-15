@@ -34,7 +34,7 @@ function LetterTile({ letter, size = 'lg' }) {
   )
 }
 
-// --- Escribir -------------------------------------------------------------
+// --- Write ----------------------------------------------------------------
 function Sheet({ room, me, send, left, colorOf }) {
   const game = room.game
   const storeKey = `cerquita:stop:${room.code}:${game.round}:${game.letter}`
@@ -51,13 +51,13 @@ function Sheet({ room, me, send, left, colorOf }) {
   const locked = game.phase !== 'writing' || !playing
   const complete = game.categories.every((c) => (answers[c.key] || '').trim())
 
-  // Si se recargó la página, el borrador guardado vuelve al servidor.
+  // If the page was reloaded, the saved draft goes back to the server.
   useEffect(() => {
     if (playing && Object.keys(latest.current).length) send({ type: 'stop_answers', answers: latest.current })
     return () => clearTimeout(debounce.current)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Alguien cantó Stop: se envía ya mismo lo último que escribí.
+  // Someone called Stop: send whatever I last typed right away.
   useEffect(() => {
     if (game.phase === 'stopping' && playing) {
       clearTimeout(debounce.current)
@@ -181,7 +181,7 @@ function StopFlash({ game, me, colorOf }) {
   )
 }
 
-// --- Revisar --------------------------------------------------------------
+// --- Review ---------------------------------------------------------------
 function Review({ game, send, colorOf }) {
   const players = Object.keys(game.results)
   const last = game.round >= game.totalRounds
@@ -218,7 +218,7 @@ function Review({ game, send, colorOf }) {
                 key={p}
                 cell={game.results[p][c.key]}
                 letter={game.letter}
-                isCity={c.key === 'ciudad'}
+                isCity={c.key === 'city'}
                 color={colorOf(p)}
                 onToggle={() => send({ type: 'stop_toggle', player: p, category: c.key })}
               />
@@ -295,7 +295,7 @@ function AnswerCell({ cell, letter, isCity, color, onToggle }) {
   )
 }
 
-// --- Hojas: una fila por letra con su total, como en papel ----------------
+// --- Sheets: one row per letter with its total, like on paper -------------
 function Sheets({ game, rows, colorOf }) {
   const players = Object.keys(game.totals)
   if (!rows.length) return null
@@ -355,7 +355,7 @@ function Sheets({ game, rows, colorOf }) {
   )
 }
 
-// --- Final ----------------------------------------------------------------
+// --- End ------------------------------------------------------------------
 function Final({ game, send, colorOf }) {
   const players = Object.keys(game.totals)
   return (

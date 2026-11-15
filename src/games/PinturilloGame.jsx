@@ -14,7 +14,7 @@ export default function PinturilloGame({ room, me, send, colorOf, error, errorId
 }
 PinturilloGame.showsErrors = true
 
-/** Segundos que quedan del turno, a partir de lo que reportó el servidor. */
+/** Seconds left in the turn, based on what the server reported. */
 function useTurnLeft(game) {
   const [left, setLeft] = useState(null)
   useEffect(() => {
@@ -40,7 +40,7 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
   const seen = useRef(errorId)
   const buffer = useRef({ id: null, points: [] })
   const flushTimer = useRef(null)
-  // Quien dibuja no recibe sus propios eventos de vuelta: deshacer y borrar se aplican aquí mismo
+  // The drawer doesn't get their own events back: undo and clear are applied right here
   const localBus = useRef(new Set())
   const localSubscribe = useCallback((fn) => {
     localBus.current.add(fn)
@@ -60,9 +60,9 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
     return () => clearTimeout(id)
   }, [flash])
 
-  useEffect(() => setFlash(null), [game.turn]) // un "¡casi!" no pasa al turno siguiente
+  useEffect(() => setFlash(null), [game.turn]) // a "¡casi!" doesn't carry over to the next turn
 
-  // Los puntos se mandan en paquetitos para no saturar la conexión
+  // Points are sent in small batches so the connection isn't flooded
   function flush() {
     clearTimeout(flushTimer.current)
     flushTimer.current = null

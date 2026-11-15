@@ -197,8 +197,8 @@ function Lobby({ room, send }) {
 
 const COLOR_LEVELS = [
   ['normal', 'Normal', '5 s para mirar y 30 s para responder.'],
-  ['dificil', 'Difícil', '3 s para mirar, 20 s para responder, colores más apagados y puntaje más exigente.'],
-  ['experto', 'Experto', '2 s para mirar, 15 s para responder, un color que te confunde y barras sin pistas.'],
+  ['hard', 'Difícil', '3 s para mirar, 20 s para responder, colores más apagados y puntaje más exigente.'],
+  ['expert', 'Experto', '2 s para mirar, 15 s para responder, un color que te confunde y barras sin pistas.'],
 ]
 
 function ColorCard({ send, alone }) {
