@@ -95,3 +95,8 @@
   .hm-draw > * { animation: none; stroke-dashoffset: 0; }
   .pop, .hm-heart, .shake, .chess-slide, .bn-splash, .bn-boom, .parques-ready, .parques-roll, .colonos-pulse { animation: none; }
 }
+
+/* Más cerca: each new card is dealt onto the table */
+@keyframes deeper-deal { from { opacity: 0; transform: translateY(22px) rotate(-3deg) scale(.96); } to { opacity: 1; transform: none; } }
+.deeper-deal { animation: deeper-deal 420ms cubic-bezier(.2,.8,.3,1) both; }
+@media (prefers-reduced-motion: reduce) { .deeper-deal { animation: none; } }

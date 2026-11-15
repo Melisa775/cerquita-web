@@ -1,0 +1,276 @@
+import { useEffect, useState } from 'react'
+import { EndActions } from '../components/EndActions'
+import { LEVELS, LEVEL_META, WILDCARD_META } from '../lib/deeper'
+
+// Short reminders for whoever is listening, so the game stays a safe space
+const LISTEN_TIPS = {
+  icebreaker: ['Escucha y pregunta algo más sobre lo que te cuente.', 'Si te da risa, ríanse juntos: es parte del juego.'],
+  deep: [
+    'Escucha sin interrumpir. Cuando termine, cuéntale qué te hizo sentir oírlo.',
+    'No hace falta arreglar nada: a veces basta con decir "te entiendo".',
+    'Antes de responder, repite con tus palabras lo que entendiste.',
+  ],
+  deeper: [
+    'Lo que se diga aquí se cuida. Agradécele por confiar en ti.',
+    'Si algo te duele oírlo, respira y pregunta antes de defenderte.',
+    'Pueden tomarse su tiempo. El silencio también es parte de la conversación.',
+  ],
+}
+
+export default function DeeperGame({ room, me, send, colorOf }) {
+  const game = room.game
+  if (game.phase === 'letters') return <Letters game={game} me={me} send={send} colorOf={colorOf} />
+  if (game.phase === 'finished') return <Final game={game} me={me} send={send} colorOf={colorOf} />
+  return <Cards game={game} me={me} send={send} colorOf={colorOf} />
+}
+
+/* --- level track ------------------------------------------------------ */
+
+function LevelTrack({ level }) {
+  const current = LEVELS.indexOf(level)
+  return (
+    <ol className="flex gap-1.5" aria-label="Niveles">
+      {LEVELS.map((l, i) => (
+        <li
+          key={l}
+          aria-current={i === current ? 'step' : undefined}
+          className={`rounded-full px-3 py-1 text-sm font-semibold ${i === current ? 'text-white' : i < current ? 'bg-paper text-ink' : 'bg-paper text-muted'}`}
+          style={i === current ? { background: LEVEL_META[l].bg } : undefined}
+        >
+          {i < current && '✓ '}
+          {LEVEL_META[l].label}
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+/* --- cards ------------------------------------------------------------ */
+
+function Cards({ game, me, send, colorOf }) {
+  const { card, answerer } = game
+  const wildcard = card.kind === 'wildcard'
+  const meta = wildcard ? WILDCARD_META : LEVEL_META[card.level]
+  const partner = game.players.find((p) => p !== me)
+  const listening = card.kind === 'question' && answerer !== me
+  const tips = LISTEN_TIPS[game.level]
+  const tip = tips[game.count % tips.length]
+  const next = () => send({ type: 'dp_next', at: game.count })
+
+  // On desktop: Enter or the right arrow draws the next card
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.closest?.('input, textarea, select, button')) return
+      if (e.key === 'ArrowRight' || e.key === 'Enter') {
+        e.preventDefault()
+        send({ type: 'dp_next', at: game.count })
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [send, game.count])
+
+  let who
+  if (card.kind === 'both') who = 'Responden los dos'
+  else if (wildcard) who = answerer === me ? 'Comodín para ti' : `Comodín para ${answerer}`
+  else who = answerer === me ? 'Te toca responder' : `Responde ${answerer}`
+
+  return (
+    <div className="mt-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <LevelTrack level={game.level} />
+        <span className="text-sm text-muted tabular-nums">Carta {game.count}</span>
+      </div>
+
+      <section
+        key={game.count}
+        className="deeper-deal relative mt-5 flex min-h-[20rem] flex-col rounded-[2rem] p-7 shadow-[0_18px_40px_-20px_rgba(34,37,46,.55)] sm:min-h-[22rem] sm:p-10"
+        style={{ background: meta.bg, color: meta.ink }}
+        aria-live="polite"
+      >
+        <div className="flex items-center justify-between text-sm font-semibold uppercase tracking-wider opacity-80">
+          <span>{wildcard ? `✦ ${meta.label}` : meta.label}</span>
+          <button
+            onClick={() => send({ type: 'dp_save' })}
+            aria-pressed={game.savedCurrent}
+            className="rounded-full px-3 py-1 normal-case tracking-normal hover:bg-black/10"
+            title={game.savedCurrent ? 'Quitar de guardadas' : 'Guardar para volver a ella'}
+          >
+            {game.savedCurrent ? '♥ Guardada' : '♡ Guardar'}
+          </button>
+        </div>
+        <p className="my-auto py-8 text-center font-display text-2xl font-bold leading-snug text-balance sm:text-4xl">{card.text}</p>
+        <p className="text-center font-semibold">
+          {card.kind !== 'both' && (
+            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle ring-2 ring-white/70" style={{ background: colorOf(answerer) }} />
+          )}
+          {who}
+        </p>
+      </section>
+
+      {listening && <p className="mt-4 text-center text-muted">{tip}</p>}
+
+      <div className="mt-5 flex flex-wrap justify-center gap-3">
+        <button onClick={next} className="rounded-2xl bg-ink px-6 py-3 font-semibold text-white">
+          Siguiente carta
+        </button>
+        <button
+          onClick={() => send({ type: 'dp_skip', at: game.count })}
+          className="rounded-2xl border border-line bg-paper px-5 py-3 font-semibold hover:border-ink"
+          title="Otra carta para la misma persona"
+        >
+          Otra carta
+        </button>
+      </div>
+      <p className="mt-2 hidden text-center text-xs text-muted sm:block">Atajo: Enter o → para la siguiente carta.</p>
+
+      <div className="mt-8 grid gap-3 sm:grid-cols-2">
+        {game.level !== 'deeper' && (
+          <VoteButton
+            label={`Pasar a ${LEVEL_META[LEVELS[LEVELS.indexOf(game.level) + 1]].label}`}
+            votes={game.votes.deeper}
+            me={me}
+            partner={partner}
+            onClick={() => send({ type: 'dp_deeper' })}
+            accent={LEVEL_META[LEVELS[LEVELS.indexOf(game.level) + 1]].bg}
+            waitText="cuando los dos estén listos"
+          />
+        )}
+        <VoteButton
+          label={game.options.letter ? 'Terminar y escribir la carta final' : 'Terminar'}
+          votes={game.votes.finish}
+          me={me}
+          partner={partner}
+          onClick={() => send({ type: 'dp_finish' })}
+          accent="var(--color-ink)"
+          waitText="cuando los dos quieran"
+        />
+      </div>
+    </div>
+  )
+}
+
+/** A choice that only happens when both players agree. */
+function VoteButton({ label, votes, me, partner, onClick, accent, waitText }) {
+  const mine = votes.includes(me)
+  const theirs = votes.includes(partner)
+  let note = `Cambia ${waitText}.`
+  if (mine) note = `Esperando a ${partner}… toca otra vez para cancelar.`
+  else if (theirs) note = `${partner} ya está de acuerdo.`
+  return (
+    <button
+      onClick={onClick}
+      aria-pressed={mine}
+      className="rounded-2xl border-2 bg-paper px-5 py-3 text-left hover:border-ink"
+      style={{ borderColor: mine || theirs ? accent : 'var(--color-line)' }}
+    >
+      <span className="block font-semibold">{label}</span>
+      <span className="block text-sm text-muted">{note}</span>
+    </button>
+  )
+}
+
+/* --- closing letters -------------------------------------------------- */
+
+function Letters({ game, me, send, colorOf }) {
+  const [text, setText] = useState('')
+  const partner = game.players.find((p) => p !== me)
+  const sent = game.lettersSent.includes(me)
+  const partnerSent = game.lettersSent.includes(partner)
+
+  return (
+    <section className="mt-6 rounded-[2rem] p-7 text-white sm:p-10" style={{ background: LEVEL_META.deeper.bg }}>
+      <h1 className="font-display text-3xl font-extrabold sm:text-4xl">Carta final</h1>
+      {sent ? (
+        <>
+          <p className="mt-3 max-w-xl text-white/85">Tu carta está sellada. Se abren las dos al mismo tiempo.</p>
+          <blockquote className="mt-5 whitespace-pre-wrap rounded-2xl bg-white/10 p-5 text-white/90">{game.letters[me]}</blockquote>
+          <p className="mt-5 font-semibold">{partnerSent ? 'Abriendo…' : `${partner} todavía está escribiendo.`}</p>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 max-w-xl text-white/85">
+            Escríbele a {partner} lo que te dejó esta conversación: algo que aprendiste, algo que agradeces o algo que
+            todavía no le habías dicho. No se ve hasta que los dos la envíen.
+          </p>
+          {partnerSent && <p className="mt-3 font-semibold">{partner} ya selló su carta.</p>}
+          <form
+            className="mt-5"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (text.trim()) send({ type: 'dp_letter', text })
+            }}
+          >
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              maxLength={1000}
+              rows={6}
+              placeholder={`Querido/a ${partner}…`}
+              className="w-full rounded-2xl bg-white p-4 text-ink outline-none"
+              style={{ borderLeft: `6px solid ${colorOf(me)}` }}
+            />
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="text-sm text-white/70 tabular-nums">{text.length}/1000</span>
+              <button disabled={!text.trim()} className="rounded-2xl bg-white px-6 py-3 font-semibold text-ink disabled:opacity-50">
+                Sellar y enviar
+              </button>
+            </div>
+          </form>
+        </>
+      )}
+    </section>
+  )
+}
+
+/* --- end -------------------------------------------------------------- */
+
+function Final({ game, me, send, colorOf }) {
+  const partner = game.players.find((p) => p !== me)
+  const order = [partner, me].filter((p) => game.letters[p])
+  const total = Object.values(game.played).reduce((a, b) => a + b, 0)
+
+  return (
+    <div className="mt-6">
+      <h1 className="font-display text-4xl font-extrabold">Un poco más cerca</h1>
+      <p className="mt-2 text-muted">
+        Respondieron {total} {total === 1 ? 'carta' : 'cartas'}
+        {LEVELS.filter((l) => game.played[l]).map((l) => ` · ${LEVEL_META[l].label}: ${game.played[l]}`).join('')}
+      </p>
+
+      {order.length > 0 && (
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          {order.map((p) => (
+            <article key={p} className="deeper-deal rounded-3xl bg-paper p-6" style={{ borderTop: `6px solid ${colorOf(p)}` }}>
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
+                {p === me ? `Tu carta para ${partner}` : `Carta de ${p} para ti`}
+              </h2>
+              <p className="mt-3 whitespace-pre-wrap text-lg leading-relaxed">{game.letters[p]}</p>
+            </article>
+          ))}
+        </div>
+      )}
+
+      <section className="mt-8">
+        <h2 className="text-2xl font-bold">Cartas guardadas</h2>
+        {game.saved.length ? (
+          <ul className="mt-3 space-y-2">
+            {game.saved.map((c) => {
+              const meta = c.kind === 'wildcard' ? WILDCARD_META : LEVEL_META[c.level]
+              return (
+                <li key={c.id} className="flex items-start gap-3 rounded-2xl bg-paper p-4">
+                  <span className="mt-1.5 h-3 w-3 shrink-0 rounded-full" style={{ background: meta.bg }} title={meta.label} />
+                  <span>{c.text}</span>
+                </li>
+              )
+            })}
+          </ul>
+        ) : (
+          <p className="mt-2 text-muted">No guardaron ninguna. La próxima vez, toquen ♡ en las que quieran volver a hablar.</p>
+        )}
+      </section>
+
+      <EndActions send={send} replay={{ type: 'start_game', game: 'deeper', ...game.options }} />
+    </div>
+  )
+}
