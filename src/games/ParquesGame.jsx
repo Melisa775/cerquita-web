@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { EndActions } from '../components/EndActions'
+import { motion } from 'motion/react'
 import { ARM, N, jailOrigin, laneCell, pathCell, toView, viewRotation } from '../lib/parques'
 
 const HOME = 71
@@ -175,7 +176,7 @@ function Board({ game, me, colorOf, movable, onPiece }) {
                 const x = jailed[slot]
                 return (
                   <div key={slot} className="flex aspect-square items-center justify-center rounded-full" style={{ background: 'rgba(34,37,46,.08)' }}>
-                    {x && <Piece color={colorOf(owner)} active={owner === me && movable.has(x.i)} onClick={() => onPiece(owner, x.i)} />}
+                    {x && <Piece id={`${owner}-${x.i}`} color={colorOf(owner)} active={owner === me && movable.has(x.i)} onClick={() => onPiece(owner, x.i)} />}
                   </div>
                 )
               })}
@@ -201,7 +202,13 @@ function Board({ game, me, colorOf, movable, onPiece }) {
         title="Cielo"
       >
         {heaven.map((x) => (
-          <span key={`${x.p}${x.i}`} className="h-[22%] w-[22%] rounded-full" style={{ background: colorOf(x.p), boxShadow: '0 0 0 1.5px white' }} />
+          <motion.span
+            key={`${x.p}${x.i}`}
+            layoutId={`pq-${x.p}-${x.i}`}
+            transition={PIECE_MOVE}
+            className="h-[22%] w-[22%] rounded-full"
+            style={{ background: colorOf(x.p), boxShadow: '0 0 0 1.5px white' }}
+          />
         ))}
         {!heaven.length && <span className="text-[0.55rem] font-bold text-ink/50 sm:text-xs">CIELO</span>}
       </div>
@@ -222,25 +229,30 @@ function Stack({ entries, colorOf, movable, me, onPiece, last }) {
   if (entries.length === 1) {
     const { p, i } = entries[0]
     const fresh = last && last.player === p && last.piece === i
-    return <Piece color={colorOf(p)} active={p === me && movable.has(i)} onClick={() => onPiece(p, i)} fresh={fresh} />
+    return <Piece id={`${p}-${i}`} color={colorOf(p)} active={p === me && movable.has(i)} onClick={() => onPiece(p, i)} fresh={fresh} />
   }
   return (
     <div className="absolute inset-0 grid grid-cols-2 place-items-center p-[4%]">
       {entries.slice(0, 4).map(({ p, i }) => (
-        <Piece key={`${p}${i}`} small color={colorOf(p)} active={p === me && movable.has(i)} onClick={() => onPiece(p, i)} />
+        <Piece key={`${p}${i}`} id={`${p}-${i}`} small color={colorOf(p)} active={p === me && movable.has(i)} onClick={() => onPiece(p, i)} />
       ))}
     </div>
   )
 }
 
-function Piece({ color, active, onClick, small, fresh }) {
+// A piece keeps its identity across squares, so moving it (or sending it back to jail) glides it there
+const PIECE_MOVE = { type: 'spring', stiffness: 260, damping: 26 }
+
+function Piece({ id, color, active, onClick, small, fresh }) {
   return (
-    <button
+    <motion.button
+      layoutId={`pq-${id}`}
+      transition={PIECE_MOVE}
       type="button"
       onClick={onClick}
       disabled={!active}
-      className={`relative z-10 rounded-full ${small ? 'h-[90%] w-[90%]' : 'h-[78%] w-[78%]'} ${active ? 'parques-ready cursor-pointer' : ''} ${fresh ? 'pop' : ''}`}
-      style={{ background: color, boxShadow: `inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 ${small ? 1 : 2}px white` }}
+      className={`relative rounded-full ${fresh ? 'z-20' : 'z-10'} ${small ? 'h-[90%] w-[90%]' : 'h-[78%] w-[78%]'} ${active ? 'parques-ready cursor-pointer' : ''}`}
+      style={{ background: color, borderRadius: 9999, boxShadow: `inset 0 -2px 0 rgba(0,0,0,.25), 0 0 0 ${small ? 1 : 2}px white` }}
       aria-label={active ? 'Mover esta ficha' : 'Ficha'}
     />
   )

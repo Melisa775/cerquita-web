@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { LayoutGroup, motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import Avatar from '../components/Avatar'
 import { EndActions, winnerTitle } from '../components/EndActions'
 
@@ -192,9 +194,15 @@ function QuickPick({ game, selected, setSelected, violated }) {
         <div className="mt-2 rounded-2xl bg-paper px-4 py-3 text-sm">
           <p className="font-bold">{person.name}{person.role === 'victim' && ' (víctima)'}</p>
           {person.clues.map((cl) => (
-            <p key={cl.index} style={violated.has(cl.index) ? { color: DANGER, fontWeight: 600 } : undefined}>
+            <motion.p
+              key={`${cl.index}-${violated.has(cl.index)}`}
+              style={violated.has(cl.index) ? { color: DANGER, fontWeight: 600 } : undefined}
+              initial={violated.has(cl.index) ? { x: 0 } : false}
+              animate={violated.has(cl.index) ? { x: [0, -6, 6, -3, 0] } : undefined}
+              transition={{ duration: 0.4 }}
+            >
               {cl.text}
-            </p>
+            </motion.p>
           ))}
         </div>
       )}
@@ -224,6 +232,7 @@ function Board({ game, placedAt, objects, notes, selected, onCell, colorOf }) {
   const murderer = game.result?.murderer
 
   return (
+    <LayoutGroup id={`plan-${game.round}`}>
     <div
       className="grid aspect-square w-full overflow-hidden rounded-2xl border-[3px] border-ink bg-ink"
       style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${n}, minmax(0, 1fr))` }}
@@ -260,11 +269,29 @@ function Board({ game, placedAt, objects, notes, selected, onCell, colorOf }) {
                   {game.roomNames[k]}
                 </span>
               )}
-              {kind && <FurnitureIcon kind={kind} />}
-              {notes.has(key) && !person && <span className="font-display text-2xl font-bold text-ink/35">✕</span>}
+              {kind && (
+                <motion.span
+                  className="absolute inset-0"
+                  initial={{ scale: 0, rotate: -20 }}
+                  animate={{ scale: 1, rotate: 0 }}
+                  transition={{ ...spring, delay: 0.15 + 0.03 * (r * n + c) }}
+                >
+                  <FurnitureIcon kind={kind} />
+                </motion.span>
+              )}
+              {notes.has(key) && !person && (
+                <motion.span className="font-display text-2xl font-bold text-ink/35" initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={spring}>
+                  ✕
+                </motion.span>
+              )}
               {person && (
-                <span
-                  className={`pop absolute inset-[8%] overflow-hidden rounded-xl ${pid === victimIndex ? 'grayscale' : ''}`}
+                // the same person glides from cell to cell when moved
+                <motion.span
+                  layoutId={`person-${pid}`}
+                  initial={{ scale: 0.3, opacity: 0, y: -12 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  transition={spring}
+                  className={`absolute inset-[8%] overflow-hidden rounded-xl ${pid === victimIndex ? 'grayscale' : ''} ${highlight && pid === murderer ? 'murdoku-culprit' : ''}`}
                   style={{
                     boxShadow: highlight
                       ? `0 0 0 3px ${pid === murderer ? DANGER : 'var(--color-ink)'}`
@@ -274,13 +301,14 @@ function Board({ game, placedAt, objects, notes, selected, onCell, colorOf }) {
                   }}
                 >
                   <Avatar c={person} zoom className="h-full w-full" />
-                </span>
+                </motion.span>
               )}
             </button>
           )
         }),
       )}
     </div>
+    </LayoutGroup>
   )
 }
 
@@ -345,9 +373,23 @@ function Reveal({ game, me, victim, send, colorOf }) {
   const winner = game.result.winner
   return (
     <div className="pop mt-5 flex gap-4 rounded-[2rem] p-5 text-white" style={{ background: winner ? colorOf(winner) : 'var(--color-ink)' }}>
-      <div className="h-24 w-24 shrink-0 overflow-hidden rounded-2xl ring-4 ring-white/40">
-        <Avatar c={murderer} zoom className="h-full w-full" />
-      </div>
+      <motion.div
+        className="relative h-24 w-24 shrink-0 rounded-2xl ring-4 ring-white/40"
+        initial={{ scale: 0.5, rotate: -10 }}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ ...spring, delay: 0.15 }}
+      >
+        <span className="block h-full w-full overflow-hidden rounded-2xl"><Avatar c={murderer} zoom className="h-full w-full" /></span>
+        {/* a rubber stamp lands on the culprit */}
+        <motion.span
+          className="absolute -bottom-2 left-1/2 rounded-md border-[3px] border-white bg-[hsl(4_70%_45%)] px-1.5 font-display text-xs font-extrabold tracking-widest text-white"
+          initial={{ scale: 3, opacity: 0, x: '-50%', rotate: -18 }}
+          animate={{ scale: 1, opacity: 1, x: '-50%', rotate: -8 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.55 }}
+        >
+          CULPABLE
+        </motion.span>
+      </motion.div>
       <div>
         <p className="text-sm font-semibold text-white/80">¡Caso resuelto en {clock(game.result.seconds * 1000)}!</p>
         <p className="font-display text-3xl font-extrabold">Fue {murderer.name}</p>
@@ -374,21 +416,27 @@ function Final({ game, me, send, colorOf }) {
           {Object.entries(game.scores).map(([p, n]) => (
             <div key={p} className="rounded-2xl bg-paper px-5 py-3">
               <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-              <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+              <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
             </div>
           ))}
         </div>
       )}
       <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
         {game.history.map((h) => (
-          <li key={h.round} className="flex flex-wrap items-center gap-x-4 rounded-2xl bg-paper px-4 py-3">
+          <motion.li
+            key={h.round}
+            className="flex flex-wrap items-center gap-x-4 rounded-2xl bg-paper px-4 py-3"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...softSpring, delay: 0.1 * h.round }}
+          >
             <span className="text-sm text-muted">Caso {h.round}</span>
             <span className="font-semibold">Fue {h.murderer}</span>
             <span className="text-sm text-muted">
               {clock(h.seconds * 1000)}
               {h.winner && <> · lo resolvió <span style={{ color: colorOf(h.winner) }}>{h.winner}</span></>}
             </span>
-          </li>
+          </motion.li>
         ))}
       </ol>
       <EndActions send={send} replay={{ type: 'start_game', game: 'murdoku', ...game.options }} />

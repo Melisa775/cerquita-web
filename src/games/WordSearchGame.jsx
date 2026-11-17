@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { EndActions, winnerTitle } from '../components/EndActions'
 
 export default function WordSearchGame({ room, me, send, colorOf, error, errorId }) {
@@ -77,7 +79,7 @@ function Play({ game, me, send, colorOf, error, errorId }) {
             <div className="mt-3 flex flex-wrap gap-2">
               {Object.entries(game.scores).map(([p, n]) => (
                 <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-                  <span style={{ color: colorOf(p) }}>{p}</span> <span className="tabular-nums">{n}</span>
+                  <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} />
                 </span>
               ))}
             </div>
@@ -89,9 +91,11 @@ function Play({ game, me, send, colorOf, error, errorId }) {
               const missed = !f && game.phase === 'round_over'
               return (
                 <li key={w} className="flex items-center gap-2">
-                  <span
+                  <motion.span
                     className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{ background: f ? colorOf(f.player) : missed ? 'var(--color-muted)' : 'var(--color-line)' }}
+                    initial={false}
+                    animate={{ background: f ? colorOf(f.player) : missed ? 'var(--color-muted)' : 'var(--color-line)', scale: f ? [1, 2, 1] : 1 }}
+                    transition={{ duration: 0.4 }}
                   />
                   <span
                     className={`font-display font-bold uppercase tracking-wide ${f ? 'text-muted line-through' : missed ? 'text-danger' : ''}`}
@@ -219,6 +223,19 @@ function Board({ game, me, send, colorOf, interactive }) {
   const capsule = (start, end, color, key, extra = {}) => {
     const [x1, y1] = center(start)
     const [x2, y2] = center(end)
+    if (extra.draw) {
+      // found words: the highlight is drawn from the first letter to the last
+      return (
+        <motion.line
+          key={key}
+          x1={x1} y1={y1} x2={x2} y2={y2}
+          stroke={color} strokeWidth="0.78" strokeLinecap="round"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+        />
+      )
+    }
     return (
       <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="0.78" strokeLinecap="round" {...extra} />
     )
@@ -226,6 +243,7 @@ function Board({ game, me, send, colorOf, interactive }) {
 
   const text = size >= 14 ? 'text-base sm:text-lg' : size >= 12 ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'
   const mine = sel ?? (anchor ? { start: anchor, end: anchor } : null)
+  const foundCells = new Set(Object.values(game.found).flatMap((f) => f.cells.map(([r, c]) => `${r}-${c}`)))
 
   return (
     <div className="rounded-[2rem] bg-paper p-3 sm:p-4">
@@ -241,8 +259,8 @@ function Board({ game, me, send, colorOf, interactive }) {
       >
         <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
           <g opacity="0.32">
-            {Object.entries(game.found).map(([w, f]) => capsule(f.cells[0], f.cells.at(-1), colorOf(f.player), w))}
-            {game.missing.map((m) => capsule(m.cells[0], m.cells.at(-1), 'var(--color-muted)', `m-${m.word}`))}
+            {Object.entries(game.found).map(([w, f]) => capsule(f.cells[0], f.cells.at(-1), colorOf(f.player), w, { draw: true }))}
+            {game.missing.map((m) => capsule(m.cells[0], m.cells.at(-1), 'var(--color-muted)', `m-${m.word}`, { draw: true }))}
           </g>
           {Object.entries(game.selecting).map(([p, s]) =>
             capsule(s.start, s.end, colorOf(p), `s-${p}`, { opacity: 0.22, strokeDasharray: '0.25 0.18', strokeWidth: 0.7 }),
@@ -255,9 +273,16 @@ function Board({ game, me, send, colorOf, interactive }) {
         >
           {game.grid.flatMap((row, r) =>
             row.split('').map((ch, c) => (
-              <span key={`${r}-${c}`} className={`flex items-center justify-center font-display font-bold ${text}`}>
+              // letters ripple in from the top-left corner; found letters jump once
+              <motion.span
+                key={`${r}-${c}`}
+                className={`flex items-center justify-center font-display font-bold ${text}`}
+                initial={{ opacity: 0, scale: 0.4 }}
+                animate={{ opacity: 1, scale: foundCells.has(`${r}-${c}`) ? [1, 1.4, 1] : 1 }}
+                transition={foundCells.has(`${r}-${c}`) ? { duration: 0.4 } : { ...spring, delay: (r + c) * 0.018 }}
+              >
                 {ch}
-              </span>
+              </motion.span>
             )),
           )}
         </div>
@@ -313,14 +338,20 @@ function Final({ game, me, send, colorOf }) {
           {Object.entries(game.scores).map(([p, n]) => (
             <div key={p} className="rounded-2xl bg-paper px-5 py-3">
               <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-              <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+              <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
             </div>
           ))}
         </div>
       )}
       <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
         {game.history.map((h) => (
-          <li key={h.round} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-paper px-4 py-3">
+          <motion.li
+            key={h.round}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-paper px-4 py-3"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...softSpring, delay: 0.1 * h.round }}
+          >
             <span className="w-5 text-sm text-muted tabular-nums">{h.round}</span>
             <span className="font-semibold">{h.theme}</span>
             <span className="text-sm text-muted">
@@ -336,7 +367,7 @@ function Final({ game, me, send, colorOf }) {
                 ))}
               </span>
             )}
-          </li>
+          </motion.li>
         ))}
       </ol>
       <EndActions send={send} replay={{ type: 'start_game', game: 'wordsearch', ...game.options }} />

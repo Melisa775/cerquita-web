@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import DrawingCanvas from '../components/DrawingCanvas'
 import TimerBar from '../components/TimerBar'
 import { EndActions, winnerTitle } from '../components/EndActions'
@@ -82,7 +84,7 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
         <div className="flex gap-2">
           {Object.entries(game.scores).map(([p, n]) => (
             <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <span className="text-ink tabular-nums">{n}</span>
+              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} className="text-ink" />
             </span>
           ))}
         </div>
@@ -150,16 +152,32 @@ function WordBar({ game, me, left, colorOf }) {
                 ch === ' ' ? (
                   <span key={i} className="w-2" />
                 ) : (
-                  <span key={i} className={ch ? '' : 'text-muted'}>
+                  <motion.span
+                    key={`${i}-${ch ?? ''}`}
+                    className={`inline-block ${ch ? '' : 'text-muted'}`}
+                    initial={ch && !isDrawer ? { y: -18, scale: 1.8, opacity: 0 } : false}
+                    animate={{ y: 0, scale: 1, opacity: 1 }}
+                    transition={spring}
+                  >
                     {ch ?? '_'}
-                  </span>
+                  </motion.span>
                 ),
               )}
               {!isDrawer && <span className="self-center text-sm font-normal normal-case tracking-normal text-muted">{game.mask.filter((c) => c !== ' ').length} letras</span>}
             </p>
           )}
         </div>
-        {drawing && left != null && <span className="font-display text-3xl font-extrabold tabular-nums">{left}</span>}
+        {drawing && left != null && (
+          <motion.span
+            key={left}
+            className={`font-display text-3xl font-extrabold tabular-nums ${left <= 10 ? 'text-danger' : ''}`}
+            initial={left <= 10 ? { scale: 1.5 } : false}
+            animate={{ scale: 1 }}
+            transition={spring}
+          >
+            {left}
+          </motion.span>
+        )}
       </div>
       {drawing && <TimerBar seconds={game.drawSeconds} resetKey={game.turn} msLeft={game.turnEndsInMs} color={colorOf(game.drawer)} />}
     </div>
@@ -225,14 +243,18 @@ function Choosing({ game, me, left, send, colorOf }) {
           <p className="font-display text-2xl font-extrabold">¿Qué quieres dibujar?</p>
           <div className="flex flex-wrap justify-center gap-3">
             {game.choices.map((w, i) => (
-              <button
+              <motion.button
                 key={w}
+                initial={{ y: 30, opacity: 0, rotate: (i - 1) * 8 }}
+                animate={{ y: 0, opacity: 1, rotate: (i - 1) * 2 }}
+                whileHover={{ rotate: 0, y: -4 }}
+                transition={{ ...spring, delay: 0.08 * i }}
                 onClick={() => send({ type: 'pz_choose', index: i })}
                 className="rounded-2xl px-5 py-3 font-display text-xl font-bold text-white"
                 style={{ background: colorOf(me) }}
               >
                 {w}
-              </button>
+              </motion.button>
             ))}
           </div>
           <p className="text-sm text-muted">Si no eliges en {left ?? '…'} s, se escoge una sola.</p>
@@ -286,7 +308,14 @@ function Chat({ game, me, send, colorOf, flash }) {
           <li className="text-sm text-muted">{game.drawer === me ? 'Aquí verás lo que va diciendo tu pareja.' : 'Escribe lo que crees que es.'}</li>
         )}
         {game.guesses.map((g, i) => (
-          <li key={i} className="text-sm">
+          <motion.li
+            key={i}
+            className="text-sm"
+            initial={{ opacity: 0, x: -12, scale: g.correct ? 0.6 : 1 }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            transition={spring}
+            style={{ transformOrigin: 'left center' }}
+          >
             {g.correct ? (
               <span className="font-semibold" style={{ color: 'hsl(148 42% 34%)' }}>
                 {g.player === me ? '¡Adivinaste!' : `¡${g.player} adivinó!`}
@@ -299,12 +328,20 @@ function Chat({ game, me, send, colorOf, flash }) {
                 {g.text}
               </>
             )}
-          </li>
+          </motion.li>
         ))}
       </ol>
-      <p className="mt-2 min-h-5 text-sm font-semibold" style={{ color: 'hsl(42 82% 38%)' }} role="status">
+      <motion.p
+        key={flash ?? 'none'}
+        className="mt-2 min-h-5 text-sm font-semibold"
+        style={{ color: 'hsl(42 82% 38%)' }}
+        role="status"
+        initial={flash ? { scale: 0.6, rotate: -6 } : false}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 600, damping: 12 }}
+      >
         {flash}
-      </p>
+      </motion.p>
       {canGuess ? (
         <form
           className="mt-2 flex gap-2"
@@ -342,14 +379,22 @@ function Final({ game, me, send, colorOf }) {
         {Object.entries(game.scores).map(([p, n]) => (
           <div key={p} className="rounded-2xl bg-paper px-5 py-3">
             <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-            <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+            <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
           </div>
         ))}
       </div>
       <h2 className="mt-8 text-2xl font-bold">Sus dibujos</h2>
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {game.history.map((h, i) => (
-          <figure key={h.turn} className="overflow-hidden rounded-2xl bg-paper p-2">
+          // the drawings are laid out like photos on a table
+          <motion.figure
+            key={h.turn}
+            className="overflow-hidden rounded-2xl bg-paper p-2 shadow-sm"
+            initial={{ opacity: 0, y: 40, rotate: i % 2 ? 6 : -6, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, rotate: i % 2 ? 1 : -1, scale: 1 }}
+            whileHover={{ rotate: 0, scale: 1.03 }}
+            transition={{ ...softSpring, delay: 0.3 + 0.12 * i }}
+          >
             <DrawingCanvas strokes={game.drawings[i] ?? []} />
             <figcaption className="px-2 py-2 text-sm">
               <span className="font-display font-bold uppercase tracking-wide">{h.word}</span>
@@ -358,7 +403,7 @@ function Final({ game, me, send, colorOf }) {
                 {h.guesser ? ' · adivinado' : ' · nadie lo adivinó'}
               </span>
             </figcaption>
-          </figure>
+          </motion.figure>
         ))}
       </div>
       <EndActions send={send} replay={{ type: 'start_game', game: 'pinturillo', ...game.options }} />

@@ -1,3 +1,7 @@
+import { Confetti } from '../lib/motion'
+
+export const CONFETTI_COLORS = ['var(--color-p1)', 'var(--color-p2)', 'hsl(44 90% 58%)', 'hsl(16 80% 62%)', 'hsl(200 70% 60%)']
+
 /** End-of-game title based on the scores. */
 export function winnerTitle(scores, unit = 'puntos') {
   const players = Object.keys(scores)
@@ -10,6 +14,7 @@ export function winnerTitle(scores, unit = 'puntos') {
 export function EndActions({ send, replay }) {
   return (
     <div className="mt-8 flex flex-wrap gap-3">
+      <Confetti colors={CONFETTI_COLORS} />
       <button onClick={() => send(replay)} className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white">
         Jugar otra vez
       </button>

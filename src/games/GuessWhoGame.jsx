@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import Avatar from '../components/Avatar'
 import { EndActions, winnerTitle } from '../components/EndActions'
 
@@ -48,7 +50,7 @@ function Play({ game, me, send, colorOf }) {
         <div className="flex gap-2">
           {Object.entries(game.scores).map(([p, n]) => (
             <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <span className="text-ink tabular-nums">{n}</span>
+              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} className="text-ink" />
             </span>
           ))}
         </div>
@@ -62,9 +64,10 @@ function Play({ game, me, send, colorOf }) {
             </p>
           )}
           <div className={`grid gap-2 sm:gap-3 ${cols}`}>
-            {game.characters.map((c) => (
+            {game.characters.map((c, i) => (
               <Card
                 key={c.id}
+                index={i}
                 c={c}
                 down={flipped.has(c.id)}
                 onClick={() => onCard(c.id)}
@@ -88,6 +91,7 @@ function Play({ game, me, send, colorOf }) {
               {game.mySecret && <Secret c={byId[game.mySecret]} color={colorOf(me)} />}
               {isPlayer && (
                 <TurnPanel
+                  key={`${game.pending ? `q${game.log.length}` : ''}-${game.turn}-${guessing}`}
                   game={game}
                   me={me}
                   other={other}
@@ -111,9 +115,13 @@ function Play({ game, me, send, colorOf }) {
   )
 }
 
-function Card({ c, down, onClick, guessing, picked, backColor, disabled }) {
+function Card({ c, down, onClick, guessing, picked, backColor, disabled, index = 0 }) {
   return (
-    <button
+    <motion.button
+      // the board is dealt card by card at the start of each round
+      initial={{ opacity: 0, y: 30, rotate: (index % 3) - 1 }}
+      animate={{ opacity: 1, y: 0, rotate: 0, scale: picked ? 1.06 : 1 }}
+      transition={{ ...spring, delay: picked ? 0 : 0.025 * index }}
       onClick={onClick}
       disabled={disabled}
       aria-pressed={down}
@@ -121,7 +129,7 @@ function Card({ c, down, onClick, guessing, picked, backColor, disabled }) {
       className="group relative aspect-[3/4] [perspective:700px] disabled:cursor-default"
     >
       <span
-        className="absolute inset-0 transition-transform duration-500 [transform-style:preserve-3d]"
+        className="absolute inset-0 transition-transform duration-500 [transform-style:preserve-3d] [transition-timing-function:cubic-bezier(.3,1.45,.55,1)]"
         style={{ transform: down ? 'rotateY(180deg)' : 'none' }}
       >
         <span
@@ -142,7 +150,7 @@ function Card({ c, down, onClick, guessing, picked, backColor, disabled }) {
           </svg>
         </span>
       </span>
-    </button>
+    </motion.button>
   )
 }
 
@@ -303,10 +311,17 @@ function TurnPanel({ game, me, other, myTurn, guessing, setGuessing, picked, set
 }
 
 function Panel({ children, accent }) {
+  // each change of the panel (a question arrives, it's your turn…) slides in
   return (
-    <div className="rounded-[2rem] p-5" style={{ background: accent ?? 'var(--color-paper)' }}>
+    <motion.div
+      className="rounded-[2rem] p-5"
+      style={{ background: accent ?? 'var(--color-paper)' }}
+      initial={{ opacity: 0, y: 16, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={softSpring}
+    >
       {children}
-    </div>
+    </motion.div>
   )
 }
 
@@ -327,23 +342,32 @@ function Log({ game, me, colorOf, other }) {
       ) : (
         <ol className="mt-3 space-y-2">
           {[...game.log].reverse().map((l, i) => (
-            <li key={game.log.length - i} className="text-sm">
+            <motion.li
+              key={game.log.length - i}
+              className="text-sm"
+              initial={i === 0 ? { opacity: 0, x: -14 } : false}
+              animate={{ opacity: 1, x: 0 }}
+              transition={spring}
+            >
               <span className="font-semibold" style={{ color: colorOf(l.asker) }}>
                 {l.asker === me ? 'Tú' : l.asker}:
               </span>{' '}
               {l.text}{' '}
-              <span
-                className="ml-1 rounded-md px-1.5 py-0.5 text-xs font-bold text-white"
+              <motion.span
+                className="ml-1 inline-block rounded-md px-1.5 py-0.5 text-xs font-bold text-white"
                 style={{ background: l.answer ? 'hsl(148 42% 38%)' : '#8A8E99' }}
+                initial={i === 0 ? { scale: 0 } : false}
+                animate={{ scale: 1 }}
+                transition={{ ...spring, delay: 0.15 }}
               >
                 {l.answer ? 'Sí' : 'No'}
-              </span>
+              </motion.span>
               {!l.auto && (
                 <span className="ml-1 text-xs text-muted">
                   (la respondió {l.asker === me ? other : 'tú'})
                 </span>
               )}
-            </li>
+            </motion.li>
           ))}
         </ol>
       )}
@@ -366,16 +390,22 @@ function RoundOver({ game, me, byId, send, colorOf }) {
         Punto para {r.winner === me ? 'ti' : r.winner}, después de {r.questions} {r.questions === 1 ? 'pregunta' : 'preguntas'}.
       </p>
       <div className="mt-4 grid grid-cols-2 gap-3">
-        {game.players.map((p) => {
+        {game.players.map((p, i) => {
           const c = byId[game.secrets[p]]
           return (
-            <div key={p} className="overflow-hidden rounded-2xl bg-white/15">
+            <motion.div
+              key={p}
+              className="overflow-hidden rounded-2xl bg-white/15"
+              initial={{ rotateY: 90, opacity: 0 }}
+              animate={{ rotateY: 0, opacity: 1 }}
+              transition={{ ...spring, delay: 0.25 + i * 0.2 }}
+            >
               <Avatar c={c} className="w-full" />
               <p className="px-2 py-1.5 text-sm">
                 <span className="font-semibold">{c.name}</span>
                 <span className="text-white/75"> · de {p === me ? 'ti' : p}</span>
               </p>
-            </div>
+            </motion.div>
           )
         })}
       </div>
@@ -395,7 +425,7 @@ function Final({ game, me, send, colorOf }) {
         {Object.entries(game.scores).map(([p, n]) => (
           <div key={p} className="rounded-2xl bg-paper px-5 py-3">
             <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-            <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+            <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
           </div>
         ))}
       </div>

@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedNumber, Confetti, spring } from '../lib/motion'
+import { CONFETTI_COLORS } from '../components/EndActions'
 import { EndActions } from '../components/EndActions'
 import { SIZE, preview } from '../lib/crosswords'
 
@@ -183,11 +186,12 @@ CrosswordsGame.showsErrors = true
 
 /* --- board -------------------------------------------------------------- */
 
-function Tile({ letter, value, blank, size = 'h-full w-full', pending, fresh, lifted, dim }) {
+function Tile({ letter, value, blank, size = 'h-full w-full', pending, fresh, freshIndex = 0, lifted, dim }) {
   return (
     <span
-      className={`relative flex items-center justify-center rounded-[18%] font-display font-extrabold leading-none ${size} ${fresh ? 'pop' : ''}`}
+      className={`relative flex items-center justify-center rounded-[18%] font-display font-extrabold leading-none ${size} ${fresh ? 'cw-drop' : pending ? 'cw-place' : ''}`}
       style={{
+        animationDelay: fresh ? `${freshIndex * 70}ms` : undefined,
         background: pending ? 'hsl(46 95% 72%)' : 'hsl(42 60% 86%)',
         color: '#22252E',
         boxShadow: lifted ? '0 8px 18px rgba(0,0,0,.25)' : 'inset 0 -2px 0 rgba(0,0,0,.12)',
@@ -205,7 +209,8 @@ function Tile({ letter, value, blank, size = 'h-full w-full', pending, fresh, li
 
 function Board({ game, pending, onCell, canPlace }) {
   const prem = useMemo(() => new Map(game.premiums.map(([r, c, k]) => [`${r},${c}`, k])), [game.premiums])
-  const fresh = new Set((game.last?.cells ?? []).map(([r, c]) => `${r},${c}`))
+  // the tiles of the last play drop onto the board one after another
+  const fresh = new Map((game.last?.cells ?? []).map(([r, c], i) => [`${r},${c}`, i]))
   const ref = useRef(null)
   return (
     <div
@@ -237,7 +242,7 @@ function Board({ game, pending, onCell, canPlace }) {
             ) : style ? (
               <span className="text-[0.48em] font-bold" style={{ color: style.fg }}>{style.label}</span>
             ) : null)}
-            {tile && <Tile letter={tile.letter} value={game.values[tile.letter]} blank={tile.blank} fresh={fresh.has(k)} />}
+            {tile && <Tile key={fresh.has(k) ? `f${game.moves ?? game.history?.length}` : 's'} letter={tile.letter} value={game.values[tile.letter]} blank={tile.blank} fresh={fresh.has(k)} freshIndex={fresh.get(k)} />}
             {pend && <Tile letter={pend.letter} value={game.values[pend.letter]} blank={pend.blank} pending />}
           </button>
         )
@@ -258,8 +263,13 @@ function Rack({ game, order, used, selected, swap, onSwapToggle, onPointerDown, 
         const isSel = selected === i
         const inSwap = swap?.has(i)
         return (
-          <button
-            key={i}
+          // tiles slide to their new place when shuffled and come up from the bag when drawn
+          <motion.button
+            key={`${i}-${letter}`}
+            layout
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ ...spring, delay: 0.04 * order.indexOf(i) }}
             type="button"
             className={`touch-none rounded-xl transition-transform ${isSel || inSwap ? '-translate-y-1.5' : ''}`}
             style={{ outline: isSel ? '3px solid var(--color-ink)' : inSwap ? '3px dashed var(--color-danger)' : 'none', outlineOffset: 2 }}
@@ -270,7 +280,7 @@ function Rack({ game, order, used, selected, swap, onSwapToggle, onPointerDown, 
             aria-label={letter === '?' ? 'Comodín' : `Letra ${letter}`}
           >
             <Tile letter={letter} value={game.values[letter]} size="h-11 w-11 text-2xl sm:h-12 sm:w-12" dim={isUsed} />
-          </button>
+          </motion.button>
         )
       })}
     </div>
@@ -322,16 +332,32 @@ function Side({ game, me, colorOf, send }) {
   else title = game.turn === me ? 'Te toca' : `Juega ${game.turn}…`
   return (
     <aside className="rounded-[2rem] bg-paper p-5">
+      {game.last?.bingo && <Confetti key={game.history?.length} colors={CONFETTI_COLORS} count={45} />}
       <p className="font-display text-3xl font-extrabold" style={{ color: finished ? (game.winner ? colorOf(game.winner) : undefined) : colorOf(game.turn) }}>{title}</p>
       <div className="mt-4 space-y-2">
         {game.players.map((p) => (
-          <div key={p} className="flex items-center justify-between rounded-2xl bg-stone px-4 py-2.5">
+          <div key={p} className="relative flex items-center justify-between rounded-2xl bg-stone px-4 py-2.5">
             <span className="font-semibold" style={{ color: colorOf(p) }}>
               {p}
               {p === me && ' (tú)'}
               <span className="ml-2 text-xs font-normal text-muted">{game.rackCounts[p]} letras</span>
             </span>
-            <span className="font-display text-2xl font-extrabold tabular-nums">{game.scores[p]}</span>
+            <AnimatedNumber value={game.scores[p]} className="font-display text-2xl font-extrabold" duration={0.9} />
+            {/* the points of the last play float up next to the score */}
+            <AnimatePresence>
+              {game.last?.player === p && game.last.action === 'play' && (
+                <motion.span
+                  key={game.history?.length}
+                  className="pointer-events-none absolute -top-2 right-3 rounded-full px-2 py-0.5 text-sm font-bold text-white"
+                  style={{ background: colorOf(p) }}
+                  initial={{ y: 10, opacity: 0, scale: 0.6 }}
+                  animate={{ y: -8, opacity: [0, 1, 1, 0], scale: 1 }}
+                  transition={{ duration: 1.8, times: [0, 0.15, 0.75, 1] }}
+                >
+                  +{game.last.score}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
         ))}
       </div>

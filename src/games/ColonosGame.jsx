@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, spring } from '../lib/motion'
 import { EndActions } from '../components/EndActions'
 import { DEV_META, RESOURCES, RES_META, ResourceIcon, TERRAIN, TerrainArt, pips } from '../lib/colonos'
 
@@ -199,8 +201,18 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
         const hot = h.number === 6 || h.number === 8
         const isRolled = rolled && h.number === rolled
         return (
-          <g key={i} onClick={() => legalH.has(i) && onRobber(i)} className={legalH.has(i) ? 'cursor-pointer' : ''}>
+          // the island is laid out tile by tile from the center
+          <motion.g
+            key={i}
+            onClick={() => legalH.has(i) && onRobber(i)}
+            className={legalH.has(i) ? 'cursor-pointer' : ''}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ ...spring, delay: 0.035 * i }}
+            style={{ transformOrigin: `${cx}px ${cy}px` }}
+          >
             <polygon points={hexPoints(cx, cy, S - 1.5)} fill={t.fill} stroke="hsl(40 40% 92%)" strokeWidth="3" />
+            {isRolled && <polygon key={game.rollId} points={hexPoints(cx, cy, S - 1.5)} fill="white" className="colonos-flash" />}
             <g transform={`translate(${cx} ${cy - S * 0.36}) scale(${S * 0.42})`} opacity=".9">
               <TerrainArt terrain={h.terrain} />
             </g>
@@ -217,17 +229,26 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
                 </g>
               </g>
             )}
-            {b.robber === i && (
-              <g transform={`translate(${cx + S * 0.38} ${cy + S * 0.05})`}>
-                <ellipse cx="0" cy="12" rx="8" ry="3" fill="rgba(0,0,0,.3)" />
-                <path d="M-7 12 C-7 2 -5 -2 0 -2 C5 -2 7 2 7 12 Z" fill="#2A2D36" />
-                <circle cx="0" cy="-6" r="5" fill="#2A2D36" />
-              </g>
-            )}
             {legalH.has(i) && <polygon points={hexPoints(cx, cy, S - 5)} fill="rgba(255,255,255,.18)" stroke="white" strokeWidth="3" strokeDasharray="6 5" className="colonos-pulse" />}
-          </g>
+          </motion.g>
         )
       })}
+
+      {/* robber: hops from hex to hex */}
+      {b.robber != null && b.hexes[b.robber] && (
+        <motion.g
+          initial={false}
+          animate={{ x: b.hexes[b.robber].center[0] * S + S * 0.38, y: b.hexes[b.robber].center[1] * S + S * 0.05 }}
+          transition={{ type: 'spring', stiffness: 160, damping: 16 }}
+          className="pointer-events-none"
+        >
+          <motion.g key={b.robber} initial={{ y: -14 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 10, delay: 0.25 }}>
+            <ellipse cx="0" cy="12" rx="8" ry="3" fill="rgba(0,0,0,.3)" />
+            <path d="M-7 12 C-7 2 -5 -2 0 -2 C5 -2 7 2 7 12 Z" fill="#2A2D36" />
+            <circle cx="0" cy="-6" r="5" fill="#2A2D36" />
+          </motion.g>
+        </motion.g>
+      )}
 
       {/* roads */}
       {Object.entries(game.roads).map(([e, owner]) => {
@@ -237,9 +258,10 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
         const ex = a[0] + (c[0] - a[0]) * 0.84
         const ey = a[1] + (c[1] - a[1]) * 0.84
         return (
+          // a new road is laid from one end to the other
           <g key={e}>
-            <line x1={sx} y1={sy} x2={ex} y2={ey} stroke="white" strokeWidth="9" strokeLinecap="round" />
-            <line x1={sx} y1={sy} x2={ex} y2={ey} stroke={colorOf(owner)} strokeWidth="5.5" strokeLinecap="round" />
+            <motion.line x1={sx} y1={sy} x2={ex} y2={ey} stroke="white" strokeWidth="9" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} />
+            <motion.line x1={sx} y1={sy} x2={ex} y2={ey} stroke={colorOf(owner)} strokeWidth="5.5" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} />
           </g>
         )
       })}
@@ -256,7 +278,15 @@ function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
 
       {/* settlements and cities */}
       {Object.entries(game.buildings).map(([v, bld]) => (
-        <House key={v} x={V[v][0]} y={V[v][1]} color={colorOf(bld.owner)} city={bld.kind === 'city'} />
+        <motion.g
+          key={`${v}-${bld.kind}`}
+          initial={{ scale: 0, y: -12 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 420, damping: 13 }}
+          style={{ transformOrigin: `${V[v][0]}px ${V[v][1]}px` }}
+        >
+          <House x={V[v][0]} y={V[v][1]} color={colorOf(bld.owner)} city={bld.kind === 'city'} />
+        </motion.g>
       ))}
       {/* available vertices */}
       {[...legalV].map((v) => (
@@ -343,9 +373,9 @@ function Hand({ game, me }) {
       <p className="mb-2 text-sm font-semibold text-muted">Tus cartas</p>
       <div className="grid grid-cols-5 gap-1.5">
         {RESOURCES.map((r) => (
-          <div key={r} className={`flex flex-col items-center rounded-xl bg-stone py-2 ${hand[r] ? '' : 'opacity-45'}`} title={RES_META[r].label}>
+          <div key={r} className={`flex flex-col items-center rounded-xl bg-stone py-2 transition-opacity ${hand[r] ? '' : 'opacity-45'}`} title={RES_META[r].label}>
             <ResourceIcon res={r} className="h-9 w-9" />
-            <span className="mt-1 font-display text-xl font-extrabold tabular-nums">{hand[r]}</span>
+            <AnimatedNumber value={hand[r]} className="mt-1 font-display text-xl font-extrabold" />
             <span className="text-[0.62rem] text-muted">{RES_META[r].label}</span>
           </div>
         ))}

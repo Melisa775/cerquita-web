@@ -1,4 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedNumber, spring } from '../lib/motion'
 import DominoTile from '../components/DominoTile'
 import { EndActions } from '../components/EndActions'
 
@@ -59,21 +61,29 @@ export default function DominoGame({ room, me, send, colorOf, error, errorId }) 
             {game.forced && myTurn && ` · sales con el ${game.forced[0]}|${game.forced[1]}`}
           </p>
           <div className="mt-3 flex flex-wrap justify-center gap-2 sm:gap-3">
-            {(game.hands[me] ?? []).map((t) => {
+            <AnimatePresence initial={false}>
+            {(game.hands[me] ?? []).map((t, i) => {
               const playable = myTurn && !!moveOf(t)
               const isSel = sameTile(selected, t)
               return (
-                <button
-                  key={`${t[0]}-${t[1]}`}
+                // tiles are dealt one by one; a played tile flies up to the table
+                <motion.button
+                  key={`${game.handNo}-${t[0]}-${t[1]}`}
+                  layout
+                  initial={{ y: 60, opacity: 0, rotate: 12 }}
+                  animate={{ y: 0, opacity: 1, rotate: 0 }}
+                  exit={{ y: -140, opacity: 0, scale: 0.7, transition: { duration: 0.25 } }}
+                  transition={{ ...spring, delay: game.line.length ? 0 : 0.05 * i }}
                   onClick={() => choose(t)}
                   disabled={!playable}
                   className={`rounded-xl transition-transform ${playable ? 'hover:-translate-y-1.5' : ''} ${isSel ? '-translate-y-2' : ''}`}
                   aria-label={`Ficha ${t[0]} y ${t[1]}${playable ? ', se puede jugar' : ''}`}
                 >
                   <DominoTile a={t[0]} b={t[1]} vertical unit={34} dim={myTurn && !playable} ring={isSel ? 'var(--color-ink)' : playable ? colorOf(me) : undefined} />
-                </button>
+                </motion.button>
               )
             })}
+            </AnimatePresence>
           </div>
         </section>
       ) : (
@@ -93,7 +103,7 @@ function Scores({ game, me, colorOf }) {
           <div className="flex items-baseline justify-between">
             <span className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</span>
             <span className="text-sm text-muted">
-              <span className="font-display text-2xl font-extrabold text-ink tabular-nums">{game.scores[p]}</span> / {game.goal}
+              <AnimatedNumber value={game.scores[p]} className="font-display text-2xl font-extrabold text-ink" duration={1} /> / {game.goal}
             </span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line">
@@ -110,7 +120,13 @@ function OpponentHand({ game, other }) {
   if (game.phase !== 'playing') return null
   return (
     <div className="mt-2 flex flex-wrap gap-1">
-      {Array.from({ length: n }, (_, i) => <DominoTile key={i} faceDown vertical unit={14} />)}
+      <AnimatePresence initial={false}>
+        {Array.from({ length: n }, (_, i) => (
+          <motion.span key={i} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ y: 30, opacity: 0 }} transition={spring}>
+            <DominoTile faceDown vertical unit={14} />
+          </motion.span>
+        ))}
+      </AnimatePresence>
     </div>
   )
 }
@@ -185,11 +201,11 @@ function Table({ game, selected, onPlace }) {
                     vertical={double}
                     unit={unit}
                     ring={endSide ? 'hsl(46 95% 60%)' : undefined}
-                    className={fresh ? 'pop' : ''}
+                    className={fresh ? 'dm-slap' : ''}
                   />
                 )
                 return endSide ? (
-                  <button key={i} onClick={() => onPlace(endSide)} className="rounded-md" aria-label={`Poner en el extremo ${endSide === 'left' ? 'izquierdo' : 'derecho'}`}>
+                  <button key={i} onClick={() => onPlace(endSide)} className="dm-target rounded-md" aria-label={`Poner en el extremo ${endSide === 'left' ? 'izquierdo' : 'derecho'}`}>
                     {tile}
                   </button>
                 ) : (

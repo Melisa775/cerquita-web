@@ -2,6 +2,15 @@ import { useEffect, useState } from 'react'
 import TimerBar from '../components/TimerBar'
 import { useCountdown } from '../hooks/useCountdown'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
+
+// A guessed card flies off to the right, a passed one drops to the left
+const CARD_VARIANTS = {
+  enter: { x: 0, y: 40, scale: 0.85, opacity: 0, rotate: 0 },
+  show: { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 },
+  exit: (result) => (result === 'hit' ? { x: 360, rotate: 18, opacity: 0 } : { x: -260, y: 80, rotate: -14, opacity: 0 }),
+}
 
 const HIT = 'hsl(148 42% 38%)'
 
@@ -97,13 +106,29 @@ function Acting({ room, me, send, colorOf }) {
           <p className="font-semibold" style={{ color }}>
             {mine ? 'Actúas tú' : `Actúa ${game.actor}`}
           </p>
-          <span className={`font-display text-5xl font-extrabold tabular-nums ${urgent ? 'text-danger' : ''}`}>{left ?? game.seconds}</span>
+          <motion.span
+            key={left}
+            className={`font-display text-5xl font-extrabold tabular-nums ${urgent ? 'text-danger' : ''}`}
+            initial={urgent ? { scale: 1.45 } : false}
+            animate={{ scale: 1 }}
+            transition={spring}
+          >
+            {left ?? game.seconds}
+          </motion.span>
         </div>
         <TimerBar seconds={game.seconds} resetKey={game.turn} msLeft={room.phaseEndsInMs} color={color} />
 
-        <section
-          key={mine ? game.card?.text : 'guess'}
-          className="pop mt-4 flex min-h-[18rem] flex-col items-center justify-center rounded-[2rem] p-8 text-center text-white"
+        <div className="relative mt-4">
+        <AnimatePresence mode="popLayout" custom={game.played.at(-1)?.result} initial={false}>
+        <motion.section
+          key={`${game.played.length}-${mine ? game.card?.text : 'guess'}`}
+          custom={game.played.at(-1)?.result}
+          variants={CARD_VARIANTS}
+          initial="enter"
+          animate="show"
+          exit="exit"
+          transition={spring}
+          className="flex min-h-[18rem] flex-col items-center justify-center rounded-[2rem] p-8 text-center text-white"
           style={{ background: color }}
         >
           {game.card?.category && (
@@ -120,7 +145,9 @@ function Acting({ room, me, send, colorOf }) {
               <p className="mt-2 text-white/85">Adivina en voz alta por la videollamada.</p>
             </>
           )}
-        </section>
+        </motion.section>
+        </AnimatePresence>
+        </div>
 
         {mine && (
           <div className="mt-4 grid grid-cols-[2fr_1fr] gap-3">
@@ -142,9 +169,15 @@ function Acting({ room, me, send, colorOf }) {
         </p>
         <ul className="mt-3 space-y-1.5">
           {[...game.played].reverse().map((c, i) => (
-            <li key={game.played.length - i} className={`text-sm ${c.result === 'hit' ? 'font-semibold' : 'text-muted line-through'}`}>
+            <motion.li
+              key={game.played.length - i}
+              className={`text-sm ${c.result === 'hit' ? 'font-semibold' : 'text-muted line-through'}`}
+              initial={i === 0 ? { opacity: 0, x: c.result === 'hit' ? 16 : -16 } : false}
+              animate={{ opacity: 1, x: 0 }}
+              transition={spring}
+            >
               {c.text}
-            </li>
+            </motion.li>
           ))}
         </ul>
       </aside>
@@ -169,9 +202,9 @@ function TurnOver({ game, me, send, colorOf }) {
           <p className="text-sm font-semibold" style={{ color: HIT }}>Adivinaron</p>
           <ul className="mt-2 space-y-1">
             {hits.map((c, i) => (
-              <li key={i}>
+              <motion.li key={i} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ ...spring, delay: 0.2 + 0.06 * i }}>
                 <span className="font-semibold">{c.text}</span> <span className="text-sm text-muted">· {c.category}</span>
-              </li>
+              </motion.li>
             ))}
             {!hits.length && <li className="text-muted">Ninguna esta vez.</li>}
           </ul>
@@ -203,14 +236,20 @@ function Final({ game, me, send, colorOf }) {
         {Object.entries(game.scores).map(([p, n]) => (
           <div key={p} className="rounded-2xl bg-paper px-5 py-3">
             <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-            <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+            <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
             <p className="text-xs text-muted">cartas que hizo adivinar</p>
           </div>
         ))}
       </div>
       <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
         {game.history.map((h) => (
-          <li key={h.turn} className="rounded-2xl bg-paper px-4 py-3">
+          <motion.li
+            key={h.turn}
+            className="rounded-2xl bg-paper px-4 py-3"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...softSpring, delay: 0.1 * h.turn }}
+          >
             <p className="text-sm">
               <span className="text-muted">Turno {h.turn} · </span>
               <span className="font-semibold" style={{ color: colorOf(h.actor) }}>{h.actor}</span>
@@ -224,7 +263,7 @@ function Final({ game, me, send, colorOf }) {
                 </span>
               ))}
             </p>
-          </li>
+          </motion.li>
         ))}
       </ol>
       <EndActions send={send} replay={{ type: 'start_game', game: 'charades', ...game.options }} />

@@ -61,16 +61,22 @@ export function CategoryIcon({ category, className = 'h-6 w-6', color = 'white',
   )
 }
 
-/** Round category badge (filled if its crown was already won). */
+import { motion } from 'motion/react'
+
+/** Round category badge (filled if its crown was already won). A newly won crown spins in. */
 export function CrownBadge({ category, won = true, size = 'h-9 w-9', title }) {
   const meta = CATEGORY_META[category]
   return (
-    <span
+    <motion.span
+      key={won ? 'won' : 'pending'}
       className={`inline-flex shrink-0 items-center justify-center rounded-full ${size}`}
       style={won ? { background: meta.color } : { background: 'var(--color-stone)', border: '2px dashed var(--color-line)' }}
       title={title ?? `${meta.label}${won ? '' : ' (pendiente)'}`}
+      initial={won ? { scale: 0, rotate: -180 } : false}
+      animate={{ scale: 1, rotate: 0 }}
+      transition={{ type: 'spring', stiffness: 260, damping: 14 }}
     >
       <CategoryIcon category={category} className="h-[58%] w-[58%]" color={won ? 'white' : 'var(--color-line)'} />
-    </span>
+    </motion.span>
   )
 }

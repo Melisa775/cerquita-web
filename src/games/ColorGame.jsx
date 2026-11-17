@@ -1,4 +1,7 @@
 import { useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, Confetti, softSpring, spring } from '../lib/motion'
+import { CONFETTI_COLORS } from '../components/EndActions'
 import ColorSliders from '../components/ColorSliders'
 import TimerBar from '../components/TimerBar'
 import { useCountdown } from '../hooks/useCountdown'
@@ -51,9 +54,16 @@ function Memorize({ game, left }) {
     >
       <p className="text-lg font-semibold"><RoundLabel game={game} /></p>
       <h1 className="text-4xl font-extrabold sm:text-6xl">Memoriza este color</h1>
-      <p className="font-display text-8xl font-extrabold tabular-nums" aria-label={`${left ?? ''} segundos`}>
+      <motion.p
+        key={left ?? game.memorizeSeconds}
+        className="font-display text-8xl font-extrabold tabular-nums"
+        aria-label={`${left ?? ''} segundos`}
+        initial={{ scale: 1.6, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        transition={spring}
+      >
         {left ?? game.memorizeSeconds}
-      </p>
+      </motion.p>
     </div>
   )
 }
@@ -77,9 +87,11 @@ function Guess({ game, me, send, left, msLeft, colorOf }) {
       <TimerBar seconds={game.guessSeconds} resetKey={game.round} msLeft={msLeft} />
 
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_1.1fr] md:items-start">
-        <div
+        <motion.div
           className="aspect-square w-full rounded-[2rem] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)] max-md:aspect-auto max-md:h-[26dvh]"
           style={{ background: hsbToCss(color) }}
+          animate={sent ? { scale: [1, 0.92, 1.03, 1], rotate: [0, -2, 1, 0] } : { scale: 1 }}
+          transition={{ duration: 0.5 }}
           aria-label="Tu color"
           role="img"
         />
@@ -101,9 +113,15 @@ function Guess({ game, me, send, left, msLeft, colorOf }) {
           </button>
           <ul className="mt-4 space-y-1 text-sm">
             {others.map((p) => (
-              <li key={p} style={{ color: colorOf(p) }} className="font-semibold">
-                {game.submitted.includes(p) ? `${p} ya envió su color` : `${p} está eligiendo…`}
-              </li>
+              <motion.li
+                key={`${p}-${game.submitted.includes(p)}`}
+                style={{ color: colorOf(p) }}
+                className="font-semibold"
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+              >
+                {game.submitted.includes(p) ? `✓ ${p} ya envió su color` : `${p} está eligiendo…`}
+              </motion.li>
             ))}
           </ul>
         </div>
@@ -123,30 +141,37 @@ function Reveal({ game, send, colorOf }) {
       <div className="text-muted"><RoundLabel game={game} /></div>
 
       <section className="mt-3 overflow-hidden rounded-[2rem] bg-paper">
-        <div
+        <motion.div
           className="flex h-40 items-end p-5 sm:h-52"
           style={{ background: hsbToCss(game.target), color: inkFor(game.target) }}
+          initial={{ clipPath: 'inset(0 0 100% 0)' }}
+          animate={{ clipPath: 'inset(0 0 0% 0)' }}
+          transition={{ duration: 0.55, ease: [0.3, 0.7, 0.2, 1] }}
         >
           <span className="text-lg font-semibold">El color era este</span>
-        </div>
+        </motion.div>
         <div className="grid gap-1 border-t-4 border-paper" style={{ gridTemplateColumns: `repeat(${players.length}, 1fr)` }}>
-          {players.map((p) => {
+          {players.map((p, i) => {
             const guess = game.guesses[p]
+            const delay = 0.45 + i * 0.25
             return (
               <div key={p} className="bg-paper">
-                <div
+                <motion.div
                   className="flex h-28 items-center justify-center text-sm font-semibold sm:h-36"
                   style={guess ? { background: hsbToCss(guess), color: inkFor(guess) } : undefined}
+                  initial={{ clipPath: 'inset(100% 0 0 0)' }}
+                  animate={{ clipPath: 'inset(0% 0 0 0)' }}
+                  transition={{ duration: 0.45, delay, ease: [0.3, 0.7, 0.2, 1] }}
                 >
                   {!guess && <span className="text-muted">Sin respuesta</span>}
-                </div>
-                <div className="p-5">
+                </motion.div>
+                <motion.div className="p-5" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ ...softSpring, delay: delay + 0.2 }}>
                   <p className="font-semibold" style={{ color: colorOf(p) }}>{p}</p>
                   <p className="font-display text-5xl font-extrabold tabular-nums">
-                    {game.roundScores[p]?.toFixed(1) ?? '0.0'}
+                    <AnimatedNumber key={game.round} value={game.roundScores[p] ?? 0} from={0} decimals={1} duration={1} />
                   </p>
                   <p className="text-sm text-muted">de 10. Total: {game.totals[p].toFixed(1)}</p>
-                </div>
+                </motion.div>
               </div>
             )
           })}
@@ -155,6 +180,7 @@ function Reveal({ game, send, colorOf }) {
 
       {finished ? (
         <section className="mt-8">
+          <Confetti colors={CONFETTI_COLORS} />
           <h1 className="text-4xl font-extrabold">
             {players.length < 2 ? `Terminaste con ${game.totals[ranking[0]].toFixed(1)} puntos` : tie ? 'Empate perfecto' : `Ganó ${ranking[0]}`}
           </h1>
@@ -190,7 +216,13 @@ function History({ game, players }) {
   return (
     <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
       {game.history.map((r) => (
-        <li key={r.round} className="flex items-center gap-3">
+        <motion.li
+          key={r.round}
+          className="flex items-center gap-3"
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ ...softSpring, delay: 0.6 + r.round * 0.08 }}
+        >
           <span className="w-6 text-sm text-muted tabular-nums">{r.round}</span>
           <span className="h-10 w-16 rounded-xl" style={{ background: hsbToCss(r.target) }} title="Color real" />
           {players.map((p) => (
@@ -203,7 +235,7 @@ function History({ game, players }) {
               <span className="w-10 text-sm tabular-nums">{r.scores[p].toFixed(1)}</span>
             </span>
           ))}
-        </li>
+        </motion.li>
       ))}
     </ol>
   )

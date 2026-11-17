@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring } from '../lib/motion'
 import HangmanDrawing from '../components/HangmanDrawing'
 import { EndActions, winnerTitle } from '../components/EndActions'
 
@@ -287,14 +289,23 @@ function Lives({ left, total }) {
   return (
     <div className="mt-3 flex flex-wrap justify-center gap-1" aria-label={`${left} de ${total} vidas`}>
       {Array.from({ length: total }, (_, i) => (
-        <svg key={i} viewBox="-7 -2 14 14" className="h-4 w-4" aria-hidden="true">
+        <motion.svg
+          key={i}
+          viewBox="-7 -2 14 14"
+          className="h-4 w-4"
+          aria-hidden="true"
+          initial={false}
+          // a lost life jumps, shrinks and fades to an outline
+          animate={i < left ? { scale: 1, y: 0, rotate: 0 } : { scale: [1, 1.6, 0.85, 1], y: [0, -6, 2, 0], rotate: [0, -15, 10, 0] }}
+          transition={{ duration: 0.5 }}
+        >
           <path
             d="M0 3 C0 -1 -6 -1 -6 3 C-6 6 0 9 0 11 C0 9 6 6 6 3 C6 -1 0 -1 0 3 Z"
             fill={i < left ? 'var(--color-p2)' : 'none'}
             stroke={i < left ? 'none' : 'var(--color-line)'}
             strokeWidth="1.4"
           />
-        </svg>
+        </motion.svg>
       ))}
     </div>
   )
@@ -331,8 +342,11 @@ function Keyboard({ game, canGuess, color, send }) {
             const used = game.guessed.includes(l)
             const hit = inWord(l)
             return (
-              <button
+              <motion.button
                 key={L}
+                initial={false}
+                animate={hit ? { y: [0, -8, 0], scale: [1, 1.15, 1] } : used ? { x: [0, -5, 5, -3, 0] } : { x: 0, y: 0, scale: 1 }}
+                transition={{ duration: 0.35 }}
                 onClick={() => send({ type: 'hangman_guess', letter: l })}
                 disabled={!canGuess || used}
                 aria-label={`${L}${used ? (hit ? ', está' : ', no está') : ''}`}
@@ -348,7 +362,7 @@ function Keyboard({ game, canGuess, color, send }) {
                 style={hit ? { background: color } : undefined}
               >
                 {L}
-              </button>
+              </motion.button>
             )
           })}
         </div>
@@ -404,14 +418,20 @@ function Final({ game, me, send, colorOf }) {
           {Object.entries(game.scores).map(([p, n]) => (
             <div key={p} className="rounded-2xl bg-paper px-5 py-3">
               <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-              <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+              <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
             </div>
           ))}
         </div>
       )}
       <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
         {game.history.map((h) => (
-          <li key={h.round} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-paper px-4 py-3">
+          <motion.li
+            key={h.round}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-paper px-4 py-3"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...softSpring, delay: 0.1 * h.round }}
+          >
             <span className="w-5 text-sm text-muted tabular-nums">{h.round}</span>
             <span className="font-display text-xl font-extrabold uppercase tracking-wide">{h.word}</span>
             <span className="text-sm text-muted">
@@ -423,7 +443,7 @@ function Final({ game, me, send, colorOf }) {
             >
               {h.won ? `adivinada · ${h.misses} ${h.misses === 1 ? 'error' : 'errores'}` : 'ahorcado'}
             </span>
-          </li>
+          </motion.li>
         ))}
       </ol>
       <EndActions send={send} replay={{ type: 'start_game', game: 'hangman', ...game.options }} />

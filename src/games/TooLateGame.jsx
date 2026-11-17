@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import TimerBar from '../components/TimerBar'
 import { EndActions, winnerTitle } from '../components/EndActions'
 import { useCountdown } from '../hooks/useCountdown'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 
 export default function TooLateGame({ room, me, send, colorOf }) {
   const game = room.game
@@ -14,7 +16,7 @@ function Scores({ game, colorOf }) {
     <div className="flex flex-wrap gap-2">
       {Object.entries(game.scores).map(([p, n]) => (
         <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-          <span style={{ color: colorOf(p) }}>{p}</span> <span className="tabular-nums">{n}</span>
+          <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} />
         </span>
       ))}
     </div>
@@ -57,7 +59,20 @@ function Board({ room, me, send, colorOf }) {
 
       <section className="mt-3 rounded-[2rem] bg-paper p-6">
         <p className="text-sm font-semibold text-muted">Categoría</p>
-        <h1 className="mt-1 text-3xl font-extrabold sm:text-4xl">{game.category}</h1>
+        <div className="mt-1 overflow-hidden [perspective:600px]">
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.h1
+              key={game.category}
+              className="text-3xl font-extrabold sm:text-4xl"
+              initial={{ rotateX: -90, opacity: 0 }}
+              animate={{ rotateX: 0, opacity: 1 }}
+              exit={{ rotateX: 90, opacity: 0 }}
+              transition={{ duration: 0.25 }}
+            >
+              {game.category}
+            </motion.h1>
+          </AnimatePresence>
+        </div>
       </section>
 
       <div className="mt-4">
@@ -73,22 +88,25 @@ function Board({ room, me, send, colorOf }) {
           const by = usedBy[l]
           const isLast = lastUsed?.letter === l
           return (
-            <button
+            <motion.button
               key={l}
+              initial={false}
+              animate={by ? { scale: [1, 1.25, 0.92, 1], rotate: [0, -8, 4, 0] } : { scale: 1, rotate: 0 }}
+              transition={{ duration: 0.45 }}
               onClick={() => pick(l)}
               disabled={!canPick || !!by}
               aria-label={by ? `${l}, usada por ${by}` : `Letra ${l}`}
-              className={`aspect-square rounded-2xl font-display text-3xl font-extrabold transition-transform sm:text-4xl ${
+              className={`aspect-square rounded-2xl font-display text-3xl font-extrabold transition-colors sm:text-4xl ${
                 by
                   ? 'text-white'
                   : canPick
-                    ? 'bg-paper shadow-[inset_0_0_0_2px_var(--color-ink)] hover:bg-ink hover:text-white active:scale-95'
+                    ? 'bg-paper shadow-[inset_0_0_0_2px_var(--color-ink)] hover:bg-ink hover:text-white'
                     : 'bg-paper text-ink/70'
               } ${isLast ? 'ring-4 ring-ink ring-offset-2 ring-offset-stone' : ''}`}
               style={by ? { background: colorOf(by), opacity: isLast ? 1 : 0.55 } : undefined}
             >
               {l}
-            </button>
+            </motion.button>
           )
         })}
       </div>
@@ -126,19 +144,34 @@ function Turn({ game, me, left, msLeft, send, colorOf, lastUsed }) {
   const mine = game.turn === me
   const color = colorOf(game.turn)
   return (
-    <div className="rounded-[2rem] p-5 text-white" style={{ background: color }} aria-live="polite">
+    <motion.div className="rounded-[2rem] p-5 text-white" animate={{ background: color }} transition={{ duration: 0.35 }} aria-live="polite">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="font-display text-3xl font-extrabold">{mine ? '¡Tu turno!' : `Turno de ${game.turn}`}</p>
+          <motion.p
+            key={game.turnId}
+            className="font-display text-3xl font-extrabold"
+            initial={{ x: mine ? -30 : 30, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            transition={spring}
+          >
+            {mine ? '¡Tu turno!' : `Turno de ${game.turn}`}
+          </motion.p>
           <p className="mt-1 text-white/85">
             {mine
               ? 'Di una palabra en voz alta y toca la letra con la que empieza.'
               : `Escucha a ${game.turn}. Si su palabra no vale, toquen ¡No vale!`}
           </p>
         </div>
-        <span className="font-display text-6xl font-extrabold tabular-nums" aria-label={`${left ?? game.turnSeconds} segundos`}>
+        <motion.span
+          key={left}
+          className="font-display text-6xl font-extrabold tabular-nums"
+          aria-label={`${left ?? game.turnSeconds} segundos`}
+          initial={{ scale: left != null && left <= 3 ? 1.5 : 1.15, opacity: 0.6 }}
+          animate={{ scale: 1, opacity: 1, rotate: left != null && left <= 3 ? [0, -6, 6, 0] : 0 }}
+          transition={{ duration: 0.3 }}
+        >
           {left ?? game.turnSeconds}
-        </span>
+        </motion.span>
       </div>
       <TimerBar seconds={game.turnSeconds} resetKey={game.turnId} msLeft={msLeft} color="white" track="bg-white/30" />
       {lastUsed && (
@@ -154,7 +187,7 @@ function Turn({ game, me, left, msLeft, send, colorOf, lastUsed }) {
           </button>
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }
 
@@ -164,7 +197,12 @@ function RoundOver({ game, send }) {
   const winner = r.type === 'timeout' ? players.find((p) => p !== r.loser) : null
   const last = game.round >= game.totalRounds
   return (
-    <div className="rounded-[2rem] bg-ink p-6 text-white">
+    <motion.div
+      className="rounded-[2rem] bg-ink p-6 text-white"
+      initial={{ scale: 0.85, opacity: 0, rotate: -2 }}
+      animate={{ scale: 1, opacity: 1, rotate: 0 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 16 }}
+    >
       {r.type === 'completed' ? (
         <>
           <p className="font-display text-4xl font-extrabold">¡Lo lograron!</p>
@@ -186,7 +224,7 @@ function RoundOver({ game, send }) {
       >
         {last ? 'Ver resultados' : 'Siguiente ronda'}
       </button>
-    </div>
+    </motion.div>
   )
 }
 
@@ -197,7 +235,13 @@ function Final({ game, send, colorOf }) {
       <div className="mt-4"><Scores game={game} colorOf={colorOf} /></div>
       <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
         {game.history.map((h) => (
-          <li key={h.round} className="flex flex-wrap items-baseline gap-x-3 rounded-2xl bg-paper px-4 py-3">
+          <motion.li
+            key={h.round}
+            className="flex flex-wrap items-baseline gap-x-3 rounded-2xl bg-paper px-4 py-3"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...softSpring, delay: 0.1 * h.round }}
+          >
             <span className="w-5 text-sm text-muted tabular-nums">{h.round}</span>
             <span className="font-semibold">{h.category}</span>
             <span className="text-sm text-muted">
@@ -205,7 +249,7 @@ function Final({ game, send, colorOf }) {
                 ? `¡Completaron las ${h.letters} letras!`
                 : <>{h.letters} letras · perdió <span style={{ color: colorOf(h.result.loser) }}>{h.result.loser}</span></>}
             </span>
-          </li>
+          </motion.li>
         ))}
       </ol>
       <EndActions send={send} replay={{ type: 'start_game', game: 'toolate', ...game.options }} />

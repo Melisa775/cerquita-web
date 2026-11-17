@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { TurnBanner, spring, softSpring } from '../lib/motion'
 import { useRoom } from '../hooks/useRoom'
 import { Logo } from './Home'
 import Credit from '../components/Credit'
@@ -47,6 +49,7 @@ import { storage } from '../lib/api'
 
 const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame }
 const UPCOMING = []
+const LOBBY_CARDS = [ColorCard, StopCard, BoggleCard, HangmanCard, WordleCard, WordSearchCard, GuessWhoCard, PinturilloCard, CharadesCard, MurdokuCard, TriviaCard, ChessCard, BattleshipCard, DominoCard, ParquesCard, CrosswordsCard, UnaLobbyCard, GolfCard, ColonosCard, DeeperCard]
 
 export default function Room({ code, name, onExit }) {
   const { room, status, error, errorId, fatal, send, subscribe } = useRoom(code, name)
@@ -76,27 +79,53 @@ export default function Room({ code, name, onExit }) {
       <header className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-4">
         <button onClick={onExit} aria-label="Salir de la sala"><Logo small /></button>
         <div className="flex items-center gap-2">
-          {players.map((p, i) => (
-            <span
-              key={p.name}
-              className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold text-white"
-              style={{ background: PLAYER_COLORS[i], opacity: p.online ? 1 : 0.45 }}
-              title={p.online ? 'Conectado' : 'Desconectado'}
-            >
-              {p.name}{p.name === name && ' (tú)'}
-              {!p.online && <span className="font-normal">(sin conexión)</span>}
-            </span>
-          ))}
+          <AnimatePresence initial={false}>
+            {players.map((p, i) => (
+              <motion.span
+                key={p.name}
+                layout
+                initial={{ opacity: 0, scale: 0.5, x: 20 }}
+                animate={{ opacity: p.online ? 1 : 0.45, scale: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                transition={spring}
+                className="flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-semibold text-white"
+                style={{ background: PLAYER_COLORS[i] }}
+                title={p.online ? 'Conectado' : 'Desconectado'}
+              >
+                {p.online && <span className="online-dot h-1.5 w-1.5 rounded-full bg-white" aria-hidden="true" />}
+                {p.name}{p.name === name && ' (tú)'}
+                {!p.online && <span className="font-normal">(sin conexión)</span>}
+              </motion.span>
+            ))}
+          </AnimatePresence>
         </div>
       </header>
 
-      {status === 'reconnecting' && (
-        <p role="status" className="bg-ink py-2 text-center text-sm text-white">Se perdió la conexión. Reconectando…</p>
-      )}
+      <AnimatePresence>
+        {status === 'reconnecting' && (
+          <motion.p
+            role="status"
+            className="overflow-hidden bg-ink text-center text-sm text-white"
+            initial={{ height: 0 }}
+            animate={{ height: 'auto' }}
+            exit={{ height: 0 }}
+          >
+            <span className="block py-2">Se perdió la conexión. Reconectando…</span>
+          </motion.p>
+        )}
+      </AnimatePresence>
+      {GameView && <TurnBanner game={room.game} me={name} color={colorOf(name)} />}
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-12">
+        <AnimatePresence mode="wait" initial={false}>
         {GameView ? (
-          <>
+          <motion.div
+            key={`game-${room.game.name}`}
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16, transition: { duration: 0.15 } }}
+            transition={softSpring}
+          >
             <GameView
               room={room}
               me={name}
@@ -114,12 +143,21 @@ export default function Room({ code, name, onExit }) {
                 Salir de este juego
               </button>
             )}
-          </>
+          </motion.div>
         ) : (
-          <Lobby room={room} send={send} />
+          <motion.div
+            key="lobby"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16, transition: { duration: 0.15 } }}
+            transition={softSpring}
+          >
+            <Lobby room={room} send={send} />
+          </motion.div>
         )}
+        </AnimatePresence>
         {error && !GameView?.showsErrors && (
-          <p role="alert" className="mt-4 text-center font-medium text-danger">{error}</p>
+          <p key={errorId} role="alert" className="shake mt-4 text-center font-medium text-danger">{error}</p>
         )}
       </main>
     </div>
@@ -165,26 +203,19 @@ function Lobby({ room, send }) {
 
       <h2 className="mt-10 text-2xl font-bold">Juegos</h2>
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <ColorCard send={send} alone={alone} />
-        <StopCard send={send} alone={alone} />
-        <BoggleCard send={send} alone={alone} />
-        <HangmanCard send={send} alone={alone} />
-        <WordleCard send={send} alone={alone} />
-        <WordSearchCard send={send} alone={alone} />
-        <GuessWhoCard send={send} alone={alone} />
-        <PinturilloCard send={send} alone={alone} />
-        <CharadesCard send={send} alone={alone} />
-        <MurdokuCard send={send} alone={alone} />
-        <TriviaCard send={send} alone={alone} />
-        <ChessCard send={send} alone={alone} />
-        <BattleshipCard send={send} alone={alone} />
-        <DominoCard send={send} alone={alone} />
-        <ParquesCard send={send} alone={alone} />
-        <CrosswordsCard send={send} alone={alone} />
-        <UnaLobbyCard send={send} alone={alone} />
-        <GolfCard send={send} alone={alone} />
-        <ColonosCard send={send} alone={alone} />
-        <DeeperCard send={send} alone={alone} />
+        {LOBBY_CARDS.map((Card, i) => (
+          <motion.div
+            key={i}
+            className="lobby-card"
+            initial={{ opacity: 0, y: 28 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: '0px 0px -40px 0px' }}
+            whileHover={{ y: -5 }}
+            transition={{ ...softSpring, delay: (i % 2) * 0.07 }}
+          >
+            <Card send={send} alone={alone} />
+          </motion.div>
+        ))}
       </div>
 
       <Credit className="mt-10 text-center" />
