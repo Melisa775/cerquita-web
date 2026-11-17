@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { EndActions, winnerTitle } from '../components/EndActions'
 
 export const MARK_COLORS = {
@@ -136,7 +138,7 @@ function Header({ game, colorOf }) {
         <div className="flex gap-2">
           {Object.entries(game.scores).map(([p, n]) => (
             <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <span className="text-ink tabular-nums">{n}</span>
+              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} className="text-ink" />
             </span>
           ))}
         </div>
@@ -184,12 +186,18 @@ function Grid({ game, rows, draft, shakeKey, typerColor, colorOf }) {
       lines.push(
         <div key={`r${i}-done`} className="flex gap-1.5">
           {row.marks.map((mark, j) => (
+            // A solved row does a little wave once every tile has flipped
             <div
               key={j}
-              className={`flip flex items-center justify-center rounded-xl border-2 font-display font-extrabold uppercase ${size}`}
-              style={{ '--from': 'var(--color-paper)', '--to': MARK_COLORS[mark], animationDelay: `${j * 110}ms` }}
+              className={row.marks.every((m) => m === 'correct') ? 'wordle-win' : undefined}
+              style={{ animationDelay: `${row.marks.length * 110 + 450 + j * 90}ms` }}
             >
-              {row.word?.[j]}
+              <div
+                className={`flip flex items-center justify-center rounded-xl border-2 font-display font-extrabold uppercase ${size}`}
+                style={{ '--from': 'var(--color-paper)', '--to': MARK_COLORS[mark], animationDelay: `${j * 110}ms` }}
+              >
+                {row.word?.[j]}
+              </div>
             </div>
           ))}
           {game.mode === 'team' && (
@@ -249,13 +257,16 @@ function MiniBoard({ game, player, colorOf }) {
               const mark = rows[i]?.marks[j]
               const letter = rows[i]?.word?.[j]
               return (
-                <span
-                  key={j}
+                <motion.span
+                  key={`${j}-${mark ?? ''}`}
                   className="flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold uppercase text-white"
                   style={{ background: mark ? MARK_COLORS[mark] : 'var(--color-stone)' }}
+                  initial={mark ? { rotateX: 90 } : false}
+                  animate={{ rotateX: 0 }}
+                  transition={{ duration: 0.3, delay: j * 0.08 }}
                 >
                   {letter}
-                </span>
+                </motion.span>
               )
             })}
           </div>
@@ -292,7 +303,8 @@ function Keyboard({ rows, canType, onPress }) {
                 onClick={() => onPress(l)}
                 disabled={!canType}
                 className={`${key} min-w-0 flex-1 text-lg ${mark ? 'text-white' : 'bg-paper shadow-[0_2px_0_rgb(0_0_0/0.12)]'}`}
-                style={mark ? { background: MARK_COLORS[mark] } : undefined}
+                // the key changes color once the row has finished flipping
+                style={{ ...(mark ? { background: MARK_COLORS[mark] } : null), transition: 'background-color 250ms 650ms, color 250ms 650ms, scale 120ms' }}
               >
                 {L}
               </button>
@@ -331,7 +343,13 @@ function RoundOver({ game, me, send, colorOf }) {
   return (
     <div className="pop mt-2 w-full max-w-xl rounded-[2rem] p-6 text-white" style={{ background: accent }}>
       <p className="text-sm font-semibold text-white/80">La palabra era</p>
-      <p className="font-display text-4xl font-extrabold uppercase tracking-widest">{game.answer}</p>
+      <p className="font-display text-4xl font-extrabold uppercase tracking-widest" aria-label={game.answer}>
+        {game.answer.split('').map((ch, i) => (
+          <motion.span key={i} className="inline-block" initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ ...spring, delay: 0.15 + i * 0.07 }}>
+            {ch}
+          </motion.span>
+        ))}
+      </p>
       <p className="mt-3 font-display text-2xl font-extrabold">{title}</p>
       <p className="text-white/85">{detail}</p>
       <button onClick={() => send({ type: 'next_round' })} className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-ink">
@@ -353,14 +371,20 @@ function Final({ game, me, send, colorOf }) {
           {Object.entries(game.scores).map(([p, n]) => (
             <div key={p} className="rounded-2xl bg-paper px-5 py-3">
               <p className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</p>
-              <p className="font-display text-4xl font-extrabold tabular-nums">{n}</p>
+              <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={n} from={0} duration={1} /></p>
             </div>
           ))}
         </div>
       )}
       <ol className="mt-6 space-y-2" aria-label="Resumen de rondas">
         {game.history.map((h) => (
-          <li key={h.round} className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-paper px-4 py-3">
+          <motion.li
+            key={h.round}
+            className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-2xl bg-paper px-4 py-3"
+            initial={{ opacity: 0, x: -16 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ ...softSpring, delay: 0.1 * h.round }}
+          >
             <span className="w-5 text-sm text-muted tabular-nums">{h.round}</span>
             <span className="flex gap-1">
               {h.answer.split('').map((ch, i) => (
@@ -382,7 +406,7 @@ function Final({ game, me, send, colorOf }) {
                   ? <>ganó <span style={{ color: colorOf(h.result.winner) }}>{h.result.winner}</span> en {h.result.tries[h.result.winner]}</>
                   : 'nadie la sacó'}
             </span>
-          </li>
+          </motion.li>
         ))}
       </ol>
       <EndActions send={send} replay={{ type: 'start_game', game: 'wordle', ...game.options }} />

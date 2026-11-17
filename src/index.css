@@ -16,7 +16,7 @@
 
 @layer base {
   html { background: var(--color-stone); color: var(--color-ink); }
-  body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+  body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; min-height: 100dvh; overflow-x: clip; }
   h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.02em; }
   :focus-visible { outline: 3px solid var(--color-ink); outline-offset: 3px; border-radius: 6px; }
 }
@@ -100,3 +100,80 @@
 @keyframes deeper-deal { from { opacity: 0; transform: translateY(22px) rotate(-3deg) scale(.96); } to { opacity: 1; transform: none; } }
 .deeper-deal { animation: deeper-deal 420ms cubic-bezier(.2,.8,.3,1) both; }
 @media (prefers-reduced-motion: reduce) { .deeper-deal { animation: none; } }
+
+/* --- shared motion ------------------------------------------------------ */
+/* Action buttons sink a little when pressed */
+button:is(.rounded-2xl, .rounded-full, .rounded-xl):not(:disabled) { transition: scale 120ms ease, translate 200ms ease, color 150ms, background-color 150ms, border-color 150ms, box-shadow 150ms, opacity 150ms; }
+button:is(.rounded-2xl, .rounded-full, .rounded-xl):not(:disabled):active { scale: .96; }
+
+/* Lobby cards: the banner art wakes up on hover */
+.lobby-card { height: 100%; }
+.lobby-card > article { height: 100%; transition: box-shadow 250ms ease; }
+.lobby-card:hover > article { box-shadow: 0 18px 36px -22px rgb(34 37 46 / .45); }
+.lobby-card > article > div:first-child > * { transition: scale 350ms cubic-bezier(.2,.8,.3,1.3), translate 350ms cubic-bezier(.2,.8,.3,1.3); }
+.lobby-card:hover > article > div:first-child > * { scale: 1.07; translate: 0 -3px; }
+.lobby-card:hover > article > div:first-child > *:nth-child(2n) { translate: 0 3px; }
+
+/* Online dot in the player chips */
+@keyframes online-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.online-dot { animation: online-pulse 2.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 1ms !important; animation-iteration-count: 1 !important; transition-duration: 1ms !important; }
+}
+
+/* Logo: hovering it brings the two circles even closer */
+.logo-left, .logo-right { transition: translate 300ms cubic-bezier(.2,.8,.3,1.4); }
+.group:hover .logo-left { translate: 1.5px 0; }
+.group:hover .logo-right { translate: -1.5px 0; }
+
+/* Wordle: the solved row jumps tile by tile */
+@keyframes wordle-win { 0%, 100% { translate: 0 0; } 40% { translate: 0 -14px; } 70% { translate: 0 3px; } }
+.wordle-win { animation: wordle-win 420ms ease-out both; }
+
+/* Murdoku: the culprit's portrait throbs in red when the case is solved */
+@keyframes murdoku-culprit { 0%, 100% { box-shadow: 0 0 0 3px hsl(4 70% 45%); } 50% { box-shadow: 0 0 0 7px hsl(4 70% 45% / .35); } }
+.murdoku-culprit { animation: murdoku-culprit 1.1s ease-in-out infinite; }
+
+/* Chess: a king in check glows, and a clock under 10 seconds throbs */
+@keyframes chess-check { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.chess-check { animation: chess-check 900ms ease-in-out infinite; }
+@keyframes chess-low { 0%, 100% { scale: 1; } 50% { scale: 1.08; } }
+.chess-low { animation: chess-low 1s ease-in-out infinite; }
+
+/* Battleship: slow waves on the sea and ships bobbing on them */
+@keyframes bn-waves { from { background-position: 0 0; } to { background-position: 120px 60px; } }
+.bn-waves {
+  background-image: repeating-linear-gradient(-35deg, transparent 0 18px, rgb(255 255 255 / .07) 18px 22px, transparent 22px 40px);
+  animation: bn-waves 9s linear infinite;
+}
+@keyframes bn-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -1.5px; } }
+.bn-bob { animation: bn-bob 2.6s ease-in-out infinite; }
+
+/* Dominoes: a played tile is slapped onto the table; open ends invite a tap */
+@keyframes dm-slap { 0% { transform: scale(1.7) rotate(-14deg); opacity: 0; } 60% { transform: scale(.94) rotate(2deg); opacity: 1; } 100% { transform: none; } }
+.dm-slap { animation: dm-slap 380ms cubic-bezier(.2,.8,.3,1.1) both; }
+@keyframes dm-target { 0%, 100% { scale: 1; } 50% { scale: 1.07; } }
+.dm-target { animation: dm-target 1.1s ease-in-out infinite; }
+
+/* Crosswords: played tiles drop onto the board; a tile you place snaps in */
+@keyframes cw-drop { 0% { transform: translateY(-60%) scale(1.5); opacity: 0; } 70% { transform: translateY(4%) scale(.95); opacity: 1; } 100% { transform: none; } }
+.cw-drop { animation: cw-drop 380ms cubic-bezier(.2,.8,.3,1.1) both; }
+@keyframes cw-place { 0% { transform: scale(.5); } 70% { transform: scale(1.12); } 100% { transform: none; } }
+.cw-place { animation: cw-place 220ms ease-out; }
+
+/* Una: the "¡Una!" button wiggles to get noticed */
+@keyframes una-call { 0%, 100% { rotate: 0deg; scale: 1; } 20% { rotate: -6deg; scale: 1.08; } 40% { rotate: 5deg; } 60% { rotate: -3deg; scale: 1.04; } 80% { rotate: 2deg; } }
+.una-call { animation: una-call 900ms ease-in-out infinite; }
+
+/* Mini golf: the flag flutters */
+@keyframes golf-flag { 0%, 100% { transform: scaleX(1) skewY(0deg); } 50% { transform: scaleX(.82) skewY(6deg); } }
+.golf-flag { transform-box: fill-box; transform-origin: left center; animation: golf-flag 1.4s ease-in-out infinite; }
+
+/* Colonos: the hexes of the rolled number flash */
+@keyframes colonos-flash { 0% { opacity: 0; } 20% { opacity: .55; } 100% { opacity: 0; } }
+.colonos-flash { pointer-events: none; animation: colonos-flash 1.2s ease-out both; }
+
+/* Más cerca: a vote your partner already cast gently asks for yours */
+@keyframes deeper-nudge { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--accent) 22%, transparent); } }
+.deeper-nudge { animation: deeper-nudge 1.6s ease-in-out infinite; }

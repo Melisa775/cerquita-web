@@ -3,6 +3,9 @@ import TimerBar from '../components/TimerBar'
 import { EndActions, winnerTitle } from '../components/EndActions'
 import { useCountdown } from '../hooks/useCountdown'
 import { storage } from '../lib/api'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
+import { useRollingLetter } from '../hooks/useRollingLetter'
 
 export default function StopGame({ room, me, send, colorOf }) {
   const game = room.game
@@ -19,18 +22,29 @@ function RoundLabel({ game }) {
   return <span>Ronda {game.round} de {game.totalRounds}</span>
 }
 
-function LetterTile({ letter, size = 'lg' }) {
+/** The letter tile. With `roll`, it spins through random letters like a slot machine before landing. */
+function LetterTile({ letter, size = 'lg', roll = false }) {
   const big = size === 'lg'
+  const [shown, rolling] = useRollingLetter(letter, roll)
   return (
-    <div
-      className={`flex shrink-0 items-center justify-center bg-ink font-display font-extrabold text-white ${
+    <motion.div
+      className={`flex shrink-0 items-center justify-center overflow-hidden bg-ink font-display font-extrabold text-white ${
         big ? 'h-32 w-32 rounded-[2rem] text-8xl sm:h-40 sm:w-40' : 'h-14 w-14 rounded-2xl text-4xl'
       }`}
       aria-label={`Letra ${letter}`}
       role="img"
+      animate={roll && !rolling ? { scale: [1, 1.12, 1], rotate: [0, -4, 0] } : undefined}
+      transition={{ duration: 0.4 }}
     >
-      {letter}
-    </div>
+      <motion.span
+        key={shown}
+        initial={rolling ? { y: '-60%', opacity: 0.4 } : false}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ duration: rolling ? 0.06 : 0.2 }}
+      >
+        {shown}
+      </motion.span>
+    </motion.div>
   )
 }
 
@@ -95,7 +109,7 @@ function Sheet({ room, me, send, left, colorOf }) {
 
       <div className="mt-6 grid gap-6 md:grid-cols-[auto_1fr] md:items-start">
         <div className="flex items-center gap-5 md:flex-col md:items-start">
-          <LetterTile letter={game.letter} />
+          <LetterTile letter={game.letter} roll={game.phase === 'writing'} />
           <ul className="space-y-2 text-sm">
             {others.map((p) => (
               <li key={p}>
@@ -154,10 +168,11 @@ function Dots({ filled, total, color }) {
   return (
     <span className="mt-1 flex gap-1" aria-hidden="true">
       {Array.from({ length: total }, (_, i) => (
-        <span
+        <motion.span
           key={i}
           className="h-2 w-4 rounded-full"
-          style={{ background: i < filled ? color : 'var(--color-line)' }}
+          animate={{ background: i < filled ? color : 'var(--color-line)', scaleY: i === filled - 1 ? [1, 1.8, 1] : 1 }}
+          transition={{ duration: 0.3 }}
         />
       ))}
     </span>
@@ -173,10 +188,17 @@ function StopFlash({ game, me, colorOf }) {
       role="status"
       aria-live="assertive"
     >
-      <p className="font-display text-8xl font-extrabold sm:text-9xl">¡Stop!</p>
-      <p className="text-xl font-semibold">
+      <motion.p
+        className="font-display text-8xl font-extrabold sm:text-9xl"
+        initial={{ scale: 2.6, rotate: -12, opacity: 0 }}
+        animate={{ scale: 1, rotate: -4, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 18 }}
+      >
+        ¡Stop!
+      </motion.p>
+      <motion.p className="text-xl font-semibold" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
         {who ? (who === me ? 'Lo cantaste tú' : `Lo cantó ${who}`) : 'Se acabó el tiempo'}
-      </p>
+      </motion.p>
     </div>
   )
 }
@@ -211,11 +233,12 @@ function Review({ game, send, colorOf }) {
           <span key={p} className="truncate font-semibold" style={{ color: colorOf(p) }}>{p}</span>
         ))}
 
-        {game.categories.map((c) => (
+        {game.categories.map((c, row) => (
           <Row key={c.key} label={c.label}>
-            {players.map((p) => (
+            {players.map((p, col) => (
               <AnswerCell
                 key={p}
+                delay={0.08 * row + 0.04 * col}
                 cell={game.results[p][c.key]}
                 letter={game.letter}
                 isCity={c.key === 'city'}
@@ -229,7 +252,7 @@ function Review({ game, send, colorOf }) {
         <span className="self-center border-t border-line pt-3 font-semibold">Total</span>
         {players.map((p) => (
           <span key={p} className="border-t border-line pt-3 font-display text-4xl font-extrabold tabular-nums">
-            {game.roundTotals[p]}
+            <AnimatedNumber value={game.roundTotals[p]} from={0} duration={0.9} />
           </span>
         ))}
       </section>
@@ -266,13 +289,15 @@ function issueNote(cell, letter, isCity) {
   return null
 }
 
-function AnswerCell({ cell, letter, isCity, color, onToggle }) {
+function AnswerCell({ cell, letter, isCity, color, onToggle, delay = 0 }) {
+  const enter = { initial: { opacity: 0, y: 10, scale: 0.96 }, animate: { opacity: 1, y: 0, scale: 1 }, transition: { ...softSpring, delay } }
   if (!cell.answer) {
-    return <span className="flex items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-sm text-muted">Vacía</span>
+    return <motion.span {...enter} className="flex items-center rounded-xl border border-dashed border-line px-3 py-2.5 text-sm text-muted">Vacía</motion.span>
   }
   const note = issueNote(cell, letter, isCity)
   return (
-    <button
+    <motion.button
+      {...enter}
       onClick={onToggle}
       aria-pressed={!cell.valid}
       aria-label={`${cell.answer}: ${cell.valid ? 'vale' : 'no vale'}${note ? `, ${note}` : ''}. Tocar para cambiar`}
@@ -280,18 +305,22 @@ function AnswerCell({ cell, letter, isCity, color, onToggle }) {
       style={{ borderColor: cell.valid ? color : 'var(--color-line)' }}
     >
       <span className={`break-words ${cell.valid ? '' : 'text-muted line-through'}`}>{cell.answer}</span>
-      <span
+      <motion.span
+        key={cell.points}
         className="ml-auto rounded-lg px-2 py-0.5 text-sm font-bold tabular-nums"
         style={cell.points ? { background: color, color: 'white' } : { color: 'var(--color-muted)' }}
+        initial={{ scale: 0.4 }}
+        animate={{ scale: 1 }}
+        transition={spring}
       >
         {cell.points}
-      </span>
+      </motion.span>
       {note && (
         <span className={`basis-full text-xs ${cell.issue === 'spelling' && !cell.valid ? 'font-medium text-danger' : 'text-muted'}`}>
           {note}
         </span>
       )}
-    </button>
+    </motion.button>
   )
 }
 
@@ -365,7 +394,7 @@ function Final({ game, send, colorOf }) {
         {players.map((p) => (
           <div key={p} className="rounded-2xl bg-paper px-5 py-3">
             <p className="font-semibold" style={{ color: colorOf(p) }}>{p}</p>
-            <p className="font-display text-4xl font-extrabold tabular-nums">{game.totals[p]}</p>
+            <p className="font-display text-4xl font-extrabold tabular-nums"><AnimatedNumber value={game.totals[p]} from={0} duration={1.2} /></p>
           </div>
         ))}
       </div>

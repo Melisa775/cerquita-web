@@ -1,3 +1,5 @@
+import { motion } from 'motion/react'
+import { Appear } from '../lib/motion'
 import Credit from '../components/Credit'
 import { useState } from 'react'
 import { checkRoom, createRoom, storage } from '../lib/api'
@@ -44,15 +46,15 @@ export default function Home({ initialCode = '', onEnter }) {
 
   return (
     <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-5 py-12">
-      <Logo />
-      <h1 className="mt-8 text-5xl leading-[0.95] font-extrabold sm:text-6xl">
+      <Logo animated />
+      <Appear as="h1" delay={0.1} className="mt-8 text-5xl leading-[0.95] font-extrabold sm:text-6xl">
         Juegos para dos, aunque estén lejos.
-      </h1>
-      <p className="mt-5 max-w-md text-lg text-muted">
+      </Appear>
+      <Appear as="p" delay={0.2} className="mt-5 max-w-md text-lg text-muted">
         Abran una videollamada, entren a la misma sala y jueguen en español, sincronizados y sin pagar.
-      </p>
+      </Appear>
 
-      <label className="mt-10 block">
+      <Appear as="label" delay={0.3} className="mt-10 block">
         <span className="text-sm font-semibold">Tu nombre</span>
         <input
           value={name}
@@ -62,9 +64,9 @@ export default function Home({ initialCode = '', onEnter }) {
           placeholder="Como te dice tu pareja"
           className="mt-2 w-full rounded-2xl border border-line bg-paper px-4 py-3.5 text-lg outline-none focus:border-ink"
         />
-      </label>
+      </Appear>
 
-      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+      <Appear delay={0.4} className="mt-6 grid gap-4 sm:grid-cols-2">
         <section className="rounded-3xl bg-p1 p-5 text-white">
           <h2 className="text-xl font-bold">Crear una sala</h2>
           <p className="mt-1 text-sm text-white/80">Te damos un código para enviarle.</p>
@@ -99,20 +101,23 @@ export default function Home({ initialCode = '', onEnter }) {
             </button>
           </div>
         </form>
-      </div>
+      </Appear>
 
-      {error && <p role="alert" className="mt-5 font-medium text-danger">{error}</p>}
+      {error && <p key={error} role="alert" className="shake mt-5 font-medium text-danger">{error}</p>}
       <Credit className="mt-12" />
     </main>
   )
 }
 
-export function Logo({ small = false }) {
+/** The two circles start apart and come closer: that's the whole idea of Cerquita. */
+export function Logo({ small = false, animated = false }) {
+  const from = (dx) => (animated ? { x: dx, opacity: 0 } : false)
+  const move = { type: 'spring', stiffness: 120, damping: 14, delay: 0.15 }
   return (
-    <div className="flex items-center gap-2.5">
-      <svg width={small ? 26 : 34} height={small ? 26 : 34} viewBox="0 0 32 32" aria-hidden="true">
-        <circle cx="11" cy="16" r="8" fill="var(--color-p1)" />
-        <circle cx="21" cy="16" r="8" fill="var(--color-p2)" fillOpacity=".9" />
+    <div className="group flex items-center gap-2.5">
+      <svg width={small ? 26 : 34} height={small ? 26 : 34} viewBox="0 0 32 32" aria-hidden="true" className="overflow-visible">
+        <motion.circle cx="11" cy="16" r="8" fill="var(--color-p1)" initial={from(-9)} animate={{ x: 0, opacity: 1 }} transition={move} className="logo-left" />
+        <motion.circle cx="21" cy="16" r="8" fill="var(--color-p2)" fillOpacity=".9" initial={from(9)} animate={{ x: 0, opacity: 1 }} transition={move} className="logo-right" />
       </svg>
       <span className={`font-display font-extrabold ${small ? 'text-xl' : 'text-2xl'}`}>Cerquita</span>
     </div>

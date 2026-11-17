@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { softSpring, spring } from '../lib/motion'
 import { EndActions } from '../components/EndActions'
 import { LEVELS, LEVEL_META, WILDCARD_META } from '../lib/deeper'
 
@@ -57,6 +59,19 @@ function Cards({ game, me, send, colorOf }) {
   const tip = tips[game.count % tips.length]
   const next = () => send({ type: 'dp_next', at: game.count })
 
+  // When both agree to go deeper, the new level is announced over the whole screen
+  const lastLevel = useRef(game.level)
+  const [announce, setAnnounce] = useState(null)
+  useEffect(() => {
+    if (lastLevel.current !== game.level) setAnnounce(game.level)
+    lastLevel.current = game.level
+  }, [game.level])
+  useEffect(() => {
+    if (!announce) return
+    const t = setTimeout(() => setAnnounce(null), 1700)
+    return () => clearTimeout(t)
+  }, [announce])
+
   // On desktop: Enter or the right arrow draws the next card
   useEffect(() => {
     const onKey = (e) => {
@@ -77,6 +92,30 @@ function Cards({ game, me, send, colorOf }) {
 
   return (
     <div className="mt-4">
+      <AnimatePresence>
+        {announce && (
+          <motion.div
+            className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-2 p-6 text-center text-white"
+            style={{ background: LEVEL_META[announce].bg }}
+            initial={{ clipPath: 'circle(0% at 50% 50%)' }}
+            animate={{ clipPath: 'circle(100% at 50% 50%)' }}
+            exit={{ opacity: 0, transition: { duration: 0.4 } }}
+            transition={{ duration: 0.6, ease: [0.3, 0.7, 0.2, 1] }}
+            onClick={() => setAnnounce(null)}
+            role="status"
+          >
+            <motion.p className="text-lg font-semibold text-white/80" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+              Los dos quisieron ir más hondo
+            </motion.p>
+            <motion.p className="font-display text-5xl font-extrabold sm:text-7xl" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} transition={{ ...softSpring, delay: 0.4 }}>
+              {LEVEL_META[announce].label}
+            </motion.p>
+            <motion.p className="max-w-md text-white/85" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
+              {LEVEL_META[announce].blurb}
+            </motion.p>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <LevelTrack level={game.level} />
         <span className="text-sm text-muted tabular-nums">Carta {game.count}</span>
@@ -161,8 +200,8 @@ function VoteButton({ label, votes, me, partner, onClick, accent, waitText }) {
     <button
       onClick={onClick}
       aria-pressed={mine}
-      className="rounded-2xl border-2 bg-paper px-5 py-3 text-left hover:border-ink"
-      style={{ borderColor: mine || theirs ? accent : 'var(--color-line)' }}
+      className={`rounded-2xl border-2 bg-paper px-5 py-3 text-left hover:border-ink ${theirs && !mine ? 'deeper-nudge' : ''}`}
+      style={{ borderColor: mine || theirs ? accent : 'var(--color-line)', '--accent': accent }}
     >
       <span className="block font-semibold">{label}</span>
       <span className="block text-sm text-muted">{note}</span>
@@ -184,7 +223,20 @@ function Letters({ game, me, send, colorOf }) {
       {sent ? (
         <>
           <p className="mt-3 max-w-xl text-white/85">Tu carta está sellada. Se abren las dos al mismo tiempo.</p>
-          <blockquote className="mt-5 whitespace-pre-wrap rounded-2xl bg-white/10 p-5 text-white/90">{game.letters[me]}</blockquote>
+          <motion.div className="relative mt-5" initial={{ scale: 0.96, rotate: -1 }} animate={{ scale: 1, rotate: 0 }} transition={spring}>
+            <blockquote className="whitespace-pre-wrap rounded-2xl bg-white/10 p-5 text-white/90">{game.letters[me]}</blockquote>
+            {/* a wax seal stamped on the letter */}
+            <motion.span
+              className="absolute -right-2 -top-3 flex h-12 w-12 items-center justify-center rounded-full text-xl shadow-lg"
+              style={{ background: 'hsl(350 60% 42%)', boxShadow: 'inset 0 0 0 3px hsl(350 60% 34%)' }}
+              initial={{ scale: 3, opacity: 0, rotate: -40 }}
+              animate={{ scale: 1, opacity: 1, rotate: -12 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 16, delay: 0.15 }}
+              aria-hidden="true"
+            >
+              ♥
+            </motion.span>
+          </motion.div>
           <p className="mt-5 font-semibold">{partnerSent ? 'Abriendo…' : `${partner} todavía está escribiendo.`}</p>
         </>
       ) : (
@@ -240,13 +292,21 @@ function Final({ game, me, send, colorOf }) {
 
       {order.length > 0 && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {order.map((p) => (
-            <article key={p} className="deeper-deal rounded-3xl bg-paper p-6" style={{ borderTop: `6px solid ${colorOf(p)}` }}>
+          {order.map((p, i) => (
+            // both letters unfold at the same time, like opening an envelope
+            <motion.article
+              key={p}
+              className="rounded-3xl bg-paper p-6"
+              style={{ borderTop: `6px solid ${colorOf(p)}`, transformOrigin: 'top center', transformPerspective: 900 }}
+              initial={{ rotateX: -80, opacity: 0, y: 20 }}
+              animate={{ rotateX: 0, opacity: 1, y: 0 }}
+              transition={{ ...softSpring, delay: 0.2 + i * 0.25 }}
+            >
               <h2 className="text-sm font-semibold uppercase tracking-wider text-muted">
                 {p === me ? `Tu carta para ${partner}` : `Carta de ${p} para ti`}
               </h2>
               <p className="mt-3 whitespace-pre-wrap text-lg leading-relaxed">{game.letters[p]}</p>
-            </article>
+            </motion.article>
           ))}
         </div>
       )}

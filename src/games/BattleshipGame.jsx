@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { motion } from 'motion/react'
 import { EndActions } from '../components/EndActions'
 import { COLS, cellsOf, clampShip, problems, randomFleet } from '../lib/battleship'
 
@@ -59,6 +60,8 @@ function Grid({ size, ships = [], lengths, shots = [], autoWater = [], preview, 
           style={{ background: SEA, boxShadow: `inset 0 0 0 1px ${SEA_LINE}` }}
           onMouseLeave={() => onHover?.(null)}
         >
+          {/* waves drifting across the sea */}
+          <div className="bn-waves pointer-events-none absolute inset-0" aria-hidden="true" />
           {/* ships */}
           {ships.map((s) => {
             const len = s.length ?? lengths[s.id]
@@ -103,7 +106,15 @@ function Grid({ size, ships = [], lengths, shots = [], autoWater = [], preview, 
                   aria-label={`${COLS[c]}${r + 1}${shot === 'hit' ? ', tocado' : shot === 'water' ? ', agua' : ''}`}
                 >
                   {shot === 'water' && <span key={isLast ? 'last' : 'w'} className={`h-[26%] w-[26%] rounded-full ${isLast ? 'bn-splash' : ''}`} style={{ background: 'hsl(205 45% 55%)' }} />}
-                  {auto && <span className="h-[18%] w-[18%] rounded-full" style={{ background: 'hsl(205 30% 70%)' }} />}
+                  {auto && (
+                    <motion.span
+                      className="h-[18%] w-[18%] rounded-full"
+                      style={{ background: 'hsl(205 30% 70%)' }}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 20, delay: 0.3 + ((r + c) % 5) * 0.05 }}
+                    />
+                  )}
                   {shot === 'hit' && (
                     <span key={isLast ? 'last' : 'h'} className={`flex h-[62%] w-[62%] items-center justify-center rounded-full ${isLast ? 'bn-boom' : ''}`} style={{ background: HIT, boxShadow: '0 0 0 2px rgba(255,255,255,.7)' }}>
                       <svg viewBox="0 0 10 10" className="h-[60%] w-[60%]" aria-hidden="true">
@@ -125,30 +136,37 @@ function Grid({ size, ships = [], lengths, shots = [], autoWater = [], preview, 
 function Ship({ ship, length, cellPct }) {
   const horizontal = ship.dir === 'h'
   return (
-    <div
+    // ships glide into place while you arrange the fleet
+    <motion.div
       className="pointer-events-none absolute"
-      style={{
+      initial={false}
+      animate={{
         left: `${ship.col * cellPct}%`,
         top: `${ship.row * cellPct}%`,
         width: `${(horizontal ? length : 1) * cellPct}%`,
         height: `${(horizontal ? 1 : length) * cellPct}%`,
-        padding: `${cellPct * 0.1}%`,
       }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+      style={{ padding: `${cellPct * 0.1}%` }}
     >
-      <div
-        className="flex h-full w-full items-center justify-around"
+      <motion.div
+        className={`flex h-full w-full items-center justify-around ${ship.sunk ? '' : 'bn-bob'}`}
         style={{
           background: ship.sunk ? 'hsl(214 10% 30%)' : HULL,
           borderRadius: 9999,
           flexDirection: horizontal ? 'row' : 'column',
-          opacity: ship.sunk ? 0.75 : 1,
+          animationDelay: `${(ship.row + ship.col) * -0.37}s`,
         }}
+        initial={false}
+        // a sunk ship lists to one side and goes under a little
+        animate={ship.sunk ? { opacity: 0.75, rotate: horizontal ? 4 : -4, scale: 0.92 } : { opacity: 1, rotate: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: 'easeOut' }}
       >
         {Array.from({ length }, (_, i) => (
           <span key={i} className="rounded-full" style={{ width: '22%', aspectRatio: 1, maxWidth: 10, background: 'rgba(255,255,255,.35)' }} />
         ))}
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 

@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { Confetti, spring } from '../lib/motion'
+import { CONFETTI_COLORS } from '../components/EndActions'
 import ChessPiece, { PIECE_VALUES } from '../components/ChessPiece'
 
 const FILES = 'abcdefgh'
@@ -163,10 +166,10 @@ function Board({ game, me, myColor, myTurn, send }) {
               style={{ background: dark ? DARK_SQ : LIGHT_SQ }}
               aria-label={n}
             >
-              {isLast && <div className="absolute inset-0" style={{ background: MARK }} />}
+              {isLast && <motion.div key={game.moves.length} className="absolute inset-0" style={{ background: MARK }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} />}
               {selected === n && <div className="absolute inset-0" style={{ background: 'rgba(247, 201, 72, 0.75)' }} />}
               {game.check === n && (
-                <div className="absolute inset-0" style={{ background: 'radial-gradient(circle, rgba(214,48,49,.9) 0%, rgba(214,48,49,.45) 45%, transparent 72%)' }} />
+                <div className="chess-check absolute inset-0" style={{ background: 'radial-gradient(circle, rgba(214,48,49,.9) 0%, rgba(214,48,49,.45) 45%, transparent 72%)' }} />
               )}
               {col === 0 && (
                 <span className="absolute left-1 top-0.5 text-[0.62rem] font-bold sm:text-xs" style={{ color: dark ? LIGHT_SQ : DARK_SQ }}>
@@ -240,13 +243,25 @@ function ResultOverlay({ game, me }) {
   const r = game.result
   const title = r.winner ? (r.winner === me ? '¡Ganaste!' : `Ganó ${r.winner}`) : 'Tablas'
   return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-ink/35" onClick={() => setHidden(true)}>
-      <div className="pop rounded-3xl bg-paper px-8 py-6 text-center shadow-lg">
+    <motion.div
+      className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-ink/35"
+      onClick={() => setHidden(true)}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.35 }}
+    >
+      <Confetti colors={CONFETTI_COLORS} />
+      <motion.div
+        className="rounded-3xl bg-paper px-8 py-6 text-center shadow-lg"
+        initial={{ scale: 0.6, y: 30, rotate: -4 }}
+        animate={{ scale: 1, y: 0, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 16, delay: 0.4 }}
+      >
         <p className="font-display text-4xl font-extrabold">{title}</p>
         <p className="mt-1 text-muted">Por {r.text}.</p>
         <p className="mt-3 text-xs text-muted">Toca para ver el tablero</p>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   )
 }
 
@@ -272,7 +287,9 @@ function PlayerBar({ game, player, color, playerColor, me }) {
         </span>
         <span className="flex min-w-0 items-center">
           {sorted.map((p, i) => (
-            <ChessPiece key={i} piece={p} className="-ml-1.5 h-5 w-5 first:ml-0" />
+            <motion.span key={`${p}-${i}`} className="-ml-1.5 first:ml-0" initial={{ scale: 0, y: -10 }} animate={{ scale: 1, y: 0 }} transition={spring}>
+              <ChessPiece piece={p} className="h-5 w-5" />
+            </motion.span>
           ))}
           {advantage > 0 && <span className="ml-1 text-xs font-semibold text-muted">+{advantage}</span>}
         </span>
@@ -306,7 +323,7 @@ function Clock({ game, color, active }) {
   const text = ms < 10000 ? `${Math.floor(s)}.${Math.floor((ms % 1000) / 100)}` : `${m}:${String(Math.floor(s)).padStart(2, '0')}`
   return (
     <span
-      className={`rounded-lg px-3 py-1 font-display text-xl font-bold tabular-nums ${active ? 'text-white' : 'bg-paper text-ink'}`}
+      className={`rounded-lg px-3 py-1 font-display text-xl font-bold tabular-nums transition-colors ${active ? 'text-white' : 'bg-paper text-ink'} ${active && running && ms < 10000 ? 'chess-low' : ''}`}
       style={active ? { background: low ? 'var(--color-danger)' : 'var(--color-ink)' } : undefined}
     >
       {text}

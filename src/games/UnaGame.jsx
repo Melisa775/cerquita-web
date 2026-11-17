@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { AnimatedNumber, spring } from '../lib/motion'
 import PlayingCard, { CARD_COLORS } from '../components/PlayingCard'
 import { EndActions } from '../components/EndActions'
 
@@ -51,9 +53,21 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
         {game.counts[other] === 1 && game.saidUna[other] && <span className="rounded-full bg-ink px-3 py-1 text-sm font-bold text-white">¡Una!</span>}
       </div>
       <div className="mt-2 flex justify-center">
-        {Array.from({ length: Math.min(game.counts[other], 20) }, (_, i) => (
-          <PlayingCard key={i} faceDown width={38} className="-ml-5 first:ml-0" />
-        ))}
+        <AnimatePresence initial={false}>
+          {Array.from({ length: Math.min(game.counts[other], 20) }, (_, i) => (
+            <motion.span
+              key={i}
+              layout
+              className="-ml-5 first:ml-0"
+              initial={{ y: 40, opacity: 0, scale: 0.6 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              exit={{ y: 60, opacity: 0, transition: { duration: 0.2 } }}
+              transition={spring}
+            >
+              <PlayingCard faceDown width={38} />
+            </motion.span>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* table */}
@@ -63,7 +77,7 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
       {game.phase === 'playing' && (
         <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
           {canSayUna && (
-            <button onClick={() => send({ type: 'un_una' })} className="pop rounded-2xl px-6 py-3 font-display text-xl font-extrabold text-white" style={{ background: CARD_COLORS.r.fill }}>
+            <button onClick={() => send({ type: 'un_una' })} className="una-call rounded-2xl px-6 py-3 font-display text-xl font-extrabold text-white" style={{ background: CARD_COLORS.r.fill }}>
               ¡Una!
             </button>
           )}
@@ -83,21 +97,28 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
       {game.phase === 'playing' ? (
         <section className="mt-3 rounded-[2rem] bg-paper px-3 pb-4 pt-6 sm:px-5">
           <div className="flex flex-wrap justify-center gap-y-3">
-            {game.hand.map((c) => {
+            <AnimatePresence initial={false}>
+            {game.hand.map((c, i) => {
               const ok = myTurn && playable.has(c.id)
-              const isDrawn = game.drawn === c.id
               return (
-                <button
+                // the hand is dealt like a fan; a played card leaves upward and the rest close the gap
+                <motion.button
                   key={c.id}
+                  layout
+                  initial={{ y: -120, x: -60, opacity: 0, rotate: -20 }}
+                  animate={{ y: 0, x: 0, opacity: 1, rotate: 0 }}
+                  exit={{ y: -180, opacity: 0, scale: 0.8, transition: { duration: 0.22 } }}
+                  transition={{ ...spring, delay: game.log.length ? 0 : 0.05 * i }}
                   onClick={() => playCard(c)}
                   disabled={!ok}
-                  className={`-ml-4 rounded-xl transition-transform first:ml-0 sm:-ml-3 ${ok ? '-translate-y-3 hover:-translate-y-5' : ''} ${isDrawn ? 'pop' : ''}`}
+                  className={`-ml-4 rounded-xl first:ml-0 sm:-ml-3 ${ok ? '-translate-y-3 hover:-translate-y-5' : ''}`}
                   style={{ zIndex: ok ? 2 : 1 }}
                 >
-                  <PlayingCard card={c} width={68} style={{ opacity: myTurn && !ok ? 0.55 : 1 }} />
-                </button>
+                  <PlayingCard card={c} width={68} style={{ opacity: myTurn && !ok ? 0.55 : 1, transition: 'opacity 200ms' }} />
+                </motion.button>
               )
             })}
+            </AnimatePresence>
           </div>
           {myTurn && game.drawn != null && <p className="mt-3 text-center text-sm text-muted">La carta que robaste sirve: juégala o pasa.</p>}
         </section>
@@ -142,7 +163,7 @@ function Scoreboard({ game, me, colorOf }) {
         <div className="flex gap-2">
           {game.players.map((p) => (
             <span key={p} className="rounded-full bg-paper px-3 py-1 font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</span> <span className="text-ink tabular-nums">{game.scores[p]}</span>
+              <span style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</span> <AnimatedNumber value={game.scores[p]} className="text-ink" />
             </span>
           ))}
         </div>
@@ -193,11 +214,26 @@ function Table({ game, me, myTurn, send, colorOf }) {
         </button>
         <div className="relative">
           {game.top && (
-            <PlayingCard key={game.top.id} card={game.top} width={96} className="pop" chosen={game.top.color === null ? game.color : null} style={{ transform: `rotate(${(game.top.id % 9) - 4}deg)` }} />
+            // the card is thrown onto the pile from whoever played it
+            <motion.div
+              key={game.top.id}
+              initial={{ y: last?.action === 'play' && last.player === me ? 180 : -180, opacity: 0, rotate: (game.top.id % 9) - 4 + 25, scale: 1.15 }}
+              animate={{ y: 0, opacity: 1, rotate: (game.top.id % 9) - 4, scale: 1 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 22 }}
+            >
+              <PlayingCard card={game.top} width={96} chosen={game.top.color === null ? game.color : null} />
+            </motion.div>
           )}
         </div>
         <div className="flex flex-col items-center gap-1 text-white/80">
-          <span className="h-10 w-10 rounded-full" style={{ background: CARD_COLORS[game.color]?.fill, boxShadow: '0 0 0 3px rgba(255,255,255,.8)' }} />
+          <motion.span
+            key={game.color}
+            className="h-10 w-10 rounded-full"
+            style={{ background: CARD_COLORS[game.color]?.fill, boxShadow: '0 0 0 3px rgba(255,255,255,.8)' }}
+            initial={{ scale: 0.3 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 14 }}
+          />
           <span className="text-xs font-semibold">{CARD_COLORS[game.color]?.name}</span>
           {game.pending > 0 && <span className="mt-1 rounded-full bg-white px-2.5 py-0.5 text-sm font-extrabold text-ink">+{game.pending}</span>}
         </div>

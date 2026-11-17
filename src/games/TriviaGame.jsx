@@ -1,4 +1,6 @@
 import { useEffect } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import TimerBar from '../components/TimerBar'
 import { useCountdown } from '../hooks/useCountdown'
 import { EndActions } from '../components/EndActions'
@@ -34,7 +36,7 @@ function Scoreboard({ game, me, colorOf }) {
         <div className="flex gap-2">
           {game.players.map((p) => (
             <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <span className="text-ink tabular-nums">{game.scores[p]}</span>
+              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={game.scores[p]} className="text-ink" />
             </span>
           ))}
         </div>
@@ -48,10 +50,12 @@ function Scoreboard({ game, me, colorOf }) {
         const active = game.current === p
         const crowns = game.crowns[p] ?? []
         return (
-          <div
+          <motion.div
             key={p}
             className="rounded-3xl bg-paper p-4 transition-shadow"
             style={active ? { boxShadow: `inset 0 0 0 3px ${colorOf(p)}` } : undefined}
+            animate={{ scale: active ? 1 : 0.97, opacity: active ? 1 : 0.85 }}
+            transition={softSpring}
           >
             <div className="flex items-center justify-between gap-2">
               <p className="font-semibold" style={{ color: colorOf(p) }}>
@@ -68,7 +72,7 @@ function Scoreboard({ game, me, colorOf }) {
                     crowns[i] ? <CrownBadge key={i} category={crowns[i]} /> : <CrownBadge key={i} category="crown" won={false} title="Corona pendiente" />,
                   )}
             </div>
-          </div>
+          </motion.div>
         )
       })}
     </div>
@@ -79,7 +83,13 @@ function Meter({ value, max, color }) {
   return (
     <span className="flex items-center gap-1" title={`${value} de ${max} aciertos seguidos para jugar por una corona`}>
       {Array.from({ length: max }, (_, i) => (
-        <span key={i} className="h-2.5 w-5 rounded-full" style={{ background: i < value ? color : 'var(--color-line)' }} />
+        <motion.span
+          key={i}
+          className="h-2.5 w-5 rounded-full"
+          initial={false}
+          animate={{ background: i < value ? color : 'var(--color-line)', scaleY: i === value - 1 ? [1, 1.9, 1] : 1 }}
+          transition={{ duration: 0.35 }}
+        />
       ))}
       <CategoryIcon category="crown" className="ml-0.5 h-4 w-4" color={value >= max ? color : 'var(--color-line)'} />
     </span>
@@ -304,8 +314,14 @@ function Question({ room, me, send, colorOf }) {
                 cls = 'border-line bg-white opacity-60'
               }
               return (
-                <button
+                <motion.div
                   key={i}
+                  className="grid"
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ ...spring, delay: 0.25 + 0.07 * i }}
+                >
+                <button
                   disabled={!canAnswer}
                   onClick={() => send({ type: 'tv_answer', choice: i })}
                   className={`flex min-h-16 items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-lg font-semibold transition-transform enabled:hover:-translate-y-0.5 enabled:hover:border-ink ${cls} ${isAnswer ? 'pop' : ''} ${pickedWrong ? 'shake' : ''}`}
@@ -318,16 +334,20 @@ function Question({ room, me, send, colorOf }) {
                     {LETTERS[i]}
                   </span>
                   <span className="flex-1">{opt}</span>
-                  {pickers.map((p) => (
-                    <span
+                  {pickers.map((p, k) => (
+                    <motion.span
                       key={p}
                       className="rounded-full px-2 py-0.5 text-xs font-bold text-white"
                       style={{ background: colorOf(p), boxShadow: '0 0 0 2px white' }}
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ ...spring, delay: 0.3 + 0.12 * k }}
                     >
                       {p}
-                    </span>
+                    </motion.span>
                   ))}
                 </button>
+                </motion.div>
               )
             })}
           </div>
@@ -446,7 +466,7 @@ function Final({ game, me, send, colorOf }) {
                 {!(game.crowns[p] ?? []).length && <span className="text-muted">Sin coronas esta vez</span>}
               </div>
             ) : (
-              <p className="font-display text-4xl font-extrabold tabular-nums">{game.scores[p]}</p>
+              <p className="font-display text-4xl font-extrabold"><AnimatedNumber value={game.scores[p]} from={0} duration={1} /></p>
             )}
             <p className="mt-1 text-sm text-muted">{game.correct[p]} {game.correct[p] === 1 ? 'acierto' : 'aciertos'}</p>
           </div>
@@ -459,7 +479,7 @@ function Final({ game, me, send, colorOf }) {
           const meta = CATEGORY_META[h.question.category]
           const players = game.mode === 'crowns' ? [h.by] : game.players
           return (
-            <li key={h.n} className="flex gap-3 rounded-2xl bg-paper px-4 py-3">
+            <motion.li key={h.n} className="flex gap-3 rounded-2xl bg-paper px-4 py-3" initial={{ opacity: 0, x: -16 }} animate={{ opacity: 1, x: 0 }} transition={{ ...softSpring, delay: Math.min(0.06 * h.n, 1.2) }}>
               <CrownBadge category={h.question.category} size="h-8 w-8" title={meta.label} />
               <div className="min-w-0 flex-1">
                 <p className="text-sm">
@@ -477,7 +497,7 @@ function Final({ game, me, send, colorOf }) {
                   ))}
                 </p>
               </div>
-            </li>
+            </motion.li>
           )
         })}
       </ol>

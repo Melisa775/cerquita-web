@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { motion } from 'motion/react'
+import { AnimatedNumber, Confetti } from '../lib/motion'
+import { CONFETTI_COLORS } from '../components/EndActions'
 import { EndActions } from '../components/EndActions'
 
 const W = 100
@@ -172,7 +175,16 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
           role="img"
           aria-label={`Hoyo ${game.hole + 1}: ${course.name}`}
         >
-          <Course course={course} />
+          {/* each new hole unrolls into view */}
+          <motion.g
+            key={game.hole}
+            initial={{ opacity: 0, scale: 0.92 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 22 }}
+            style={{ transformBox: 'fill-box', transformOrigin: 'center' }}
+          >
+            <Course course={course} />
+          </motion.g>
           {/* balls */}
           {/* the shooter's ball goes on top */}
           {[...game.players].sort((a, b) => (a === (anim?.player ?? game.turn)) - (b === (anim?.player ?? game.turn))).map((p) => {
@@ -192,6 +204,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
 
         {label?.text && (
           <div key={label.id} className="pop pointer-events-none absolute inset-x-0 top-1/3 flex justify-center">
+            {/^¡(Hoyo en uno|Albatros|Águila|Birdie)/.test(label.text) && <Confetti colors={CONFETTI_COLORS} count={50} />}
             <span className="rounded-2xl bg-ink/85 px-5 py-2.5 font-display text-2xl font-extrabold text-white shadow-lg">{label.text}</span>
           </div>
         )}
@@ -271,7 +284,7 @@ function Course({ course }) {
       <circle cx={hx} cy={hy} r={HOLE_R + 0.6} fill="hsl(112 30% 38%)" />
       <circle cx={hx} cy={hy} r={HOLE_R} fill="#1d2420" />
       <line x1={hx + 0.4} y1={hy} x2={hx + 0.4} y2={hy - 13} stroke="white" strokeWidth="0.7" />
-      <path d={`M${hx + 0.7} ${hy - 13} l7 2.2 l-7 2.4 z`} fill="hsl(2 75% 55%)" />
+      <path className="golf-flag" d={`M${hx + 0.7} ${hy - 13} l7 2.2 l-7 2.4 z`} fill="hsl(2 75% 55%)" />
       {/* tee */}
       <rect x={course.tee[0] - 3} y={course.tee[1] - 3} width="6" height="6" rx="1.2" fill="none" stroke="rgba(255,255,255,.5)" strokeWidth="0.5" />
       {(course.bumpers ?? []).map(([x, y, r], i) => (
@@ -338,7 +351,7 @@ function Side({ game, me, send, colorOf, myTurn, animating }) {
             </span>
             <span className="text-sm text-muted">
               {game.done[p] ? '✓ ' : ''}
-              <span className="font-display text-xl font-extrabold text-ink tabular-nums">{game.strokes[p]}</span> {game.strokes[p] === 1 ? 'golpe' : 'golpes'}
+              <AnimatedNumber value={game.strokes[p]} className="font-display text-xl font-extrabold text-ink" /> {game.strokes[p] === 1 ? 'golpe' : 'golpes'}
             </span>
           </div>
         ))}
