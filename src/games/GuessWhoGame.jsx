@@ -41,7 +41,7 @@ function Play({ game, me, send, colorOf }) {
     send({ type: 'gw_flip', id })
   }
 
-  const cols = game.characters.length > 16 ? 'grid-cols-4 sm:grid-cols-6' : 'grid-cols-4'
+  const cols = game.characters.length > 16 ? 'grid-cols-4 sm:grid-cols-6 xl:grid-cols-8' : 'grid-cols-4 xl:grid-cols-8'
 
   return (
     <div className="mt-4">

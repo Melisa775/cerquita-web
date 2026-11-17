@@ -163,7 +163,7 @@ export default function GolfGame({ room, me, send, colorOf, error, errorId, subs
 
   return (
     <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <div className="relative mx-auto w-full max-w-[28rem]">
+      <div className="fit-board relative [--fit-top:9rem] [--fit-ratio:0.667]">
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}

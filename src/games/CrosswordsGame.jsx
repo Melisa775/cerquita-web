@@ -97,7 +97,7 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
 
   return (
     <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <div className="mx-auto w-full max-w-[40rem]">
+      <div className="fit-board [--fit-top:15rem]">
         <Board game={game} pending={pending} onCell={clickCell} canPlace={myTurn && (selected != null || pending.length > 0)} colorOf={colorOf} />
 
         {game.phase === 'playing' && (

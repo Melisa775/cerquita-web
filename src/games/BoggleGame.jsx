@@ -197,8 +197,8 @@ function Play({ room, me, send, colorOf }) {
       </div>
       <TimerBar seconds={game.playSeconds} resetKey={game.round} msLeft={room.phaseEndsInMs} />
 
-      <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_17rem] md:items-start">
-        <div className="mx-auto w-full max-w-[32rem]">
+      <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_17rem] md:items-start xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="fit-board [--fit-top:16rem]">
           <div className="flex h-12 items-center justify-center" aria-live="polite">
             {current ? (
               <span

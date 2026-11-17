@@ -1,30 +1,9 @@
-import { useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { TurnBanner, spring, softSpring } from '../lib/motion'
 import { useRoom } from '../hooks/useRoom'
 import { Logo } from './Home'
 import Credit from '../components/Credit'
-import ColorGame from '../games/ColorGame'
-import StopGame from '../games/StopGame'
-import TooLateGame from '../games/TooLateGame'
-import BoggleGame from '../games/BoggleGame'
-import HangmanGame from '../games/HangmanGame'
-import WordleGame from '../games/WordleGame'
-import WordSearchGame from '../games/WordSearchGame'
-import GuessWhoGame from '../games/GuessWhoGame'
-import PinturilloGame from '../games/PinturilloGame'
-import CharadesGame from '../games/CharadesGame'
-import MurdokuGame from '../games/MurdokuGame'
-import TriviaGame from '../games/TriviaGame'
-import ChessGame from '../games/ChessGame'
-import BattleshipGame from '../games/BattleshipGame'
-import DominoGame from '../games/DominoGame'
-import ParquesGame from '../games/ParquesGame'
-import CrosswordsGame from '../games/CrosswordsGame'
-import UnaGame from '../games/UnaGame'
-import GolfGame from '../games/GolfGame'
-import ColonosGame from '../games/ColonosGame'
-import DeeperGame from '../games/DeeperGame'
 import StopCard from '../components/StopCard'
 import BoggleCard from '../components/BoggleCard'
 import HangmanCard from '../components/HangmanCard'
@@ -43,16 +22,80 @@ import CrosswordsCard from '../components/CrosswordsCard'
 import UnaLobbyCard from '../components/UnaLobbyCard'
 import GolfCard from '../components/GolfCard'
 import ColonosCard from '../components/ColonosCard'
+import LobbyBoard from '../components/LobbyBoard'
 import DeeperCard from '../components/DeeperCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
+// Each game is loaded only when it starts, so the first visit stays light
+const ColorGame = lazy(() => import('../games/ColorGame'))
+const StopGame = lazy(() => import('../games/StopGame'))
+const TooLateGame = lazy(() => import('../games/TooLateGame'))
+const BoggleGame = lazy(() => import('../games/BoggleGame'))
+const HangmanGame = lazy(() => import('../games/HangmanGame'))
+const WordleGame = lazy(() => import('../games/WordleGame'))
+const WordSearchGame = lazy(() => import('../games/WordSearchGame'))
+const GuessWhoGame = lazy(() => import('../games/GuessWhoGame'))
+const PinturilloGame = lazy(() => import('../games/PinturilloGame'))
+const CharadesGame = lazy(() => import('../games/CharadesGame'))
+const MurdokuGame = lazy(() => import('../games/MurdokuGame'))
+const TriviaGame = lazy(() => import('../games/TriviaGame'))
+const ChessGame = lazy(() => import('../games/ChessGame'))
+const BattleshipGame = lazy(() => import('../games/BattleshipGame'))
+const DominoGame = lazy(() => import('../games/DominoGame'))
+const ParquesGame = lazy(() => import('../games/ParquesGame'))
+const CrosswordsGame = lazy(() => import('../games/CrosswordsGame'))
+const UnaGame = lazy(() => import('../games/UnaGame'))
+const GolfGame = lazy(() => import('../games/GolfGame'))
+const ColonosGame = lazy(() => import('../games/ColonosGame'))
+const DeeperGame = lazy(() => import('../games/DeeperGame'))
+
+// Games that show server errors themselves, inside their own layout
+const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch'])
+
 const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame }
 const UPCOMING = []
-const LOBBY_CARDS = [ColorCard, StopCard, BoggleCard, HangmanCard, WordleCard, WordSearchCard, GuessWhoCard, PinturilloCard, CharadesCard, MurdokuCard, TriviaCard, ChessCard, BattleshipCard, DominoCard, ParquesCard, CrosswordsCard, UnaLobbyCard, GolfCard, ColonosCard, DeeperCard]
+// Lobby: every game with its filter group and a one-line pitch shown while the card is folded
+const LOBBY_GAMES = [
+  { Card: DeeperCard, kind: 'connect', tagline: 'Preguntas para conocerse y conectar de verdad.' },
+  { Card: ColorCard, kind: 'wits', tagline: 'Memoriza un color y recréalo.' },
+  { Card: StopCard, kind: 'words', tagline: 'Una letra, siete categorías y ¡Stop!' },
+  { Card: BoggleCard, kind: 'words', tagline: 'Une letras vecinas contra el reloj.' },
+  { Card: HangmanCard, kind: 'words', tagline: 'Adivinen la palabra antes de la horca.' },
+  { Card: WordleCard, kind: 'words', tagline: 'Cinco letras, en duelo o juntos.' },
+  { Card: WordSearchCard, kind: 'words', tagline: 'Encuentren las palabras escondidas.' },
+  { Card: CrosswordsCard, kind: 'words', tagline: 'Arma palabras en el tablero con premios.' },
+  { Card: GuessWhoCard, kind: 'wits', tagline: 'Pregunta, descarta y adivina quién es.' },
+  { Card: MurdokuCard, kind: 'wits', tagline: 'Sudoku con asesinato.' },
+  { Card: TriviaCard, kind: 'wits', tagline: 'Ruleta de preguntas y coronas.' },
+  { Card: PinturilloCard, kind: 'action', tagline: 'Uno dibuja y el otro adivina.' },
+  { Card: CharadesCard, kind: 'action', tagline: 'Actúa sin hablar frente a la cámara.' },
+  { Card: GolfCard, kind: 'action', tagline: 'Nueve hoyos, un tiro a la vez.' },
+  { Card: ChessCard, kind: 'table', tagline: 'Una partida completa, con reloj opcional.' },
+  { Card: BattleshipCard, kind: 'table', tagline: 'Hundan la flota del otro.' },
+  { Card: DominoCard, kind: 'table', tagline: 'Doble seis para dos.' },
+  { Card: ParquesCard, kind: 'table', tagline: 'A la colombiana, con dos dados.' },
+  { Card: UnaLobbyCard, kind: 'table', tagline: 'Cartas, comodines y ¡Una!' },
+  { Card: ColonosCard, kind: 'table', tagline: 'Construyan en una isla al azar.' },
+]
+const FILTERS = [
+  ['all', 'Todos'],
+  ['words', 'Palabras'],
+  ['table', 'Mesa y cartas'],
+  ['wits', 'Ingenio'],
+  ['action', 'Dibujo y acción'],
+  ['connect', 'Para conectar'],
+]
 
-export default function Room({ code, name, onExit }) {
+export default function Room({ code, name, onExit, onPlayingChange }) {
   const { room, status, error, errorId, fatal, send, subscribe } = useRoom(code, name)
+  const gameName = room?.game?.name ?? null
+
+  // Starting a game (or going back to the lobby) starts at the top of the page
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    onPlayingChange?.(gameName != null)
+  }, [gameName, onPlayingChange])
 
   if (fatal) {
     return (
@@ -75,8 +118,8 @@ export default function Room({ code, name, onExit }) {
   const GameView = room.game ? GAME_VIEWS[room.game.name] : null
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-4xl flex-wrap items-center justify-between gap-3 px-5 py-4">
+    <div className="relative z-10 flex min-h-dvh flex-col">
+      <header className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <button onClick={onExit} aria-label="Salir de la sala"><Logo small /></button>
         <div className="flex items-center gap-2">
           <AnimatePresence initial={false}>
@@ -116,7 +159,7 @@ export default function Room({ code, name, onExit }) {
       </AnimatePresence>
       {GameView && <TurnBanner game={room.game} me={name} color={colorOf(name)} />}
 
-      <main className="mx-auto w-full max-w-4xl flex-1 px-5 pb-12">
+      <main className="relative z-10 mx-auto w-full max-w-[1600px] flex-1 px-4 pb-12 sm:px-6 lg:px-8">
         <AnimatePresence mode="wait" initial={false}>
         {GameView ? (
           <motion.div
@@ -126,6 +169,7 @@ export default function Room({ code, name, onExit }) {
             exit={{ opacity: 0, y: -16, transition: { duration: 0.15 } }}
             transition={softSpring}
           >
+            <Suspense fallback={<p className="mt-10 text-center text-muted">Cargando el juego…</p>}>
             <GameView
               room={room}
               me={name}
@@ -135,6 +179,7 @@ export default function Room({ code, name, onExit }) {
               errorId={errorId}
               subscribe={subscribe}
             />
+            </Suspense>
             {room.game.phase !== 'finished' && (
               <button
                 onClick={() => send({ type: 'back_to_lobby' })}
@@ -156,7 +201,7 @@ export default function Room({ code, name, onExit }) {
           </motion.div>
         )}
         </AnimatePresence>
-        {error && !GameView?.showsErrors && (
+        {error && !(GameView && SHOWS_ERRORS.has(room.game.name)) && (
           <p key={errorId} role="alert" className="shake mt-4 text-center font-medium text-danger">{error}</p>
         )}
       </main>
@@ -166,7 +211,25 @@ export default function Room({ code, name, onExit }) {
 
 function Lobby({ room, send }) {
   const [copied, setCopied] = useState(false)
+  const [filter, setFilter] = useState(() => storage.get('cerquita:lobby:filter') || 'all')
   const alone = room.players.length < 2
+  const items = useMemo(
+    () =>
+      LOBBY_GAMES.map(({ Card, kind, tagline }, i) => ({
+        key: i,
+        visible: filter === 'all' || kind === filter,
+        render: (collapsed, toggle) => (
+          <div className="lobby-card relative" data-collapsed={collapsed || undefined} style={{ '--tagline': JSON.stringify(tagline) }}>
+            <button onClick={toggle} className="lobby-toggle absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm hover:bg-white" aria-expanded={!collapsed}>
+              {collapsed ? 'Opciones' : 'Menos'}
+            </button>
+            <Card send={send} alone={alone} />
+          </div>
+        ),
+      })),
+    [filter, alone, send],
+  )
+  useEffect(() => storage.set('cerquita:lobby:filter', filter), [filter])
   const link = `${window.location.origin}${window.location.pathname}?sala=${room.code}`
 
   async function copy() {
@@ -180,20 +243,15 @@ function Lobby({ room, send }) {
   }
 
   return (
-    <div className="mt-6">
-      <section className="rounded-3xl bg-paper p-6 sm:p-8">
-        {alone ? (
-          <>
-            <h1 className="text-3xl font-bold">Esperando a tu pareja</h1>
-            <p className="mt-2 text-muted">Envíale el código o el enlace. Apenas entre, aparecerá arriba.</p>
-          </>
-        ) : (
-          <>
-            <h1 className="text-3xl font-bold">Ya están los dos</h1>
-            <p className="mt-2 text-muted">Elijan un juego; cualquiera de los dos puede empezarlo.</p>
-          </>
-        )}
-        <div className="mt-6 flex flex-wrap items-center gap-3">
+    <div className="mt-2">
+      <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-paper/90 px-6 py-5 backdrop-blur sm:px-8">
+        <div>
+          <h1 className="text-3xl font-bold">{alone ? 'Esperando a tu pareja' : 'Ya están los dos'}</h1>
+          <p className="mt-1 text-muted">
+            {alone ? 'Envíale el código o el enlace. Apenas entre, aparecerá arriba.' : 'Elijan un juego; cualquiera de los dos puede empezarlo.'}
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
           <span className="font-display text-4xl font-extrabold tracking-[0.18em]">{room.code}</span>
           <button onClick={copy} className="rounded-2xl border border-line px-4 py-2.5 font-semibold hover:border-ink">
             {copied ? 'Enlace copiado' : 'Copiar enlace'}
@@ -201,21 +259,26 @@ function Lobby({ room, send }) {
         </div>
       </section>
 
-      <h2 className="mt-10 text-2xl font-bold">Juegos</h2>
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        {LOBBY_CARDS.map((Card, i) => (
-          <motion.div
-            key={i}
-            className="lobby-card"
-            initial={{ opacity: 0, y: 28 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '0px 0px -40px 0px' }}
-            whileHover={{ y: -5 }}
-            transition={{ ...softSpring, delay: (i % 2) * 0.07 }}
-          >
-            <Card send={send} alone={alone} />
-          </motion.div>
-        ))}
+      <div className="mt-8 flex flex-wrap items-end justify-between gap-3">
+        <h2 className="text-2xl font-bold">Juegos</h2>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar juegos">
+          {FILTERS.map(([key, label]) => {
+            const count = key === 'all' ? LOBBY_GAMES.length : LOBBY_GAMES.filter((g) => g.kind === key).length
+            return (
+              <button
+                key={key}
+                onClick={() => setFilter(key)}
+                aria-pressed={filter === key}
+                className={`rounded-full px-3.5 py-1.5 text-sm font-semibold ${filter === key ? 'bg-ink text-white' : 'bg-paper text-muted hover:text-ink'}`}
+              >
+                {label} <span className="opacity-60">{count}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      <div className="mt-4">
+        <LobbyBoard items={items} />
       </div>
 
       <Credit className="mt-10 text-center" />

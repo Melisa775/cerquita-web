@@ -164,7 +164,7 @@ function Board({ game, me, send, colorOf }) {
   }, [canGuess, solving, game.guessed, send])
 
   return (
-    <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,17rem)_1fr] md:items-start">
+    <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,17rem)_1fr] md:items-start xl:grid-cols-[minmax(0,24rem)_1fr]">
       <div className="rounded-[2rem] bg-paper p-4">
         <div className="mx-auto aspect-[200/220] w-full max-w-[15rem]">
           <HangmanDrawing misses={game.misses} lives={game.lives} state={state} color={guesserColor} />

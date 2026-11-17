@@ -53,8 +53,8 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
   }
 
   return (
-    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start">
-      <div>
+    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className="fit-board [--fit-top:13rem] [--fit-ratio:1.1]">
         <Header game={game} me={me} other={other} colorOf={colorOf} />
         <Board
           game={game}

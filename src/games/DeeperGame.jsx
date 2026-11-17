@@ -21,9 +21,11 @@ const LISTEN_TIPS = {
 
 export default function DeeperGame({ room, me, send, colorOf }) {
   const game = room.game
-  if (game.phase === 'letters') return <Letters game={game} me={me} send={send} colorOf={colorOf} />
-  if (game.phase === 'finished') return <Final game={game} me={me} send={send} colorOf={colorOf} />
-  return <Cards game={game} me={me} send={send} colorOf={colorOf} />
+  // a conversation game: the card stays at a comfortable reading width
+  let view = <Cards game={game} me={me} send={send} colorOf={colorOf} />
+  if (game.phase === 'letters') view = <Letters game={game} me={me} send={send} colorOf={colorOf} />
+  if (game.phase === 'finished') view = <Final game={game} me={me} send={send} colorOf={colorOf} />
+  return <div className="mx-auto max-w-5xl">{view}</div>
 }
 
 /* --- level track ------------------------------------------------------ */

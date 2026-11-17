@@ -69,7 +69,7 @@ export default function ParquesGame({ room, me, send, colorOf, error, errorId })
 
   return (
     <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <div className="mx-auto w-full max-w-[38rem]">
+      <div className="fit-board [--fit-top:8rem]">
         <Board game={game} me={me} colorOf={colorOf} movable={myTurn ? movable : new Set()} onPiece={clickPiece} />
       </div>
       <aside className="rounded-[2rem] bg-paper p-5">

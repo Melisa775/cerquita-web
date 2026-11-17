@@ -83,7 +83,7 @@ function Play({ game, me, send, colorOf }) {
       </div>
 
       <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <div className="mx-auto w-full max-w-[36rem]">
+        <div className="fit-board [--fit-top:11rem]">
           <Board game={game} placedAt={placedAt} objects={objects} notes={notes} selected={selected} onCell={onCell} colorOf={colorOf} />
           {canEdit && (
             <QuickPick game={game} selected={selected} setSelected={setSelected} violated={violated} />

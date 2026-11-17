@@ -45,7 +45,7 @@ export default function Home({ initialCode = '', onEnter }) {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-5 py-12">
+    <main className="relative z-10 mx-auto flex min-h-dvh max-w-xl flex-col justify-center px-5 py-12">
       <Logo animated />
       <Appear as="h1" delay={0.1} className="mt-8 text-5xl leading-[0.95] font-extrabold sm:text-6xl">
         Juegos para dos, aunque estén lejos.
