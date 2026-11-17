@@ -1,432 +1,520 @@
-import { useEffect, useMemo, useState } from 'react'
-import { motion } from 'motion/react'
-import { AnimatedNumber, spring } from '../lib/motion'
+/**
+ * Colonos (Catan-style), redesigned around a 3D board.
+ *
+ * Layout: the island fills a big stage with the essentials floating on top of
+ * it (both players, what to do now, the dice and the actions), and a side
+ * panel holds the hand, development cards, trading and the history. On
+ * phones the panel simply goes below the stage.
+ *
+ * The server stays the same: every action is one of the co_* messages and
+ * the board only lights up the spots the server says are legal.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
+import { animate } from 'animejs'
+import Board3D from './colonos/Board3D'
+import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { EndActions } from '../components/EndActions'
-import { DEV_META, RESOURCES, RES_META, ResourceIcon, TERRAIN, TerrainArt, pips } from '../lib/colonos'
+import { DEV_META, RESOURCES, RES_META, ResourceIcon, TERRAIN } from '../lib/colonos'
 
-const S = 46 // size of a hexagon in the drawing
-const SEA = 'hsl(204 62% 56%)'
-
-const DIE = {
-  1: [[50, 50]],
-  2: [[28, 28], [72, 72]],
-  3: [[28, 28], [50, 50], [72, 72]],
-  4: [[28, 28], [72, 28], [28, 72], [72, 72]],
-  5: [[28, 28], [72, 28], [50, 50], [28, 72], [72, 72]],
-  6: [[28, 26], [72, 26], [28, 50], [72, 50], [28, 74], [72, 74]],
+const BUILDS = {
+  road: { label: 'Camino', key: '1', cost: { wood: 1, brick: 1 }, points: 'Conecta tus pueblos' },
+  settlement: { label: 'Pueblo', key: '2', cost: { wood: 1, brick: 1, wool: 1, grain: 1 }, points: '+1 punto' },
+  city: { label: 'Ciudad', key: '3', cost: { grain: 2, ore: 3 }, points: '+1 punto, produce doble' },
 }
+const DEV_COST = { wool: 1, grain: 1, ore: 1 }
+const resColor = (r) => TERRAIN[RES_META[r].terrain].fill
+const canPay = (hand, cost) => !!hand && Object.entries(cost).every(([r, n]) => (hand[r] ?? 0) >= n)
+const total = (o) => Object.values(o ?? {}).reduce((s, n) => s + n, 0)
 
-const COST_LABEL = {
-  road: ['Camino', { wood: 1, brick: 1 }],
-  settlement: ['Pueblo', { wood: 1, brick: 1, wool: 1, grain: 1 }],
-  city: ['Ciudad', { grain: 2, ore: 3 }],
+// CSS colors like var(--color-p1) → a real color three.js understands
+function cssColor(value) {
+  const m = /var\((--[^)]+)\)/.exec(value ?? '')
+  if (!m) return value
+  return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || '#888888'
 }
-
-const canPay = (hand, cost) => hand && Object.entries(cost).every(([r, n]) => hand[r] >= n)
 
 export default function ColonosGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
   const other = game.players.find((p) => p !== me)
-  const myTurn = game.turn === me && game.phase !== 'finished'
-  const [mode, setMode] = useState(null) // 'road' | 'settlement' | 'city'
-  const [picker, setPicker] = useState(null) // 'year_of_plenty' | 'monopoly'
+  const finished = game.phase === 'finished'
+  const myTurn = game.turn === me && !finished
+  const [mode, setMode] = useState(null) // build mode chosen by the player: road | settlement | city
+  const [picker, setPicker] = useState(null) // year_of_plenty | monopoly
   const [flash, setFlash] = useState(null)
+  const [panel, setPanel] = useState('trade')
+  const board = useRef(null)
 
-  // automatic build mode during initial placement and with free roads
+  // The board lights up whatever the server allows right now
   const autoMode = myTurn && game.phase === 'setup' ? game.setupNeed : myTurn && game.phase === 'road_building' ? 'road' : null
   const activeMode = autoMode ?? (myTurn && game.phase === 'main' ? mode : null)
+  const targets = useMemo(() => {
+    if (myTurn && game.phase === 'robber') return { kind: 'robber', ids: game.legal.robber ?? [] }
+    if (!activeMode) return null
+    return { kind: activeMode, ids: game.legal[activeMode] ?? [] }
+  }, [myTurn, game.phase, game.legal, activeMode])
 
   useEffect(() => setMode(null), [game.phase, game.turn])
   useEffect(() => {
-    if (error) setFlash(error)
+    if (error) setFlash({ text: error, id: errorId })
   }, [errorId, error])
   useEffect(() => {
     if (!flash) return
-    const id = setTimeout(() => setFlash(null), 3000)
+    const id = setTimeout(() => setFlash(null), 3200)
     return () => clearTimeout(id)
   }, [flash])
 
-  function onTarget(kind, target) {
-    if (game.phase === 'setup') send({ type: 'co_place', target })
-    else send({ type: 'co_build', what: kind, target })
-    if (game.phase === 'main') setMode(null)
-  }
+  const colors = useMemo(() => Object.fromEntries(game.players.map((p) => [p, cssColor(colorOf(p))])), [game.players, colorOf])
+  const sceneState = useMemo(
+    () => ({ board: game.board, buildings: game.buildings, roads: game.roads, colors, me, targets }),
+    [game.board, game.buildings, game.roads, colors, me, targets],
+  )
+
+  const onPick = useCallback(
+    (kind, id) => {
+      if (kind === 'robber') send({ type: 'co_robber', hex: id })
+      else if (game.phase === 'setup') send({ type: 'co_place', target: id })
+      else send({ type: 'co_build', what: kind, target: id })
+      if (game.phase === 'main') setMode(null)
+    },
+    [send, game.phase],
+  )
+
+  // After every roll the producing tiles glow and their resources float up
+  const lastRoll = useRef(game.rollId)
+  useEffect(() => {
+    if (game.rollId !== lastRoll.current && game.dice) board.current?.rolled(game.dice[0] + game.dice[1], game.board.robber)
+    lastRoll.current = game.rollId
+  }, [game.rollId, game.dice, game.board.robber])
+
+  const chooseBuild = (k) => setMode((m) => (m === k ? null : k))
+
+  // Keyboard: space rolls, Enter ends the turn, 1-3 build, 4 buys a card, Esc cancels, R resets the view
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.target.closest?.('input, textarea, select') || e.ctrlKey || e.metaKey || e.altKey) return
+      const k = e.key.toLowerCase()
+      if (k === 'r') board.current?.resetView()
+      if (!myTurn) return
+      if ((k === ' ' || k === 'd') && game.phase === 'roll') {
+        e.preventDefault()
+        send({ type: 'co_roll' })
+      } else if (k === 'enter' && game.phase === 'main' && !e.target.closest?.('button')) {
+        send({ type: 'co_end' })
+      } else if (game.phase === 'main' && ['1', '2', '3'].includes(k)) {
+        const what = Object.keys(BUILDS).find((b) => BUILDS[b].key === k)
+        if (canPay(game.hand, BUILDS[what].cost) && (game.legal[what] ?? []).length) chooseBuild(what)
+      } else if (game.phase === 'main' && k === '4' && canPay(game.hand, DEV_COST) && game.devDeck) {
+        send({ type: 'co_buy_dev' })
+      } else if (k === 'escape') setMode(null)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [myTurn, game.phase, game.hand, game.legal, game.devDeck, send])
 
   return (
-    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <div className="fit-board [--fit-top:13rem] [--fit-ratio:1.1]">
-        <Header game={game} me={me} other={other} colorOf={colorOf} />
-        <Board
-          game={game}
-          colorOf={colorOf}
-          mode={activeMode}
-          robberMode={myTurn && game.phase === 'robber'}
-          onTarget={onTarget}
-          onRobber={(hex) => send({ type: 'co_robber', hex })}
-        />
-        <p role="status" className="mt-2 min-h-6 text-center text-sm font-medium text-danger">{flash}</p>
-      </div>
+    <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
+      {/* --- the stage: 3D island with the HUD on top --------------------- */}
+      <section className="relative h-[min(72dvh,42rem)] min-h-[24rem] overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-30px_rgba(34,37,46,.6)] lg:h-[calc(100dvh-7.5rem)] lg:max-h-none" style={{ background: 'linear-gradient(#BFE3F2, #8FCBE8)' }}>
+        <Board3D ref={board} state={sceneState} onPick={onPick} />
 
-      <aside className="space-y-4">
-        <Status game={game} me={me} other={other} colorOf={colorOf} mode={activeMode} send={send} />
-        {game.phase === 'finished' ? (
-          <div className="rounded-[2rem] bg-paper p-5">
-            <EndActions send={send} replay={{ type: 'start_game', game: 'colonos', ...game.options }} />
+        <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
+          <div className="flex items-start justify-between gap-2">
+            <Plates game={game} me={me} other={other} colorOf={colorOf} />
+            <DiceTray game={game} />
           </div>
-        ) : (
-          <>
-            <Hand game={game} me={me} />
-            {myTurn && game.phase === 'main' && (
-              <Build game={game} mode={mode} setMode={setMode} send={send} />
+
+          <div className="flex flex-col items-center gap-2">
+            <Banner game={game} me={me} other={other} colorOf={colorOf} mode={activeMode} />
+            <AnimatePresence>
+              {flash && (
+                <motion.p
+                  key={flash.id}
+                  className="pointer-events-auto rounded-full bg-danger px-4 py-1.5 text-sm font-semibold text-white shadow-lg"
+                  initial={{ y: 10, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1, x: [0, -6, 6, -3, 0] }}
+                  exit={{ opacity: 0 }}
+                  role="alert"
+                >
+                  {flash.text}
+                </motion.p>
+              )}
+            </AnimatePresence>
+            {myTurn && !finished && (
+              <ActionBar game={game} mode={mode} chooseBuild={chooseBuild} send={send} color={colorOf(me)} />
             )}
-            <Devs game={game} me={me} myTurn={myTurn} send={send} onPicker={setPicker} />
-            {myTurn && game.phase === 'main' && <Trade game={game} me={me} other={other} send={send} />}
-          </>
-        )}
-        <Log game={game} me={me} colorOf={colorOf} />
+          </div>
+        </div>
+
+        <ViewButtons board={board} />
+        {finished && <Finish game={game} me={me} send={send} colorOf={colorOf} />}
+      </section>
+
+      {/* --- side panel ------------------------------------------------------ */}
+      <aside className="flex min-w-0 flex-col gap-3 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:pr-1">
+        <Hand game={game} me={me} />
+        <DevCards game={game} myTurn={myTurn} send={send} onPicker={setPicker} />
+        <section className="rounded-[1.6rem] bg-paper p-1.5">
+          <div className="grid grid-cols-2 gap-1 rounded-[1.2rem] bg-stone p-1" role="tablist">
+            {[['trade', 'Comercio'], ['log', 'Historial']].map(([k, l]) => (
+              <button key={k} role="tab" aria-selected={panel === k} onClick={() => setPanel(k)} className={`rounded-xl py-1.5 text-sm font-semibold ${panel === k ? 'bg-paper shadow-sm' : 'text-muted'}`}>
+                {l}
+              </button>
+            ))}
+          </div>
+          <div className="p-3">
+            {panel === 'trade' ? <Trade game={game} me={me} other={other} myTurn={myTurn} send={send} /> : <Log game={game} me={me} colorOf={colorOf} />}
+          </div>
+        </section>
       </aside>
 
-      {game.offer && game.offer.from !== me && game.phase !== 'finished' && <OfferModal game={game} send={send} />}
-      {game.discardNeed?.[me] > 0 && <DiscardModal game={game} me={me} send={send} />}
-      {picker && <PickerModal kind={picker} game={game} onClose={() => setPicker(null)} send={send} />}
+      <AnimatePresence>
+        {game.offer && game.offer.from !== me && !finished && <OfferSheet key="offer" game={game} send={send} />}
+        {game.discardNeed?.[me] > 0 && <DiscardModal key="discard" game={game} me={me} send={send} />}
+        {picker && <PickerModal key="picker" kind={picker} onClose={() => setPicker(null)} send={send} />}
+      </AnimatePresence>
     </div>
   )
 }
 ColonosGame.showsErrors = true
 
-/* --- header with both players ------------------------------------------- */
+/* --- HUD: players ------------------------------------------------------------- */
 
-function Header({ game, me, other, colorOf }) {
+function Plates({ game, me, other, colorOf }) {
   return (
-    <div className="mb-3 grid grid-cols-2 gap-2">
-      {[me, other].map((p) => {
+    // information only: taps go through to the board
+    <div className="flex gap-1.5">
+      {[me, other].filter(Boolean).map((p) => {
         const info = game.playersInfo[p]
+        const active = game.turn === p && game.phase !== 'finished'
+        const pct = Math.min(1, info.points / game.goal)
         return (
-          <div key={p} className="rounded-2xl bg-paper px-4 py-2.5" style={game.turn === p && game.phase !== 'finished' ? { boxShadow: `inset 0 0 0 3px ${colorOf(p)}` } : undefined}>
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="truncate font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</span>
-              <span className="text-sm text-muted">
-                <span className="font-display text-2xl font-extrabold text-ink tabular-nums">{info.points}</span>/{game.goal}
+          <motion.div
+            key={p}
+            layout
+            className="flex min-w-0 items-center gap-2 rounded-2xl bg-paper/90 py-1 pl-1 pr-2.5 shadow-sm backdrop-blur sm:gap-2.5 sm:py-1.5 sm:pl-1.5 sm:pr-3"
+            animate={{ scale: active ? 1 : 0.94, opacity: active ? 1 : 0.85 }}
+            style={active ? { boxShadow: `0 0 0 3px ${colorOf(p)}` } : undefined}
+            transition={softSpring}
+          >
+            {/* points as a ring that fills up toward the goal */}
+            <div className="relative h-9 w-9 shrink-0 sm:h-11 sm:w-11">
+              <svg viewBox="0 0 44 44" className="h-full w-full -rotate-90">
+                <circle cx="22" cy="22" r="19" fill="none" stroke="var(--color-line)" strokeWidth="4" />
+                <motion.circle
+                  cx="22" cy="22" r="19" fill="none" stroke={colorOf(p)} strokeWidth="4" strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 19}
+                  animate={{ strokeDashoffset: 2 * Math.PI * 19 * (1 - pct) }}
+                  transition={{ duration: 0.8 }}
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center font-display text-lg font-extrabold">
+                <AnimatedNumber value={info.points} />
               </span>
             </div>
-            <p className="mt-0.5 text-xs text-muted">
-              {info.cards} cartas · {info.devCount} desarrollo · {info.knights} soldados · camino {info.road}
-            </p>
-            <div className="mt-1 flex flex-wrap gap-1 text-[0.7rem] font-semibold">
-              {game.longest === p && <span className="rounded-full bg-ink px-2 py-0.5 text-white">Camino más largo +2</span>}
-              {game.army === p && <span className="rounded-full bg-ink px-2 py-0.5 text-white">Ejército más grande +2</span>}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold" style={{ color: colorOf(p) }}>
+                {p}{p === me && ' (tú)'}
+              </p>
+              <p className="hidden gap-2 text-xs text-muted sm:flex" aria-label={`${info.cards} cartas, ${info.devCount} de desarrollo, ${info.knights} soldados, camino de ${info.road}`}>
+                <span title="Cartas de recurso">🂠 {info.cards}</span>
+                <span title="Cartas de desarrollo">✦ {info.devCount}</span>
+                <span title="Soldados jugados">⚔ {info.knights}</span>
+                <span title="Camino más largo">↝ {info.road}</span>
+              </p>
+              {(game.longest === p || game.army === p) && (
+                <p className="mt-0.5 flex gap-1 text-[0.65rem] font-bold">
+                  {game.longest === p && <span className="rounded-full bg-ink px-1.5 text-white">Camino +2</span>}
+                  {game.army === p && <span className="rounded-full bg-ink px-1.5 text-white">Ejército +2</span>}
+                </p>
+              )}
             </div>
-          </div>
+          </motion.div>
         )
       })}
     </div>
   )
 }
 
-/* --- board -------------------------------------------------------------- */
+/* --- HUD: what to do now ----------------------------------------------------- */
 
-function hexPoints(cx, cy, r) {
-  const pts = []
-  for (let i = 0; i < 6; i++) {
-    const a = ((60 * i - 30) * Math.PI) / 180
-    pts.push(`${(cx + r * Math.cos(a)).toFixed(1)},${(cy + r * Math.sin(a)).toFixed(1)}`)
+function phaseText(game, me, other, mode) {
+  const myTurn = game.turn === me
+  if (game.phase === 'finished') return [game.winner === me ? '¡Ganaste!' : `Ganó ${game.winner}`, null]
+  if (game.phase === 'setup') {
+    if (!myTurn) return [`${game.turn} está poniendo`, 'Colocación inicial: dos pueblos con su camino cada uno.']
+    return game.setupNeed === 'settlement'
+      ? ['Pon un pueblo', 'Toca un punto brillante. Los números con más puntitos salen más seguido.']
+      : ['Pon un camino', 'Sale del pueblo que acabas de poner.']
   }
-  return pts.join(' ')
+  if (game.phase === 'discard') return [game.discardNeed?.[me] ? `Bota ${game.discardNeed[me]} cartas` : `${other} está botando cartas`, 'Salió 7: quien tiene más de 7 cartas bota la mitad.']
+  if (game.phase === 'robber') return myTurn ? ['Mueve el ladrón', 'Toca un hexágono brillante: deja de producir y robas una carta.'] : [`${game.turn} mueve el ladrón`, null]
+  if (game.phase === 'road_building') return myTurn ? [`Pon ${game.freeRoads} ${game.freeRoads === 1 ? 'camino gratis' : 'caminos gratis'}`, null] : [`${game.turn} está construyendo`, null]
+  if (game.phase === 'roll') return myTurn ? ['Te toca: lanza los dados', 'Espacio para lanzar.'] : [`Turno de ${game.turn}`, null]
+  if (mode) return [`¿Dónde va el ${BUILDS[mode].label.toLowerCase()}?`, 'Toca un lugar brillante. Esc para cancelar.']
+  return myTurn ? ['Construye, comercia o termina', null] : [`Juega ${game.turn}…`, null]
 }
 
-function House({ x, y, color, city }) {
-  const s = city ? 1.15 : 1
-  return city ? (
-    <g transform={`translate(${x} ${y}) scale(${s})`}>
-      <path d="M-11 9 V-1 L-5 -7 L1 -1 V-3 H11 V9 Z" fill={color} stroke="white" strokeWidth="2.2" strokeLinejoin="round" />
-      <rect x="4" y="1" width="4" height="4" fill="white" opacity=".7" />
-    </g>
-  ) : (
-    <g transform={`translate(${x} ${y})`}>
-      <path d="M-7 7 V-2 L0 -8 L7 -2 V7 Z" fill={color} stroke="white" strokeWidth="2.2" strokeLinejoin="round" />
-    </g>
+function Banner({ game, me, other, colorOf, mode }) {
+  const [title, hint] = phaseText(game, me, other, mode)
+  const who = game.phase === 'finished' ? game.winner : game.turn
+  const stolen = game.stolen?.res && game.log.at(-1)?.action === 'robber' ? game.stolen : null
+  return (
+    <AnimatePresence mode="popLayout">
+      <motion.div
+        key={`${title}-${stolen ? 's' : ''}`}
+        className="max-w-[min(100%,34rem)] rounded-2xl bg-paper/92 px-4 py-2 text-center shadow-md backdrop-blur"
+        initial={{ y: 16, opacity: 0, scale: 0.95 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: -10, opacity: 0, transition: { duration: 0.15 } }}
+        transition={spring}
+        aria-live="polite"
+      >
+        <p className="font-display text-lg font-extrabold sm:text-xl" style={{ color: colorOf(who) }}>{title}</p>
+        {hint && <p className="text-xs text-muted sm:text-sm">{hint}</p>}
+        {stolen && (
+          <p className="mt-0.5 text-sm font-semibold">
+            {stolen.thief === me ? `Le robaste 1 de ${RES_META[stolen.res].label.toLowerCase()} a ${stolen.victim}.` : `${stolen.thief} te robó 1 de ${RES_META[stolen.res].label.toLowerCase()}.`}
+          </p>
+        )}
+      </motion.div>
+    </AnimatePresence>
   )
 }
 
-function Board({ game, colorOf, mode, robberMode, onTarget, onRobber }) {
-  const b = game.board
-  const V = b.vertices.map(([x, y]) => [x * S, y * S])
-  const legalV = new Set(mode && mode !== 'road' ? game.legal[mode] ?? [] : [])
-  const legalE = new Set(mode === 'road' ? game.legal.road ?? [] : [])
-  const legalH = new Set(robberMode ? game.legal.robber ?? [] : [])
-  const last = [...game.log].reverse().find((l) => l.action === 'roll')
-  const rolled = last ? last.dice[0] + last.dice[1] : null
+/* --- HUD: dice ------------------------------------------------------------------ */
 
-  const pad = S * 0.95
-  const minX = -5 * S * 0.87 - pad
-  const W = -2 * minX
-  const H = 2 * (4 * S + pad)
+const PIPS = {
+  1: [[50, 50]],
+  2: [[27, 27], [73, 73]],
+  3: [[27, 27], [50, 50], [73, 73]],
+  4: [[27, 27], [73, 27], [27, 73], [73, 73]],
+  5: [[27, 27], [73, 27], [50, 50], [27, 73], [73, 73]],
+  6: [[27, 25], [73, 25], [27, 50], [73, 50], [27, 75], [73, 75]],
+}
 
+function Die({ value, red }) {
   return (
-    <svg viewBox={`${minX} ${-H / 2} ${W} ${H}`} className="block w-full select-none rounded-[2rem] shadow-sm" role="img" aria-label="Tablero de la isla">
-      <rect x={minX} y={-H / 2} width={W} height={H} fill={SEA} />
-      <polygon points={hexPoints(0, 0, S * 5.55)} fill="hsl(204 55% 64%)" transform="rotate(30)" />
-
-      {/* ports */}
-      {b.ports.map((p, i) => {
-        const [a, c] = p.vertices.map((v) => V[v])
-        const mx = (a[0] + c[0]) / 2
-        const my = (a[1] + c[1]) / 2
-        const len = Math.hypot(mx, my)
-        const px = mx + (mx / len) * S * 0.55
-        const py = my + (my / len) * S * 0.55
-        return (
-          <g key={i}>
-            <line x1={a[0]} y1={a[1]} x2={px} y2={py} stroke="hsl(30 35% 45%)" strokeWidth="3" />
-            <line x1={c[0]} y1={c[1]} x2={px} y2={py} stroke="hsl(30 35% 45%)" strokeWidth="3" />
-            <circle cx={px} cy={py} r={S * 0.3} fill="hsl(40 40% 94%)" stroke="hsl(30 35% 45%)" strokeWidth="2" />
-            {p.kind === '3:1' ? (
-              <text x={px} y={py + 4} textAnchor="middle" fontSize="11" fontWeight="800" fill="#22252E">3:1</text>
-            ) : (
-              <g>
-                <g transform={`translate(${px} ${py - 3}) scale(${S * 0.13})`}>
-                  <rect x="-1" y="-1" width="2" height="2" rx="0.4" fill={TERRAIN[RES_META[p.kind].terrain].fill} />
-                </g>
-                <text x={px} y={py + 11} textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#22252E">2:1</text>
-              </g>
-            )}
-          </g>
-        )
-      })}
-
-      {/* hexagons */}
-      {b.hexes.map((h, i) => {
-        const [cx, cy] = [h.center[0] * S, h.center[1] * S]
-        const t = TERRAIN[h.terrain]
-        const hot = h.number === 6 || h.number === 8
-        const isRolled = rolled && h.number === rolled
-        return (
-          // the island is laid out tile by tile from the center
-          <motion.g
-            key={i}
-            onClick={() => legalH.has(i) && onRobber(i)}
-            className={legalH.has(i) ? 'cursor-pointer' : ''}
-            initial={{ scale: 0, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ ...spring, delay: 0.035 * i }}
-            style={{ transformOrigin: `${cx}px ${cy}px` }}
-          >
-            <polygon points={hexPoints(cx, cy, S - 1.5)} fill={t.fill} stroke="hsl(40 40% 92%)" strokeWidth="3" />
-            {isRolled && <polygon key={game.rollId} points={hexPoints(cx, cy, S - 1.5)} fill="white" className="colonos-flash" />}
-            <g transform={`translate(${cx} ${cy - S * 0.36}) scale(${S * 0.42})`} opacity=".9">
-              <TerrainArt terrain={h.terrain} />
-            </g>
-            {h.number && (
-              <g>
-                <circle cx={cx} cy={cy + S * 0.22} r={S * 0.27} fill={isRolled ? 'hsl(48 100% 70%)' : 'hsl(40 45% 94%)'} stroke="rgba(0,0,0,.15)" />
-                <text x={cx} y={cy + S * 0.28} textAnchor="middle" fontSize={S * 0.27} fontWeight="800" fill={hot ? 'hsl(2 70% 45%)' : '#22252E'}>
-                  {h.number}
-                </text>
-                <g fill={hot ? 'hsl(2 70% 45%)' : '#22252E'}>
-                  {Array.from({ length: pips(h.number) }, (_, k) => (
-                    <circle key={k} cx={cx + (k - (pips(h.number) - 1) / 2) * 3.4} cy={cy + S * 0.39} r="1.25" />
-                  ))}
-                </g>
-              </g>
-            )}
-            {legalH.has(i) && <polygon points={hexPoints(cx, cy, S - 5)} fill="rgba(255,255,255,.18)" stroke="white" strokeWidth="3" strokeDasharray="6 5" className="colonos-pulse" />}
-          </motion.g>
-        )
-      })}
-
-      {/* robber: hops from hex to hex */}
-      {b.robber != null && b.hexes[b.robber] && (
-        <motion.g
-          initial={false}
-          animate={{ x: b.hexes[b.robber].center[0] * S + S * 0.38, y: b.hexes[b.robber].center[1] * S + S * 0.05 }}
-          transition={{ type: 'spring', stiffness: 160, damping: 16 }}
-          className="pointer-events-none"
-        >
-          <motion.g key={b.robber} initial={{ y: -14 }} animate={{ y: 0 }} transition={{ type: 'spring', stiffness: 400, damping: 10, delay: 0.25 }}>
-            <ellipse cx="0" cy="12" rx="8" ry="3" fill="rgba(0,0,0,.3)" />
-            <path d="M-7 12 C-7 2 -5 -2 0 -2 C5 -2 7 2 7 12 Z" fill="#2A2D36" />
-            <circle cx="0" cy="-6" r="5" fill="#2A2D36" />
-          </motion.g>
-        </motion.g>
-      )}
-
-      {/* roads */}
-      {Object.entries(game.roads).map(([e, owner]) => {
-        const [a, c] = b.edges[e].map((v) => V[v])
-        const sx = a[0] + (c[0] - a[0]) * 0.16
-        const sy = a[1] + (c[1] - a[1]) * 0.16
-        const ex = a[0] + (c[0] - a[0]) * 0.84
-        const ey = a[1] + (c[1] - a[1]) * 0.84
-        return (
-          // a new road is laid from one end to the other
-          <g key={e}>
-            <motion.line x1={sx} y1={sy} x2={ex} y2={ey} stroke="white" strokeWidth="9" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} />
-            <motion.line x1={sx} y1={sy} x2={ex} y2={ey} stroke={colorOf(owner)} strokeWidth="5.5" strokeLinecap="round" initial={{ pathLength: 0 }} animate={{ pathLength: 1 }} transition={{ duration: 0.4 }} />
-          </g>
-        )
-      })}
-      {/* available edges */}
-      {[...legalE].map((e) => {
-        const [a, c] = b.edges[e].map((v) => V[v])
-        return (
-          <g key={`le${e}`} onClick={() => onTarget('road', e)} className="cursor-pointer">
-            <line x1={a[0]} y1={a[1]} x2={c[0]} y2={c[1]} stroke="transparent" strokeWidth="16" />
-            <line x1={a[0] + (c[0] - a[0]) * 0.2} y1={a[1] + (c[1] - a[1]) * 0.2} x2={a[0] + (c[0] - a[0]) * 0.8} y2={a[1] + (c[1] - a[1]) * 0.8} stroke="white" strokeWidth="5" strokeLinecap="round" strokeDasharray="2 6" className="colonos-pulse" />
-          </g>
-        )
-      })}
-
-      {/* settlements and cities */}
-      {Object.entries(game.buildings).map(([v, bld]) => (
-        <motion.g
-          key={`${v}-${bld.kind}`}
-          initial={{ scale: 0, y: -12 }}
-          animate={{ scale: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 420, damping: 13 }}
-          style={{ transformOrigin: `${V[v][0]}px ${V[v][1]}px` }}
-        >
-          <House x={V[v][0]} y={V[v][1]} color={colorOf(bld.owner)} city={bld.kind === 'city'} />
-        </motion.g>
-      ))}
-      {/* available vertices */}
-      {[...legalV].map((v) => (
-        <g key={`lv${v}`} onClick={() => onTarget(mode, v)} className="cursor-pointer">
-          <circle cx={V[v][0]} cy={V[v][1]} r="13" fill="transparent" />
-          <circle cx={V[v][0]} cy={V[v][1]} r={mode === 'city' ? 12 : 7} fill={mode === 'city' ? 'none' : 'white'} stroke="white" strokeWidth="2.5" className="colonos-pulse" />
-        </g>
-      ))}
+    <svg viewBox="0 0 100 100" className="h-full w-full drop-shadow-md">
+      <rect x="3" y="3" width="94" height="94" rx="22" fill="white" />
+      <rect x="3" y="3" width="94" height="94" rx="22" fill="none" stroke="rgba(0,0,0,.12)" strokeWidth="3" />
+      {PIPS[value].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="9" fill={red ? '#C0392B' : '#22252E'} />)}
     </svg>
   )
 }
 
-/* --- panel ---------------------------------------------------------------- */
+function DiceTray({ game }) {
+  const refs = [useRef(null), useRef(null)]
+  const [faces, setFaces] = useState(game.dice ?? null)
+  const first = useRef(true)
 
-function Dice({ game }) {
-  if (!game.dice) return null
+  // Each roll tumbles the dice with anime.js, flicking through faces before landing
+  useEffect(() => {
+    if (!game.dice) return
+    if (first.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      first.current = false
+      setFaces(game.dice)
+      return
+    }
+    let n = 0
+    const tick = setInterval(() => {
+      n++
+      setFaces([1 + ((n * 5 + 2) % 6), 1 + ((n * 3 + 4) % 6)])
+    }, 70)
+    const stop = setTimeout(() => {
+      clearInterval(tick)
+      setFaces(game.dice)
+    }, 650)
+    refs.forEach((r, i) =>
+      r.current && animate(r.current, { rotate: [i ? 420 : -480, 0], translateY: [-40, 0], scale: [0.6, 1], duration: 900, ease: 'outBounce' }),
+    )
+    return () => {
+      clearInterval(tick)
+      clearTimeout(stop)
+    }
+  }, [game.rollId]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!faces) return null
+  const sum = game.dice ? game.dice[0] + game.dice[1] : null
   return (
-    <div className="flex items-center gap-2">
-      {game.dice.map((v, i) => (
-        <svg key={`${game.rollId}-${i}`} viewBox="0 0 100 100" className="parques-roll h-12 w-12">
-          <rect x="4" y="4" width="92" height="92" rx="20" fill="white" stroke="#CDCFD5" strokeWidth="3" />
-          {DIE[v].map(([x, y], k) => <circle key={k} cx={x} cy={y} r="8.5" fill={game.dice[0] + game.dice[1] === 7 ? 'hsl(2 70% 45%)' : '#22252E'} />)}
-        </svg>
+    <div className="flex shrink-0 items-center gap-1 rounded-2xl bg-paper/90 p-1 pr-2 shadow-sm backdrop-blur sm:gap-1.5 sm:p-1.5 sm:pr-3" aria-label={sum ? `Dados: ${sum}` : 'Dados'}>
+      {faces.map((v, i) => (
+        <div key={i} ref={refs[i]} className="h-8 w-8 sm:h-11 sm:w-11">
+          <Die value={v} red={sum === 7} />
+        </div>
       ))}
-      <span className="font-display text-2xl font-extrabold">= {game.dice[0] + game.dice[1]}</span>
+      {sum && <span className={`ml-1 font-display text-2xl font-extrabold tabular-nums ${sum === 7 ? 'text-danger' : ''}`}>{sum}</span>}
     </div>
   )
 }
 
-function Status({ game, me, other, colorOf, mode, send }) {
-  const myTurn = game.turn === me
-  let title
-  let hint = null
-  if (game.phase === 'finished') title = game.winner === me ? '¡Ganaste!' : `Ganó ${game.winner}`
-  else if (game.phase === 'setup') {
-    title = myTurn ? (game.setupNeed === 'settlement' ? 'Pon un pueblo' : 'Pon un camino') : `${game.turn} está poniendo`
-    hint = myTurn
-      ? game.setupNeed === 'settlement'
-        ? 'Toca uno de los puntos blancos. Busca números con más puntitos: salen más.'
-        : 'El camino sale del pueblo que acabas de poner.'
-      : 'Colocación inicial: cada uno pone dos pueblos con su camino.'
-  } else if (game.phase === 'discard') {
-    title = game.discardNeed[me] ? `Bota ${game.discardNeed[me]} cartas` : `${other} está botando cartas`
-    hint = 'Salió 7: quien tenga más de 7 cartas bota la mitad.'
-  } else if (game.phase === 'robber') {
-    title = myTurn ? 'Mueve el ladrón' : `${game.turn} mueve el ladrón`
-    hint = myTurn ? 'Toca un hexágono: deja de producir y le robas una carta a tu pareja si tiene algo ahí.' : null
-  } else if (game.phase === 'road_building') title = myTurn ? `Pon ${game.freeRoads} ${game.freeRoads === 1 ? 'camino gratis' : 'caminos gratis'}` : `${game.turn} está construyendo`
-  else if (game.phase === 'roll') title = myTurn ? 'Lanza los dados' : `Juega ${game.turn}…`
-  else title = myTurn ? (mode ? `Elige dónde va el ${COST_LABEL[mode][0].toLowerCase()}` : 'Construye, comercia o termina') : `Juega ${game.turn}…`
+/* --- HUD: actions --------------------------------------------------------------- */
 
-  const stolen = game.stolen
-  return (
-    <div className="rounded-[2rem] bg-paper p-5">
-      <p className="font-display text-2xl font-extrabold" style={{ color: game.phase === 'finished' ? colorOf(game.winner) : colorOf(game.turn) }}>{title}</p>
-      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
-      {stolen?.res && game.log[game.log.length - 1]?.action === 'robber' && (
-        <p className="mt-2 rounded-xl bg-stone px-3 py-2 text-sm">
-          {stolen.thief === me ? `Le robaste 1 de ${RES_META[stolen.res].label.toLowerCase()} a ${stolen.victim}.` : `${stolen.thief} te robó 1 de ${RES_META[stolen.res].label.toLowerCase()}.`}
-        </p>
-      )}
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-        <Dice game={game} />
-        {myTurn && game.phase === 'roll' && (
-          <button onClick={() => send({ type: 'co_roll' })} autoFocus className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white">
-            Lanzar dados
-          </button>
-        )}
-        {myTurn && game.phase === 'main' && (
-          <button onClick={() => send({ type: 'co_end' })} className="rounded-2xl border border-line px-4 py-2.5 font-semibold hover:border-ink">
-            Terminar turno
-          </button>
-        )}
-      </div>
-    </div>
-  )
+function BuildIcon({ kind }) {
+  if (kind === 'road') return <svg viewBox="0 0 24 24" className="h-6 w-6"><rect x="3" y="10" width="18" height="5" rx="2.5" fill="currentColor" transform="rotate(-25 12 12)" /></svg>
+  if (kind === 'settlement') return <svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M5 20V11l7-6 7 6v9z" fill="currentColor" /></svg>
+  if (kind === 'city') return <svg viewBox="0 0 24 24" className="h-6 w-6"><path d="M3 20v-8l5-4 5 4v-6h8v14z" fill="currentColor" /></svg>
+  return <svg viewBox="0 0 24 24" className="h-6 w-6"><rect x="6" y="3" width="12" height="18" rx="2.5" fill="currentColor" /><path d="M12 8l1.3 2.7 3 .4-2.2 2 .6 3-2.7-1.5-2.7 1.5.6-3-2.2-2 3-.4z" fill="white" /></svg>
 }
 
-function Hand({ game, me }) {
-  const hand = game.hand
-  if (!hand) return null
-  return (
-    <div className="rounded-[2rem] bg-paper p-4">
-      <p className="mb-2 text-sm font-semibold text-muted">Tus cartas</p>
-      <div className="grid grid-cols-5 gap-1.5">
-        {RESOURCES.map((r) => (
-          <div key={r} className={`flex flex-col items-center rounded-xl bg-stone py-2 transition-opacity ${hand[r] ? '' : 'opacity-45'}`} title={RES_META[r].label}>
-            <ResourceIcon res={r} className="h-9 w-9" />
-            <AnimatedNumber value={hand[r]} className="mt-1 font-display text-xl font-extrabold" />
-            <span className="text-[0.62rem] text-muted">{RES_META[r].label}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function CostChips({ cost }) {
+function CostDots({ cost, hand }) {
   return (
     <span className="flex gap-0.5">
-      {Object.entries(cost).flatMap(([r, n]) => Array.from({ length: n }, (_, i) => <ResourceIcon key={`${r}${i}`} res={r} className="h-4 w-4" />))}
+      {Object.entries(cost).flatMap(([r, n]) =>
+        Array.from({ length: n }, (_, i) => (
+          <span
+            key={`${r}${i}`}
+            className="h-2.5 w-2.5 rounded-full ring-1 ring-white/70"
+            style={{ background: resColor(r), opacity: (hand?.[r] ?? 0) > i ? 1 : 0.3 }}
+            title={RES_META[r].label}
+          />
+        )),
+      )}
     </span>
   )
 }
 
-function Build({ game, mode, setMode, send }) {
+function ActionBar({ game, mode, chooseBuild, send, color }) {
   const hand = game.hand
-  const devCost = { wool: 1, grain: 1, ore: 1 }
+  if (game.phase === 'roll') {
+    return (
+      <motion.button
+        onClick={() => send({ type: 'co_roll' })}
+        className="pointer-events-auto rounded-full px-8 py-3.5 font-display text-xl font-extrabold text-white shadow-xl"
+        style={{ background: color }}
+        initial={{ scale: 0.6, opacity: 0 }}
+        animate={{ scale: [1, 1.05, 1], opacity: 1 }}
+        transition={{ scale: { duration: 1.6, repeat: Infinity }, opacity: { duration: 0.2 } }}
+        autoFocus
+      >
+        🎲 Lanzar dados
+      </motion.button>
+    )
+  }
+  if (game.phase !== 'main') return null
   return (
-    <div className="rounded-[2rem] bg-paper p-4">
-      <p className="mb-2 text-sm font-semibold text-muted">Construir</p>
-      <div className="grid grid-cols-2 gap-2">
-        {Object.entries(COST_LABEL).map(([k, [label, cost]]) => {
-          const ok = canPay(hand, cost) && (game.legal[k] ?? []).length > 0
-          return (
-            <button
-              key={k}
-              onClick={() => setMode(mode === k ? null : k)}
-              disabled={!ok}
-              className={`flex flex-col items-start gap-1 rounded-2xl border px-3 py-2 text-left text-sm font-semibold disabled:opacity-40 ${mode === k ? 'border-ink bg-ink text-white' : 'border-line hover:border-ink'}`}
-            >
-              {label}
-              <CostChips cost={cost} />
-            </button>
-          )
-        })}
-        <button
-          onClick={() => send({ type: 'co_buy_dev' })}
-          disabled={!canPay(hand, devCost) || !game.devDeck}
-          className="flex flex-col items-start gap-1 rounded-2xl border border-line px-3 py-2 text-left text-sm font-semibold hover:border-ink disabled:opacity-40"
-        >
-          Carta de desarrollo
-          <CostChips cost={devCost} />
-        </button>
-      </div>
+    <motion.div
+      className="pointer-events-auto flex max-w-full items-stretch gap-1.5 overflow-x-auto rounded-[1.4rem] bg-paper/92 p-1.5 shadow-xl backdrop-blur"
+      initial={{ y: 30, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={spring}
+    >
+      {Object.entries(BUILDS).map(([k, b]) => {
+        const ok = canPay(hand, b.cost) && (game.legal[k] ?? []).length > 0
+        const active = mode === k
+        return (
+          <button
+            key={k}
+            onClick={() => chooseBuild(k)}
+            disabled={!ok}
+            aria-pressed={active}
+            title={`${b.label} (${b.key}) · ${b.points}`}
+            className={`flex min-w-[4.6rem] flex-col items-center gap-1 rounded-2xl px-2.5 py-1.5 text-xs font-bold disabled:opacity-35 ${active ? 'text-white' : 'hover:bg-stone'}`}
+            style={active ? { background: color } : undefined}
+          >
+            <BuildIcon kind={k} />
+            {b.label}
+            <CostDots cost={b.cost} hand={hand} />
+          </button>
+        )
+      })}
+      <button
+        onClick={() => send({ type: 'co_buy_dev' })}
+        disabled={!canPay(hand, DEV_COST) || !game.devDeck}
+        title="Carta de desarrollo (4)"
+        className="flex min-w-[4.6rem] flex-col items-center gap-1 rounded-2xl px-2.5 py-1.5 text-xs font-bold hover:bg-stone disabled:opacity-35"
+      >
+        <BuildIcon kind="dev" />
+        Carta
+        <CostDots cost={DEV_COST} hand={hand} />
+      </button>
+      <span className="mx-0.5 w-px self-stretch bg-line" />
+      <button
+        onClick={() => send({ type: 'co_end' })}
+        title="Terminar turno (Enter)"
+        className="min-w-[5.5rem] rounded-2xl bg-ink px-3 text-sm font-bold text-white"
+      >
+        Terminar turno
+      </button>
+    </motion.div>
+  )
+}
+
+function ViewButtons({ board }) {
+  const btn = 'flex h-9 w-9 items-center justify-center rounded-full bg-paper/90 text-lg font-bold shadow-sm backdrop-blur hover:bg-paper'
+  return (
+    <div className="absolute bottom-3 left-3 hidden flex-col gap-1.5 sm:flex">
+      <button className={btn} onClick={() => board.current?.zoom(1)} aria-label="Acercar">+</button>
+      <button className={btn} onClick={() => board.current?.zoom(-1)} aria-label="Alejar">−</button>
+      <button className={btn} onClick={() => board.current?.resetView()} aria-label="Centrar la vista (R)" title="Centrar la vista (R)">⟲</button>
     </div>
   )
 }
 
-function Devs({ game, me, myTurn, send, onPicker }) {
+/* --- side panel: hand ------------------------------------------------------------ */
+
+function Hand({ game, me }) {
+  const hand = game.hand
+  // what the last roll gave me, shown as a short "+1" over each card
+  const gain = useMemo(() => {
+    const last = [...game.log].reverse().find((l) => l.action === 'produce' || l.action === 'roll')
+    return last?.action === 'produce' ? last.got?.[me] ?? {} : {}
+  }, [game.log, me])
+  if (!hand) return null
+  const count = total(hand)
+  return (
+    <section className="rounded-[1.6rem] bg-paper p-3">
+      <div className="mb-2 flex items-baseline justify-between px-1">
+        <h2 className="font-bold">Tu mano</h2>
+        <span className={`text-sm ${count > 7 ? 'font-semibold text-danger' : 'text-muted'}`} title={count > 7 ? 'Si sale 7, botas la mitad' : undefined}>
+          {count} {count === 1 ? 'carta' : 'cartas'}{count > 7 && ' · ¡cuidado con el 7!'}
+        </span>
+      </div>
+      <div className="grid grid-cols-5 gap-1.5">
+        {RESOURCES.map((r) => (
+          <ResourceCard key={r} res={r} n={hand[r] ?? 0} gain={gain[r]} rollId={game.rollId} />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function ResourceCard({ res, n, gain, rollId }) {
+  return (
+    <motion.div
+      className="relative flex aspect-[3/4] flex-col items-center justify-between overflow-hidden rounded-xl p-1.5 text-white shadow-sm"
+      style={{ background: `linear-gradient(160deg, ${resColor(res)}, color-mix(in srgb, ${resColor(res)} 70%, black))` }}
+      animate={{ opacity: n ? 1 : 0.4, y: 0 }}
+      whileHover={{ y: -4 }}
+      transition={spring}
+      title={RES_META[res].label}
+    >
+      <ResourceIcon res={res} className="mt-1 h-8 w-8 rounded-lg ring-2 ring-white/40" />
+      <AnimatedNumber value={n} className="font-display text-2xl font-extrabold drop-shadow" />
+      <span className="text-[0.6rem] font-semibold uppercase tracking-wide opacity-90">{RES_META[res].label}</span>
+      <AnimatePresence>
+        {gain > 0 && (
+          <motion.span
+            key={rollId}
+            className="absolute right-1 top-1 rounded-full bg-white px-1.5 text-xs font-extrabold text-ink"
+            initial={{ scale: 0, y: 8 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 15, delay: 0.6 }}
+          >
+            +{gain}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  )
+}
+
+/* --- side panel: development cards ----------------------------------------------- */
+
+const DEV_ICON = { knight: '⚔', road_building: '🛤', year_of_plenty: '🌾', monopoly: '👑', victory_point: '★' }
+
+function DevCards({ game, myTurn, send, onPicker }) {
   const cards = game.devs ?? []
   if (!cards.length) return null
   const groups = {}
@@ -438,93 +526,125 @@ function Devs({ game, me, myTurn, send, onPicker }) {
   const canPlay = (kind) =>
     myTurn && !game.devPlayed && kind !== 'victory_point' && groups[kind].ready > 0 && (game.phase === 'main' || (game.phase === 'roll' && kind === 'knight'))
   return (
-    <div className="rounded-[2rem] bg-paper p-4">
-      <p className="mb-2 text-sm font-semibold text-muted">Tus cartas de desarrollo</p>
-      <ul className="space-y-1.5">
-        {Object.entries(groups).map(([kind, g]) => (
-          <li key={kind} className="flex items-center justify-between gap-2 rounded-xl bg-stone px-3 py-2">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">
-                {DEV_META[kind].label} {g.n > 1 && `×${g.n}`}
-              </p>
-              <p className="text-xs text-muted">{g.ready < g.n && kind !== 'victory_point' ? 'La de este turno se juega desde el próximo. ' : ''}{DEV_META[kind].text}</p>
+    <section className="rounded-[1.6rem] bg-paper p-3">
+      <h2 className="mb-2 px-1 font-bold">Cartas de desarrollo</h2>
+      <div className="grid grid-cols-2 gap-2">
+        {Object.entries(groups).map(([kind, g], i) => (
+          <motion.div
+            key={kind}
+            className="flex flex-col rounded-2xl bg-[hsl(258_32%_40%)] p-2.5 text-white"
+            initial={{ rotateY: 90, opacity: 0 }}
+            animate={{ rotateY: 0, opacity: 1 }}
+            transition={{ ...spring, delay: i * 0.05 }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xl" aria-hidden="true">{DEV_ICON[kind]}</span>
+              {g.n > 1 && <span className="rounded-full bg-white/20 px-2 text-xs font-bold">×{g.n}</span>}
             </div>
+            <p className="mt-1 font-bold leading-tight">{DEV_META[kind].label}</p>
+            <p className="mt-0.5 flex-1 text-[0.7rem] leading-snug text-white/75">
+              {g.ready < g.n && kind !== 'victory_point' ? 'La nueva se juega desde el próximo turno. ' : ''}
+              {DEV_META[kind].text}
+            </p>
             {kind !== 'victory_point' && (
               <button
                 disabled={!canPlay(kind)}
                 onClick={() => (kind === 'year_of_plenty' || kind === 'monopoly' ? onPicker(kind) : send({ type: 'co_play_dev', card: kind }))}
-                className="shrink-0 rounded-xl bg-ink px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-35"
+                className="mt-2 rounded-xl bg-white py-1.5 text-sm font-bold text-ink disabled:opacity-35"
               >
                 Jugar
               </button>
             )}
-          </li>
+          </motion.div>
         ))}
-      </ul>
+      </div>
+    </section>
+  )
+}
+
+/* --- side panel: trade ------------------------------------------------------------ */
+
+function ResPicker({ value, onChange, rates, hand, disabledFor }) {
+  return (
+    <div className="grid grid-cols-5 gap-1">
+      {RESOURCES.map((r) => {
+        const off = disabledFor?.(r)
+        return (
+          <button
+            key={r}
+            onClick={() => onChange(r)}
+            disabled={off}
+            aria-pressed={value === r}
+            className={`flex flex-col items-center rounded-xl p-1 text-[0.65rem] font-semibold disabled:opacity-30 ${value === r ? 'bg-ink text-white' : 'bg-stone hover:bg-line'}`}
+            title={RES_META[r].label}
+          >
+            <ResourceIcon res={r} className="h-7 w-7" />
+            {rates ? `${rates[r]}:1` : hand ? `tienes ${hand[r]}` : RES_META[r].label}
+          </button>
+        )
+      })}
     </div>
   )
 }
 
-function Counter({ value, onChange, max }) {
+function Stepper({ value, onChange, max }) {
   return (
     <div className="flex items-center gap-1">
-      <button className="h-6 w-6 rounded-md bg-stone font-bold disabled:opacity-30" disabled={value <= 0} onClick={() => onChange(value - 1)}>−</button>
-      <span className="w-4 text-center font-semibold tabular-nums">{value}</span>
-      <button className="h-6 w-6 rounded-md bg-stone font-bold disabled:opacity-30" disabled={max != null && value >= max} onClick={() => onChange(value + 1)}>+</button>
+      <button className="h-7 w-7 rounded-lg bg-stone font-bold disabled:opacity-30" disabled={value <= 0} onClick={() => onChange(value - 1)} aria-label="Menos">−</button>
+      <span className="w-5 text-center font-bold tabular-nums">{value}</span>
+      <button className="h-7 w-7 rounded-lg bg-stone font-bold disabled:opacity-30" disabled={max != null && value >= max} onClick={() => onChange(value + 1)} aria-label="Más">+</button>
     </div>
   )
 }
 
-function Trade({ game, me, other, send }) {
+function Trade({ game, me, other, myTurn, send }) {
   const [tab, setTab] = useState('bank')
-  const [give, setGive] = useState('wood')
-  const [get, setGet] = useState('ore')
+  const [give, setGive] = useState(null)
+  const [get, setGet] = useState(null)
   const [offerGive, setOfferGive] = useState({})
   const [offerGet, setOfferGet] = useState({})
   const hand = game.hand
-  const rate = game.rates?.[give] ?? 4
+  if (!hand) return null
+  if (!myTurn || game.phase !== 'main') {
+    return <p className="py-2 text-sm text-muted">Se comercia durante tu turno, después de lanzar los dados.</p>
+  }
+  const rate = give ? game.rates?.[give] ?? 4 : null
   const myOffer = game.offer && game.offer.from === me ? game.offer : null
-  const sum = (o) => Object.values(o).reduce((s, n) => s + n, 0)
 
   return (
-    <div className="rounded-[2rem] bg-paper p-4">
-      <div className="mb-3 grid grid-cols-2 gap-1 rounded-2xl bg-stone p-1">
+    <div className="space-y-3 text-sm">
+      <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone p-1">
         {[['bank', 'Banco y puertos'], ['player', `Con ${other}`]].map(([k, l]) => (
-          <button key={k} onClick={() => setTab(k)} className={`rounded-xl px-2 py-1.5 text-sm font-semibold ${tab === k ? 'bg-paper shadow-sm' : 'text-muted'}`}>{l}</button>
+          <button key={k} onClick={() => setTab(k)} className={`rounded-lg py-1 font-semibold ${tab === k ? 'bg-paper shadow-sm' : 'text-muted'}`}>{l}</button>
         ))}
       </div>
       {tab === 'bank' ? (
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="w-10 text-muted">Doy</span>
-            <select value={give} onChange={(e) => setGive(e.target.value)} className="flex-1 rounded-xl border border-line bg-stone px-2 py-1.5">
-              {RESOURCES.map((r) => <option key={r} value={r}>{game.rates[r]} de {RES_META[r].label.toLowerCase()}</option>)}
-            </select>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-10 text-muted">Pido</span>
-            <select value={get} onChange={(e) => setGet(e.target.value)} className="flex-1 rounded-xl border border-line bg-stone px-2 py-1.5">
-              {RESOURCES.map((r) => <option key={r} value={r}>1 de {RES_META[r].label.toLowerCase()}</option>)}
-            </select>
-          </div>
+        <>
+          <p className="font-semibold">Doy</p>
+          <ResPicker value={give} onChange={setGive} rates={game.rates} disabledFor={(r) => hand[r] < game.rates[r]} />
+          <p className="font-semibold">Recibo</p>
+          <ResPicker value={get} onChange={setGet} disabledFor={(r) => r === give || !game.bank[r]} />
           <button
-            onClick={() => send({ type: 'co_bank', give, get })}
-            disabled={give === get || hand[give] < rate || !game.bank[get]}
-            className="w-full rounded-xl bg-ink py-2 font-semibold text-white disabled:opacity-35"
+            onClick={() => {
+              send({ type: 'co_bank', give, get })
+              setGet(null)
+            }}
+            disabled={!give || !get || give === get}
+            className="w-full rounded-xl bg-ink py-2.5 font-bold text-white disabled:opacity-35"
           >
-            Cambiar {rate} por 1
+            {give && get ? `Cambiar ${rate} de ${RES_META[give].label.toLowerCase()} por 1 de ${RES_META[get].label.toLowerCase()}` : 'Elige qué das y qué recibes'}
           </button>
-          <p className="text-xs text-muted">Con un pueblo en un puerto cambias 3 a 1 o 2 a 1 de su recurso.</p>
-        </div>
+          <p className="text-xs text-muted">4 por 1 con el banco. Un pueblo en un puerto lo baja a 3:1 o a 2:1 de su recurso.</p>
+        </>
       ) : myOffer ? (
-        <div className="space-y-2 text-sm">
+        <div className="space-y-2">
           <p>Le ofreciste a {other}:</p>
           <OfferSummary offer={myOffer} />
-          <p className="text-muted">Esperando su respuesta…</p>
+          <p className="animate-pulse text-muted">Esperando su respuesta…</p>
           <button onClick={() => send({ type: 'co_cancel' })} className="w-full rounded-xl border border-line py-2 font-semibold">Cancelar oferta</button>
         </div>
       ) : (
-        <div className="space-y-2 text-sm">
+        <>
           <table className="w-full">
             <thead>
               <tr className="text-xs text-muted"><th className="text-left font-semibold">Recurso</th><th className="font-semibold">Doy</th><th className="font-semibold">Pido</th></tr>
@@ -532,9 +652,9 @@ function Trade({ game, me, other, send }) {
             <tbody>
               {RESOURCES.map((r) => (
                 <tr key={r}>
-                  <td className="py-0.5"><span className="flex items-center gap-1.5"><ResourceIcon res={r} className="h-5 w-5" />{RES_META[r].label}</span></td>
-                  <td><div className="flex justify-center"><Counter value={offerGive[r] ?? 0} max={hand[r]} onChange={(n) => setOfferGive({ ...offerGive, [r]: n })} /></div></td>
-                  <td><div className="flex justify-center"><Counter value={offerGet[r] ?? 0} onChange={(n) => setOfferGet({ ...offerGet, [r]: n })} /></div></td>
+                  <td className="py-0.5"><span className="flex items-center gap-1.5"><ResourceIcon res={r} className="h-6 w-6" />{RES_META[r].label}</span></td>
+                  <td><div className="flex justify-center"><Stepper value={offerGive[r] ?? 0} max={hand[r]} onChange={(n) => setOfferGive({ ...offerGive, [r]: n })} /></div></td>
+                  <td><div className="flex justify-center"><Stepper value={offerGet[r] ?? 0} onChange={(n) => setOfferGet({ ...offerGet, [r]: n })} /></div></td>
                 </tr>
               ))}
             </tbody>
@@ -545,12 +665,12 @@ function Trade({ game, me, other, send }) {
               setOfferGive({})
               setOfferGet({})
             }}
-            disabled={!sum(offerGive) || !sum(offerGet)}
-            className="w-full rounded-xl bg-ink py-2 font-semibold text-white disabled:opacity-35"
+            disabled={!total(offerGive) || !total(offerGet)}
+            className="w-full rounded-xl bg-ink py-2.5 font-bold text-white disabled:opacity-35"
           >
             Proponer cambio
           </button>
-        </div>
+        </>
       )}
     </div>
   )
@@ -558,97 +678,21 @@ function Trade({ game, me, other, send }) {
 
 function OfferSummary({ offer, flip }) {
   const line = (o) =>
-    Object.entries(o).map(([r, n]) => (
-      <span key={r} className="inline-flex items-center gap-1 rounded-lg bg-stone px-2 py-0.5">
-        {n} <ResourceIcon res={r} className="h-4 w-4" /> {RES_META[r].label.toLowerCase()}
+    Object.entries(o).filter(([, n]) => n).map(([r, n]) => (
+      <span key={r} className="inline-flex items-center gap-1 rounded-lg bg-stone px-2 py-0.5 font-semibold">
+        {n} <ResourceIcon res={r} className="h-4 w-4" />
       </span>
     ))
   const [a, b] = flip ? [offer.get, offer.give] : [offer.give, offer.get]
   return (
     <div className="space-y-1">
-      <p className="flex flex-wrap items-center gap-1"><span className="w-10 text-muted">Das</span>{line(a)}</p>
-      <p className="flex flex-wrap items-center gap-1"><span className="w-10 text-muted">Recibes</span>{line(b)}</p>
+      <p className="flex flex-wrap items-center gap-1"><span className="w-16 text-muted">Das</span>{line(a)}</p>
+      <p className="flex flex-wrap items-center gap-1"><span className="w-16 text-muted">Recibes</span>{line(b)}</p>
     </div>
   )
 }
 
-function OfferModal({ game, send }) {
-  const o = game.offer
-  const can = Object.entries(o.get).every(([r, n]) => game.hand[r] >= n)
-  return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex justify-center p-4 sm:bottom-6">
-      <div className="pop w-full max-w-md rounded-3xl bg-paper p-5 shadow-2xl ring-1 ring-line">
-        <p className="font-display text-xl font-bold">{o.from} te propone un cambio</p>
-        <div className="mt-3 text-sm"><OfferSummary offer={o} flip /></div>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button onClick={() => send({ type: 'co_accept' })} disabled={!can} className="rounded-2xl bg-ink py-2.5 font-semibold text-white disabled:opacity-40">
-            {can ? 'Aceptar' : 'No te alcanza'}
-          </button>
-          <button onClick={() => send({ type: 'co_reject' })} className="rounded-2xl border border-line py-2.5 font-semibold">No, gracias</button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-function DiscardModal({ game, me, send }) {
-  const need = game.discardNeed[me]
-  const [pick, setPick] = useState({})
-  const total = Object.values(pick).reduce((s, n) => s + n, 0)
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-      <div className="pop w-full max-w-md rounded-3xl bg-paper p-5">
-        <p className="font-display text-xl font-bold">Salió 7: bota {need} cartas</p>
-        <p className="text-sm text-muted">Tienes más de 7, así que botas la mitad.</p>
-        <div className="mt-3 space-y-1.5">
-          {RESOURCES.map((r) => (
-            <div key={r} className="flex items-center justify-between rounded-xl bg-stone px-3 py-1.5">
-              <span className="flex items-center gap-2 text-sm font-semibold"><ResourceIcon res={r} className="h-6 w-6" />{RES_META[r].label} <span className="font-normal text-muted">({game.hand[r]})</span></span>
-              <Counter value={pick[r] ?? 0} max={Math.min(game.hand[r], (pick[r] ?? 0) + need - total)} onChange={(n) => setPick({ ...pick, [r]: n })} />
-            </div>
-          ))}
-        </div>
-        <button onClick={() => send({ type: 'co_discard', cards: pick })} disabled={total !== need} className="mt-4 w-full rounded-2xl bg-ink py-3 font-semibold text-white disabled:opacity-40">
-          Botar {total}/{need}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-function PickerModal({ kind, onClose, send }) {
-  const [picks, setPicks] = useState([])
-  const title = kind === 'year_of_plenty' ? 'Elige dos recursos del banco' : '¿Qué recurso le quitas a tu pareja?'
-  const need = kind === 'year_of_plenty' ? 2 : 1
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={onClose}>
-      <div className="pop w-full max-w-sm rounded-3xl bg-paper p-5" onClick={(e) => e.stopPropagation()}>
-        <p className="font-display text-xl font-bold">{title}</p>
-        <div className="mt-3 grid grid-cols-5 gap-2">
-          {RESOURCES.map((r) => (
-            <button key={r} onClick={() => setPicks(picks.length < need ? [...picks, r] : [r])} className="flex flex-col items-center rounded-xl bg-stone py-2 hover:bg-line">
-              <ResourceIcon res={r} className="h-9 w-9" />
-              <span className="mt-1 text-[0.65rem]">{RES_META[r].label}</span>
-              {picks.filter((x) => x === r).length > 0 && <span className="text-xs font-bold">×{picks.filter((x) => x === r).length}</span>}
-            </button>
-          ))}
-        </div>
-        <button
-          disabled={picks.length !== need}
-          onClick={() => {
-            send(kind === 'year_of_plenty' ? { type: 'co_play_dev', card: 'year_of_plenty', resources: picks } : { type: 'co_play_dev', card: 'monopoly', resource: picks[0] })
-            onClose()
-          }}
-          className="mt-4 w-full rounded-2xl bg-ink py-3 font-semibold text-white disabled:opacity-40"
-        >
-          Jugar
-        </button>
-      </div>
-    </div>
-  )
-}
-
-/* --- log ------------------------------------------------------------------ */
+/* --- side panel: history ---------------------------------------------------------- */
 
 const WHAT = { road: 'un camino', settlement: 'un pueblo', city: 'una ciudad' }
 
@@ -656,57 +700,170 @@ function describe(l, me) {
   const you = l.player === me
   const who = you ? '' : `${l.player} `
   switch (l.action) {
-    case 'settlement':
-      return `${you ? 'Pusiste' : `${who}puso`} un pueblo`
-    case 'road':
-      return `${you ? 'Pusiste' : `${who}puso`} un camino`
-    case 'initial':
-      return `${you ? 'Recibiste' : `${who}recibió`} ${l.got.length} cartas iniciales`
-    case 'roll':
-      return `${you ? 'Sacaste' : `${who}sacó`} ${l.dice[0] + l.dice[1]}`
+    case 'settlement': return `${you ? 'Pusiste' : `${who}puso`} un pueblo`
+    case 'road': return `${you ? 'Pusiste' : `${who}puso`} un camino`
+    case 'initial': return `${you ? 'Recibiste' : `${who}recibió`} ${l.got.length} cartas iniciales`
+    case 'roll': return `${you ? 'Sacaste' : `${who}sacó`} ${l.dice[0] + l.dice[1]}`
     case 'produce': {
       const mine = l.got?.[me] ?? {}
       const parts = Object.entries(mine).map(([r, n]) => `${n} de ${RES_META[r].label.toLowerCase()}`)
       return parts.length ? `Produjiste ${parts.join(', ')}` : 'Esta vez no produjiste nada'
     }
-    case 'discard':
-      return `${you ? 'Botaste' : `${who}botó`} ${l.count} cartas`
-    case 'robber':
-      return `${you ? 'Moviste' : `${who}movió`} el ladrón${l.stole ? ' y robó una carta' : ''}`
-    case 'build':
-      return `${you ? 'Construiste' : `${who}construyó`} ${WHAT[l.what]}`
-    case 'bank':
-      return `${you ? 'Cambiaste' : `${who}cambió`} ${l.rate} de ${RES_META[l.give].label.toLowerCase()} por 1 de ${RES_META[l.get].label.toLowerCase()}`
-    case 'offer':
-      return `${you ? 'Propusiste' : `${who}propuso`} un cambio`
-    case 'accept':
-      return `${you ? 'Aceptaste' : `${who}aceptó`} el cambio`
-    case 'reject':
-      return `${you ? 'Rechazaste' : `${who}rechazó`} el cambio`
-    case 'buy_dev':
-      return `${you ? 'Compraste' : `${who}compró`} una carta de desarrollo`
-    case 'dev':
-      return `${you ? 'Jugaste' : `${who}jugó`} ${DEV_META[l.card].label}`
-    case 'monopoly':
-      return `${you ? 'Te llevaste' : `${who}se llevó`} ${l.count} de ${RES_META[l.resource].label.toLowerCase()}`
-    case 'win':
-      return `¡${you ? 'Ganaste' : `${l.player} ganó`}!`
-    default:
-      return ''
+    case 'discard': return `${you ? 'Botaste' : `${who}botó`} ${l.count} cartas`
+    case 'robber': return `${you ? 'Moviste' : `${who}movió`} el ladrón${l.stole ? ' y robó una carta' : ''}`
+    case 'build': return `${you ? 'Construiste' : `${who}construyó`} ${WHAT[l.what]}`
+    case 'bank': return `${you ? 'Cambiaste' : `${who}cambió`} ${l.rate} de ${RES_META[l.give].label.toLowerCase()} por 1 de ${RES_META[l.get].label.toLowerCase()}`
+    case 'offer': return `${you ? 'Propusiste' : `${who}propuso`} un cambio`
+    case 'accept': return `${you ? 'Aceptaste' : `${who}aceptó`} el cambio`
+    case 'reject': return `${you ? 'Rechazaste' : `${who}rechazó`} el cambio`
+    case 'buy_dev': return `${you ? 'Compraste' : `${who}compró`} una carta de desarrollo`
+    case 'dev': return `${you ? 'Jugaste' : `${who}jugó`} ${DEV_META[l.card].label}`
+    case 'monopoly': return `${you ? 'Te llevaste' : `${who}se llevó`} ${l.count} de ${RES_META[l.resource].label.toLowerCase()}`
+    case 'win': return `¡${you ? 'Ganaste' : `${l.player} ganó`}!`
+    default: return ''
   }
 }
 
 function Log({ game, me, colorOf }) {
-  const items = useMemo(() => [...game.log].reverse().slice(0, 7), [game.log])
-  if (!items.length) return null
+  const items = [...game.log].reverse()
+  if (!items.length) return <p className="py-2 text-sm text-muted">Aquí aparece lo que va pasando.</p>
   return (
-    <ul className="space-y-1 rounded-[2rem] bg-paper p-4 text-sm">
+    <ul className="max-h-72 space-y-1.5 overflow-y-auto text-sm">
       {items.map((l, i) => (
-        <li key={`${game.log.length}-${i}`} className={i === 0 ? 'pop font-semibold' : 'text-muted'}>
-          <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: colorOf(l.player) }} />
+        <motion.li
+          key={game.log.length - i}
+          className={`flex items-start gap-2 ${i === 0 ? 'font-semibold' : 'text-muted'}`}
+          initial={i === 0 ? { opacity: 0, x: -10 } : false}
+          animate={{ opacity: 1, x: 0 }}
+        >
+          <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: colorOf(l.player) }} />
           {describe(l, me)}
-        </li>
+        </motion.li>
       ))}
     </ul>
+  )
+}
+
+/* --- modals ----------------------------------------------------------------------- */
+
+function Sheet({ children, onClose, bottom = false }) {
+  return (
+    <motion.div
+      className={`fixed inset-0 z-50 flex justify-center bg-ink/35 p-4 ${bottom ? 'items-end sm:items-center' : 'items-center'}`}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+    >
+      <motion.div
+        className="w-full max-w-md rounded-3xl bg-paper p-5 shadow-2xl"
+        initial={{ y: 60, scale: 0.95 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 40, opacity: 0 }}
+        transition={spring}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </motion.div>
+    </motion.div>
+  )
+}
+
+function OfferSheet({ game, send }) {
+  const o = game.offer
+  const can = Object.entries(o.get).every(([r, n]) => (game.hand?.[r] ?? 0) >= n)
+  return (
+    <Sheet bottom>
+      <p className="font-display text-xl font-bold">{o.from} te propone un cambio</p>
+      <div className="mt-3 text-sm"><OfferSummary offer={o} flip /></div>
+      <div className="mt-4 grid grid-cols-2 gap-2">
+        <button onClick={() => send({ type: 'co_accept' })} disabled={!can} className="rounded-2xl bg-ink py-3 font-bold text-white disabled:opacity-40">
+          {can ? 'Aceptar' : 'No te alcanza'}
+        </button>
+        <button onClick={() => send({ type: 'co_reject' })} className="rounded-2xl border border-line py-3 font-bold">No, gracias</button>
+      </div>
+    </Sheet>
+  )
+}
+
+function DiscardModal({ game, me, send }) {
+  const need = game.discardNeed[me]
+  const [pick, setPick] = useState({})
+  const chosen = total(pick)
+  return (
+    <Sheet>
+      <p className="font-display text-xl font-bold">Salió 7: bota {need} cartas</p>
+      <p className="text-sm text-muted">Tienes más de 7, así que botas la mitad.</p>
+      <div className="mt-3 space-y-1.5">
+        {RESOURCES.map((r) => (
+          <div key={r} className="flex items-center justify-between rounded-xl bg-stone px-3 py-1.5">
+            <span className="flex items-center gap-2 text-sm font-semibold"><ResourceIcon res={r} className="h-7 w-7" />{RES_META[r].label} <span className="font-normal text-muted">({game.hand[r]})</span></span>
+            <Stepper value={pick[r] ?? 0} max={Math.min(game.hand[r], (pick[r] ?? 0) + need - chosen)} onChange={(n) => setPick({ ...pick, [r]: n })} />
+          </div>
+        ))}
+      </div>
+      <button onClick={() => send({ type: 'co_discard', cards: pick })} disabled={chosen !== need} className="mt-4 w-full rounded-2xl bg-ink py-3 font-bold text-white disabled:opacity-40">
+        Botar {chosen}/{need}
+      </button>
+    </Sheet>
+  )
+}
+
+function PickerModal({ kind, onClose, send }) {
+  const [picks, setPicks] = useState([])
+  const plenty = kind === 'year_of_plenty'
+  const need = plenty ? 2 : 1
+  return (
+    <Sheet onClose={onClose}>
+      <p className="font-display text-xl font-bold">{plenty ? 'Elige dos recursos del banco' : '¿Qué recurso le quitas a tu pareja?'}</p>
+      <div className="mt-3 grid grid-cols-5 gap-2">
+        {RESOURCES.map((r) => {
+          const n = picks.filter((x) => x === r).length
+          return (
+            <button key={r} onClick={() => setPicks(picks.length < need ? [...picks, r] : [r])} className={`relative flex flex-col items-center rounded-xl py-2 ${n ? 'bg-ink text-white' : 'bg-stone hover:bg-line'}`}>
+              <ResourceIcon res={r} className="h-9 w-9" />
+              <span className="mt-1 text-[0.65rem] font-semibold">{RES_META[r].label}</span>
+              {n > 0 && <span className="absolute -right-1 -top-1 rounded-full bg-danger px-1.5 text-xs font-bold text-white">×{n}</span>}
+            </button>
+          )
+        })}
+      </div>
+      <button
+        disabled={picks.length !== need}
+        onClick={() => {
+          send(plenty ? { type: 'co_play_dev', card: 'year_of_plenty', resources: picks } : { type: 'co_play_dev', card: 'monopoly', resource: picks[0] })
+          onClose()
+        }}
+        className="mt-4 w-full rounded-2xl bg-ink py-3 font-bold text-white disabled:opacity-40"
+      >
+        Jugar
+      </button>
+    </Sheet>
+  )
+}
+
+function Finish({ game, me, send, colorOf }) {
+  const won = game.winner === me
+  return (
+    <motion.div
+      className="absolute inset-0 z-20 flex items-center justify-center bg-ink/30 p-4 backdrop-blur-[2px]"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 0.6 }}
+    >
+      <motion.div
+        className="w-full max-w-sm rounded-3xl bg-paper p-6 text-center shadow-2xl"
+        initial={{ scale: 0.6, y: 40, rotate: -3 }}
+        animate={{ scale: 1, y: 0, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 260, damping: 16, delay: 0.7 }}
+      >
+        <p className="text-5xl" aria-hidden="true">🏆</p>
+        <p className="mt-2 font-display text-3xl font-extrabold" style={{ color: colorOf(game.winner) }}>{won ? '¡Ganaste!' : `Ganó ${game.winner}`}</p>
+        <p className="mt-1 text-muted">
+          {game.players.map((p) => `${p}: ${game.playersInfo[p].points}`).join(' · ')}
+        </p>
+        <div className="flex justify-center"><EndActions send={send} replay={{ type: 'start_game', game: 'colonos', ...game.options }} /></div>
+      </motion.div>
+    </motion.div>
   )
 }

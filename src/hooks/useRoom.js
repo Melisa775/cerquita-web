@@ -18,6 +18,7 @@ export function useRoom(code, name) {
   useEffect(() => {
     let stopped = false
     let attempts = 0
+    let takenRetries = 0 // see name_taken below
     let retryTimer
 
     function connect() {
@@ -36,7 +37,12 @@ export function useRoom(code, name) {
         } else if (msg.type === 'game_event') {
           listeners.current.forEach((fn) => fn(msg.event))
         } else if (msg.type === 'error') {
-          if (msg.fatal) {
+          if (msg.fatal && msg.code === 'name_taken' && takenRetries < 5) {
+            // Usually our own previous connection (a reload, or React mounting twice in
+            // development) that the server hasn't dropped yet: try again in a moment
+            takenRetries += 1
+            attempts = 0
+          } else if (msg.fatal) {
             stopped = true
             setFatal(msg.message)
           } else {
@@ -52,7 +58,8 @@ export function useRoom(code, name) {
         }
         attempts += 1
         setStatus('reconnecting')
-        retryTimer = setTimeout(connect, Math.min(1000 * 2 ** attempts, 10000))
+        const delay = takenRetries && attempts === 1 ? 600 : Math.min(1000 * 2 ** attempts, 10000)
+        retryTimer = setTimeout(connect, delay)
       }
     }
 
