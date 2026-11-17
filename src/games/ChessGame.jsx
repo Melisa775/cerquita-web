@@ -33,7 +33,7 @@ export default function ChessGame({ room, me, send, colorOf: playerColor, error,
 
   return (
     <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <div className="mx-auto w-full max-w-[min(100%,36rem)]">
+      <div className="fit-board [--fit-top:13rem]">
         <PlayerBar game={game} player={opponent} color={game.colors[opponent]} playerColor={playerColor} me={me} />
         <Board game={game} me={me} myColor={myColor} myTurn={myTurn} send={send} />
         <PlayerBar game={game} player={me} color={myColor} playerColor={playerColor} me={me} />

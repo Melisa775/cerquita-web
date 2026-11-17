@@ -227,7 +227,7 @@ function Placement({ game, me, send, colorOf }) {
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start">
-      <div className="mx-auto w-full max-w-[34rem]">
+      <div className="fit-board [--fit-top:11rem]">
         <Grid
           size={size}
           ships={placed.map((s) => ({ ...s, length: lengths[s.id], sunk: false }))}

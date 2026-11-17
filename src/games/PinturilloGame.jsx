@@ -91,7 +91,7 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
       </div>
 
       <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-        <div className="min-w-0">
+        <div className="fit-board min-w-0 [--fit-top:13rem] [--fit-ratio:1.333]">
           <WordBar game={game} me={me} left={left} colorOf={colorOf} />
           <div className="relative mt-3 rounded-[1.6rem] p-1.5" style={{ background: colorOf(game.drawer) }}>
             <DrawingCanvas

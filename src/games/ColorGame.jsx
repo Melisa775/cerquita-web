@@ -88,7 +88,7 @@ function Guess({ game, me, send, left, msLeft, colorOf }) {
 
       <div className="mt-6 grid gap-6 md:grid-cols-[1fr_1.1fr] md:items-start">
         <motion.div
-          className="aspect-square w-full rounded-[2rem] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)] max-md:aspect-auto max-md:h-[26dvh]"
+          className="fit-board aspect-square rounded-[2rem] shadow-[inset_0_0_0_1px_rgb(0_0_0/0.08)] [--fit-top:12rem] max-md:aspect-auto max-md:h-[26dvh]"
           style={{ background: hsbToCss(color) }}
           animate={sent ? { scale: [1, 0.92, 1.03, 1], rotate: [0, -2, 1, 0] } : { scale: 1 }}
           transition={{ duration: 0.5 }}

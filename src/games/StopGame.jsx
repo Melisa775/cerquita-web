@@ -123,7 +123,7 @@ function Sheet({ room, me, send, left, colorOf }) {
 
         <form onSubmit={callStop}>
           <h1 className="text-3xl font-bold">Todo con {game.letter}</h1>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {game.categories.map((c) => (
               <label key={c.key} className="block">
                 <span className="text-sm font-semibold">{c.label}</span>

@@ -62,8 +62,8 @@ function Play({ game, me, send, colorOf, error, errorId }) {
         <span className="font-display text-xl font-bold text-ink tabular-nums">{clock(elapsed)}</span>
       </div>
 
-      <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,1fr)_16rem] md:items-start">
-        <div className="mx-auto w-full max-w-[34rem]">
+      <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,1fr)_16rem] md:items-start xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="fit-board [--fit-top:10rem]">
           <Board game={game} me={me} send={send} colorOf={colorOf} interactive={playing && isPlayer} />
           <p className="mt-2 h-6 text-center font-medium text-danger" role="alert">{flash}</p>
         </div>
