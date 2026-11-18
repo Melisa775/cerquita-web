@@ -270,3 +270,76 @@ export function glowRing(material, radius = 0.4, tube = 0.035) {
 export function hitBox(w, h, d) {
   return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshBasicMaterial({ visible: false }))
 }
+
+/* --- cards --------------------------------------------------------------------- */
+
+/** Rounded rectangle lying in the XY plane, with UVs spanning the whole shape. */
+export function roundedPlane(w, h, r) {
+  const s = new THREE.Shape()
+  const x = -w / 2
+  const y = -h / 2
+  s.moveTo(x + r, y)
+  s.lineTo(x + w - r, y)
+  s.quadraticCurveTo(x + w, y, x + w, y + r)
+  s.lineTo(x + w, y + h - r)
+  s.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+  s.lineTo(x + r, y + h)
+  s.quadraticCurveTo(x, y + h, x, y + h - r)
+  s.lineTo(x, y + r)
+  s.quadraticCurveTo(x, y, x + r, y)
+  const g = new THREE.ShapeGeometry(s, 6)
+  const pos = g.attributes.position
+  const uv = []
+  for (let i = 0; i < pos.count; i++) uv.push((pos.getX(i) - x) / w, (pos.getY(i) - y) / h)
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2))
+  return g
+}
+
+/** Canvas texture drawn by `draw(ctx, w, h)` (cached by `key` when given). */
+const texCache = new Map()
+export function canvasTexture(w, h, draw, key) {
+  if (key && texCache.has(key)) return texCache.get(key)
+  const c = document.createElement('canvas')
+  c.width = w
+  c.height = h
+  draw(c.getContext('2d'), w, h)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 8
+  if (key) {
+    tex.userData.shared = true
+    texCache.set(key, tex)
+  }
+  return tex
+}
+
+/**
+ * A playing card lying flat (face up is +y, its top edge toward −z): a thin
+ * body plus a printed front and back. `card.userData.setFront(tex)` reprints it.
+ */
+export function makeCard(w, h, front, back, { thickness = 0.012, radius = 0.07, edge = '#F4F1EA' } = {}) {
+  const g = new THREE.Group()
+  const shape = roundedPlane(w, h, radius)
+  const body = new THREE.Mesh(new THREE.ExtrudeGeometry(new THREE.Shape(shape.parameters.shapes.getPoints(6)), { depth: thickness, bevelEnabled: false }), mat(edge, { roughness: 0.6 }))
+  body.rotation.x = -Math.PI / 2
+  body.position.y = -thickness / 2
+  const faceMat = (tex) => new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 })
+  const f = new THREE.Mesh(shape, faceMat(front))
+  f.rotation.x = -Math.PI / 2
+  f.position.y = thickness / 2 + 0.001
+  // the back is seen from below: mirror its UVs so its print reads the right way
+  const backShape = shape.clone()
+  const uv = backShape.attributes.uv
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, 1 - uv.getX(i), 1 - uv.getY(i))
+  const b = new THREE.Mesh(backShape, faceMat(back))
+  b.rotation.x = Math.PI / 2
+  b.rotation.z = Math.PI
+  b.position.y = -thickness / 2 - 0.001
+  g.add(body, f, b)
+  g.userData.setFront = (tex) => {
+    f.material.map = tex
+    f.material.needsUpdate = true
+  }
+  g.userData.size = [w, h]
+  return shadowed(g)
+}
