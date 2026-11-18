@@ -24,6 +24,7 @@ import GolfCard from '../components/GolfCard'
 import ColonosCard from '../components/ColonosCard'
 import LobbyBoard from '../components/LobbyBoard'
 import DeeperCard from '../components/DeeperCard'
+import MazmorrasCard from '../components/MazmorrasCard'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
@@ -49,11 +50,12 @@ const UnaGame = lazy(() => import('../games/UnaGame'))
 const GolfGame = lazy(() => import('../games/GolfGame'))
 const ColonosGame = lazy(() => import('../games/ColonosGame'))
 const DeeperGame = lazy(() => import('../games/DeeperGame'))
+const MazmorrasGame = lazy(() => import('../games/MazmorrasGame'))
 
 // Games that show server errors themselves, inside their own layout
-const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch', 'guesswho'])
+const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch', 'guesswho', 'mazmorras'])
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame, mazmorras: MazmorrasGame }
 const UPCOMING = []
 // Lobby: every game with its filter group and a one-line pitch shown while the card is folded
 const LOBBY_GAMES = [
@@ -77,6 +79,7 @@ const LOBBY_GAMES = [
   { Card: ParquesCard, max: 4, kind: 'table', tagline: 'A la colombiana, con dos dados.' },
   { Card: UnaLobbyCard, max: 4, kind: 'table', tagline: 'Cartas, comodines y ¡Una!' },
   { Card: ColonosCard, max: 4, kind: 'table', tagline: 'Construyan en una isla al azar.' },
+  { Card: MazmorrasCard, max: 6, min: 1, kind: 'table', tagline: 'Rol de fantasía con d20 y un Dungeon Master.' },
 ]
 const FILTERS = [
   ['all', 'Todos'],
@@ -221,9 +224,11 @@ function Lobby({ room, send }) {
   const [filter, setFilter] = useState(() => storage.get('cerquita:lobby:filter') || 'all')
   const count = room.players.length
   const alone = count < 2
+  const namesKey = room.players.map((p) => p.name).join('\n')
+  const names = useMemo(() => (namesKey ? namesKey.split('\n') : []), [namesKey])
   const items = useMemo(
     () =>
-      LOBBY_GAMES.map(({ Card, kind, tagline, max }, i) => {
+      LOBBY_GAMES.map(({ Card, kind, tagline, max, min = 2 }, i) => {
         const tooMany = count > max
         return {
           key: i,
@@ -232,15 +237,15 @@ function Lobby({ room, send }) {
             <div className="lobby-card relative" data-collapsed={collapsed || undefined} style={{ '--tagline': JSON.stringify(tagline) }}>
               <span
                 className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-ink shadow-sm"
-                title={max > 2 ? `De 2 a ${max} jugadores` : 'Para 2 jugadores'}
+                title={max > min ? `De ${min} a ${max} jugadores` : 'Para 2 jugadores'}
               >
-                👥 {max > 2 ? `2–${max}` : '2'}
+                👥 {max > min ? `${min}–${max}` : '2'}
               </span>
               <button onClick={toggle} className="lobby-toggle absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm hover:bg-white" aria-expanded={!collapsed}>
                 {collapsed ? 'Opciones' : 'Menos'}
               </button>
               <div className={tooMany ? 'pointer-events-none opacity-45 grayscale' : undefined} aria-disabled={tooMany || undefined}>
-                <Card send={send} alone={alone} count={count} />
+                <Card send={send} alone={alone} count={count} players={names} />
               </div>
               {tooMany && (
                 <p className="absolute inset-x-3 bottom-3 z-10 rounded-2xl bg-ink px-3 py-2 text-center text-sm font-semibold text-white">
@@ -251,7 +256,7 @@ function Lobby({ room, send }) {
           ),
         }
       }),
-    [filter, alone, send, count],
+    [filter, alone, send, count, names],
   )
   useEffect(() => storage.set('cerquita:lobby:filter', filter), [filter])
   const link = `${window.location.origin}${window.location.pathname}?sala=${room.code}`

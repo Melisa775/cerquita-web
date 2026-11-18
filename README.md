@@ -36,6 +36,7 @@ The games themselves are in Spanish; the names below are the ones shown in the a
 | Una (UNO-style): original cards, action cards, wild cards, "¡Una!" with a penalty if you get caught, and optional stacking | Available |
 | Mini golf (Plato-style): pull back to shoot, nine holes with bumpers, sand, water, slopes and portals; the partner sees the aim live | Available |
 | Colonos (Catan-style): random island, build roads, settlements and cities, robber, trading and development cards | Available |
+| Mazmorras: cooperative fantasy role-play with a d20 (inspired by classic tabletop RPGs): pick a class, explore rooms, disarm traps and fight turn-based battles in 3D; the Dungeon Master is the system or a person, bot companions can join, and a rulebook is always one tap away | Available |
 | Más cerca: question cards to know each other better and connect, in three levels (icebreaker, deep and deeper) plus wildcards; going deeper needs both to agree, and it ends with a letter to each other that's revealed at the same time | Available |
 
 ## Technical decisions
@@ -114,6 +115,7 @@ src/
 - [x] Mini golf
 - [x] Colonos
 - [x] Más cerca
+- [x] Mazmorras
 - [x] Public deployment
 
 ## Author
