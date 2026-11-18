@@ -1,17 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { motion } from 'motion/react'
+/**
+ * Chess on the 3D stage. Tap one of your pieces to see where it can go and
+ * tap a glowing square to move. Clocks, offers and the move list live in the
+ * side panel; the board turns around when you play black.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { AnimatePresence, motion } from 'motion/react'
 import { Confetti, spring } from '../lib/motion'
 import { CONFETTI_COLORS } from '../components/EndActions'
 import ChessPiece, { PIECE_VALUES } from '../components/ChessPiece'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, Flash, Plates, Sheet, StageLayout, useFlash, useViewKeys } from '../components/stage/hud'
 
-const FILES = 'abcdefgh'
-const LIGHT_SQ = '#E8E2D4'
-const DARK_SQ = '#7C9893'
-const MARK = 'rgba(247, 201, 72, 0.5)'
 const PROMOS = ['q', 'r', 'b', 'n']
-
-const sqName = (i) => FILES[i % 8] + (Math.floor(i / 8) + 1)
+const FILES = 'abcdefgh'
 const sqIndex = (n) => (Number(n[1]) - 1) * 8 + FILES.indexOf(n[0])
+const load = () => import('../lib/three/chess3d.js')
 
 export default function ChessGame({ room, me, send, colorOf: playerColor, error, errorId }) {
   const game = room.game
@@ -19,285 +22,120 @@ export default function ChessGame({ room, me, send, colorOf: playerColor, error,
   const opponent = game.players.find((p) => p !== me)
   const finished = game.phase === 'finished'
   const myTurn = !finished && game.toMove === me
-  const [flash, setFlash] = useState(null)
-
-  useEffect(() => {
-    if (!error) return
-    setFlash(error)
-  }, [errorId, error])
-  useEffect(() => {
-    if (!flash) return
-    const id = setTimeout(() => setFlash(null), 2500)
-    return () => clearTimeout(id)
-  }, [flash])
-
-  return (
-    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <div className="fit-board [--fit-top:13rem]">
-        <PlayerBar game={game} player={opponent} color={game.colors[opponent]} playerColor={playerColor} me={me} />
-        <Board game={game} me={me} myColor={myColor} myTurn={myTurn} send={send} />
-        <PlayerBar game={game} player={me} color={myColor} playerColor={playerColor} me={me} />
-        <p role="status" className="mt-2 min-h-6 text-center text-sm font-medium text-danger">{flash}</p>
-      </div>
-      <Side game={game} me={me} send={send} playerColor={playerColor} />
-    </div>
-  )
-}
-ChessGame.showsErrors = true
-
-/* --- board -------------------------------------------------------------- */
-
-function Board({ game, me, myColor, myTurn, send }) {
-  const boardRef = useRef(null)
+  const flash = useFlash(error, errorId)
   const [selected, setSelected] = useState(null)
   const [promo, setPromo] = useState(null) // { from, to }
-  const [drag, setDrag] = useState(null) // { from, x, y, moved }
-  const dropped = useRef(null) // move made by dragging: not animated
-  const flipped = myColor === 'b'
-  const legal = myTurn ? game.legal : {}
-  const targets = selected ? legal[selected] ?? [] : []
-  const hints = game.options.hints
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
 
-  // The selection is cleared when the position changes
-  const ply = game.moves.length
   useEffect(() => {
     setSelected(null)
     setPromo(null)
-  }, [ply, game.phase])
+  }, [game.moves.length, game.phase])
 
-  const order = useMemo(() => {
-    const rows = []
-    for (let r = 7; r >= 0; r--) for (let f = 0; f < 8; f++) rows.push(r * 8 + f)
-    return flipped ? rows.reverse() : rows
-  }, [flipped])
+  const onPick = useCallback(
+    ({ kind, id }) => {
+      if (!myTurn) return
+      if (kind === 'square') return setSelected((s) => (s === id ? null : id))
+      if (kind !== 'target' || !selected) return
+      const piece = game.board[sqIndex(selected)]
+      if (piece?.toLowerCase() === 'p' && id[1] === (myColor === 'w' ? '8' : '1')) return setPromo({ from: selected, to: id })
+      send({ type: 'ch_move', from: selected, to: id })
+    },
+    [myTurn, selected, game.board, myColor, send],
+  )
 
-  function attempt(from, to) {
-    const piece = game.board[sqIndex(from)]
-    const lastRank = myColor === 'w' ? '8' : '1'
-    if (piece?.toLowerCase() === 'p' && to[1] === lastRank) {
-      setPromo({ from, to })
-      return
+  // Esc drops the selection
+  useEffect(() => {
+    const onKey = (e) => e.key === 'Escape' && setSelected(null)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  const state = useMemo(() => ({ game, me, myTurn, select: selected }), [game, me, myTurn, selected])
+
+  const value = (list) => list.reduce((s, p) => s + PIECE_VALUES[p.toLowerCase()], 0)
+  const plates = [me, opponent].filter(Boolean).map((p) => {
+    const color = game.colors[p]
+    const mine = game.captured[color] ?? []
+    const adv = value(mine) - value(game.captured[color === 'w' ? 'b' : 'w'] ?? [])
+    return {
+      name: p,
+      you: p === me,
+      color: playerColor(p),
+      value: color === 'w' ? '♔' : '♚',
+      stats: `${color === 'w' ? 'Blancas' : 'Negras'}${mine.length ? ` · capturó ${mine.length}` : ''}${adv > 0 ? ` (+${adv})` : ''}`,
+      active: game.toMove === p && !finished,
     }
-    send({ type: 'ch_move', from, to })
-  }
+  })
 
-  // Pointer events handle selecting pieces; the click only moves or deselects
-  function clickSquare(name) {
-    if (promo) return
-    if (selected && targets.includes(name)) attempt(selected, name)
-    else if (!legal[name]) setSelected(null)
-  }
-
-  function squareAt(x, y) {
-    const rect = boardRef.current.getBoundingClientRect()
-    const col = Math.floor(((x - rect.left) / rect.width) * 8)
-    const row = Math.floor(((y - rect.top) / rect.height) * 8)
-    if (col < 0 || col > 7 || row < 0 || row > 7) return null
-    return sqName(order[row * 8 + col])
-  }
-
-  function onPointerDown(e) {
-    if (promo || e.button > 0) return
-    const name = squareAt(e.clientX, e.clientY)
-    if (!name || !legal[name]) return
-    e.preventDefault()
-    boardRef.current.setPointerCapture(e.pointerId)
-    setDrag({ from: name, x: e.clientX, y: e.clientY, moved: false, wasSelected: selected === name })
-    setSelected(name)
-  }
-  function onPointerMove(e) {
-    if (!drag) return
-    const moved = drag.moved || Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 6
-    setDrag({ ...drag, x: e.clientX, y: e.clientY, moved, cx: e.clientX, cy: e.clientY })
-  }
-  function onPointerUp(e) {
-    if (!drag) return
-    const name = squareAt(e.clientX, e.clientY)
-    const d = drag
-    setDrag(null)
-    if (!d.moved) {
-      // it was a click on the piece: a second click deselects it
-      if (d.wasSelected) setSelected(null)
-      return
-    }
-    if (name && (legal[d.from] ?? []).includes(name)) {
-      dropped.current = `${d.from}${name}`
-      attempt(d.from, name)
-    }
-  }
-
-  const last = game.lastMove
-  const lastKey = last ? `${last.from}${last.to}` : null
-  const animate = last && dropped.current !== lastKey
-  const squarePx = boardRef.current ? boardRef.current.getBoundingClientRect().width / 8 : 0
+  let title
+  let hint = null
+  if (finished) title = game.result.winner ? (game.result.winner === me ? '¡Ganaste!' : `Ganó ${game.result.winner}`) : 'Tablas'
+  else if (myTurn) {
+    title = game.check ? '¡Jaque! Te toca' : 'Te toca'
+    hint = selected ? 'Toca una casilla brillante para mover, o Esc para soltar.' : 'Toca una de tus piezas.'
+  } else title = game.check ? `¡Jaque a ${game.toMove}!` : `Juega ${game.toMove}…`
+  if (finished) hint = `Por ${game.result.text}.`
 
   return (
-    <div className="relative mt-2 select-none">
-      <div
-        ref={boardRef}
-        className="grid aspect-square w-full touch-none grid-cols-8 grid-rows-8 overflow-hidden rounded-xl shadow-sm"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={() => setDrag(null)}
-        role="grid"
-        aria-label="Tablero de ajedrez"
-      >
-        {order.map((i, pos) => {
-          const n = sqName(i)
-          const piece = game.board[i]
-          const dark = (Math.floor(i / 8) + (i % 8)) % 2 === 0
-          const isTarget = targets.includes(n)
-          const row = Math.floor(pos / 8)
-          const col = pos % 8
-          const isLast = last && (last.from === n || last.to === n)
-          const dragging = drag?.moved && drag.from === n
-          let slide = null
-          if (animate && last.to === n && squarePx) {
-            const a = order.indexOf(sqIndex(last.from))
-            const b = pos
-            slide = { '--dx': `${((a % 8) - (b % 8)) * 100}%`, '--dy': `${(Math.floor(a / 8) - Math.floor(b / 8)) * 100}%` }
-          }
-          return (
-            <div
-              key={n}
-              onClick={() => clickSquare(n)}
-              className={`relative ${legal[n] || isTarget ? 'cursor-pointer' : ''}`}
-              style={{ background: dark ? DARK_SQ : LIGHT_SQ }}
-              aria-label={n}
-            >
-              {isLast && <motion.div key={game.moves.length} className="absolute inset-0" style={{ background: MARK }} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} />}
-              {selected === n && <div className="absolute inset-0" style={{ background: 'rgba(247, 201, 72, 0.75)' }} />}
-              {game.check === n && (
-                <div className="chess-check absolute inset-0" style={{ background: 'radial-gradient(circle, rgba(214,48,49,.9) 0%, rgba(214,48,49,.45) 45%, transparent 72%)' }} />
-              )}
-              {col === 0 && (
-                <span className="absolute left-1 top-0.5 text-[0.62rem] font-bold sm:text-xs" style={{ color: dark ? LIGHT_SQ : DARK_SQ }}>
-                  {n[1]}
-                </span>
-              )}
-              {row === 7 && (
-                <span className="absolute bottom-0.5 right-1 text-[0.62rem] font-bold sm:text-xs" style={{ color: dark ? LIGHT_SQ : DARK_SQ }}>
-                  {n[0]}
-                </span>
-              )}
-              {piece && (
-                <ChessPiece
-                  key={slide ? `${lastKey}-${game.moves.length}` : 'still'}
-                  piece={piece}
-                  className={`relative h-full w-full p-[3%] ${slide ? 'chess-slide z-10' : ''}`}
-                  style={{ ...slide, opacity: dragging ? 0.25 : 1 }}
-                />
-              )}
-              {isTarget && hints && (
-                piece ? (
-                  <div className="absolute inset-[4%] rounded-full" style={{ boxShadow: 'inset 0 0 0 5px rgba(34,37,46,.28)' }} />
-                ) : (
-                  <div className="absolute left-1/2 top-1/2 h-[30%] w-[30%] -translate-x-1/2 -translate-y-1/2 rounded-full" style={{ background: 'rgba(34,37,46,.25)' }} />
-                )
-              )}
+    <>
+      <StageLayout
+        stageRef={stageRef}
+        sky="linear-gradient(#E6DDCE, #CFC2AC)"
+        stage={<Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Tablero de ajedrez en 3D" />}
+        top={
+          <>
+            <Plates players={plates} />
+            <div className="flex flex-col items-end gap-1">
+              {[opponent, me].filter(Boolean).map((p) => (
+                <div key={p} className="flex items-center gap-1.5 rounded-xl bg-paper/90 px-2 py-1 text-xs font-semibold shadow-sm backdrop-blur">
+                  <span style={{ color: playerColor(p) }}>{p}</span>
+                  <Clock game={game} color={game.colors[p]} active={game.phase === 'playing' && game.toMove === p} />
+                </div>
+              ))}
             </div>
-          )
-        })}
-      </div>
-
-      {drag?.moved && (
-        <ChessPiece
-          piece={game.board[sqIndex(drag.from)]}
-          className="pointer-events-none fixed z-50 drop-shadow-lg"
-          style={{ width: squarePx * 1.1, height: squarePx * 1.1, left: drag.x - squarePx * 0.55, top: drag.y - squarePx * 0.55 }}
-        />
-      )}
-
-      {promo && (
-        <div className="absolute inset-0 z-20 flex items-center justify-center rounded-xl bg-ink/45" onClick={() => setPromo(null)}>
-          <div className="pop rounded-3xl bg-paper p-4 text-center shadow-lg" onClick={(e) => e.stopPropagation()}>
-            <p className="font-display text-lg font-bold">¿En qué coronas?</p>
-            <div className="mt-3 flex gap-2">
+          </>
+        }
+        bottom={
+          <>
+            <Banner title={title} hint={hint} color={finished ? (game.result.winner ? playerColor(game.result.winner) : undefined) : game.check ? 'var(--color-danger)' : playerColor(game.toMove)} />
+            <Flash flash={flash} />
+          </>
+        }
+        overlay={finished && game.result.winner === me && <Confetti colors={CONFETTI_COLORS} />}
+        aside={<Side game={game} me={me} send={send} playerColor={playerColor} />}
+      />
+      <AnimatePresence>
+        {promo && (
+          <Sheet key="promo" onClose={() => setPromo(null)}>
+            <p className="font-display text-xl font-bold">¿En qué coronas?</p>
+            <div className="mt-3 grid grid-cols-4 gap-2">
               {PROMOS.map((p) => (
-                <button
+                <motion.button
                   key={p}
+                  whileHover={{ y: -4 }}
+                  transition={spring}
                   onClick={() => {
                     send({ type: 'ch_move', from: promo.from, to: promo.to, promotion: p })
                     setPromo(null)
                   }}
-                  className="h-16 w-16 rounded-2xl bg-stone p-1 hover:bg-line sm:h-20 sm:w-20"
+                  className="aspect-square rounded-2xl bg-stone p-1 hover:bg-line"
                   aria-label={{ q: 'Dama', r: 'Torre', b: 'Alfil', n: 'Caballo' }[p]}
                 >
                   <ChessPiece piece={myColor === 'w' ? p.toUpperCase() : p} />
-                </button>
+                </motion.button>
               ))}
             </div>
-          </div>
-        </div>
-      )}
-
-      {game.phase === 'finished' && <ResultOverlay game={game} me={me} />}
-    </div>
+          </Sheet>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
+ChessGame.showsErrors = true
 
-function ResultOverlay({ game, me }) {
-  const [hidden, setHidden] = useState(false)
-  if (hidden) return null
-  const r = game.result
-  const title = r.winner ? (r.winner === me ? '¡Ganaste!' : `Ganó ${r.winner}`) : 'Tablas'
-  return (
-    <motion.div
-      className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-ink/35"
-      onClick={() => setHidden(true)}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ delay: 0.35 }}
-    >
-      <Confetti colors={CONFETTI_COLORS} />
-      <motion.div
-        className="rounded-3xl bg-paper px-8 py-6 text-center shadow-lg"
-        initial={{ scale: 0.6, y: 30, rotate: -4 }}
-        animate={{ scale: 1, y: 0, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 300, damping: 16, delay: 0.4 }}
-      >
-        <p className="font-display text-4xl font-extrabold">{title}</p>
-        <p className="mt-1 text-muted">Por {r.text}.</p>
-        <p className="mt-3 text-xs text-muted">Toca para ver el tablero</p>
-      </motion.div>
-    </motion.div>
-  )
-}
-
-/* --- players and clock -------------------------------------------------- */
-
-function PlayerBar({ game, player, color, playerColor, me }) {
-  const captured = game.captured[color] ?? []
-  const value = (list) => list.reduce((s, p) => s + PIECE_VALUES[p.toLowerCase()], 0)
-  const advantage = value(captured) - value(game.captured[color === 'w' ? 'b' : 'w'] ?? [])
-  const sorted = [...captured].sort((a, b) => PIECE_VALUES[a.toLowerCase()] - PIECE_VALUES[b.toLowerCase()])
-  const active = game.phase === 'playing' && game.turn === color
-  return (
-    <div className="mt-2 flex items-center justify-between gap-3">
-      <div className="flex min-w-0 items-center gap-2">
-        <span
-          className="h-4 w-4 shrink-0 rounded-full border-2"
-          style={{ background: color === 'w' ? '#F7F5EF' : '#2A2D36', borderColor: '#22252E' }}
-          title={color === 'w' ? 'Blancas' : 'Negras'}
-        />
-        <span className="truncate font-semibold" style={{ color: playerColor(player) }}>
-          {player}
-          {player === me && ' (tú)'}
-        </span>
-        <span className="flex min-w-0 items-center">
-          {sorted.map((p, i) => (
-            <motion.span key={`${p}-${i}`} className="-ml-1.5 first:ml-0" initial={{ scale: 0, y: -10 }} animate={{ scale: 1, y: 0 }} transition={spring}>
-              <ChessPiece piece={p} className="h-5 w-5" />
-            </motion.span>
-          ))}
-          {advantage > 0 && <span className="ml-1 text-xs font-semibold text-muted">+{advantage}</span>}
-        </span>
-      </div>
-      <Clock game={game} color={color} active={active} />
-    </div>
-  )
-}
+/* --- clock and side panel ------------------------------------------------- */
 
 function Clock({ game, color, active }) {
   const [now, setNow] = useState(() => Date.now())

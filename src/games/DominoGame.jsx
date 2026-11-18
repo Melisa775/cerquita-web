@@ -1,226 +1,101 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedNumber, spring } from '../lib/motion'
+/**
+ * Dominoes on the 3D stage. Tap a glowing tile in your hand to play it; if it
+ * fits both ends, tap the end where it goes. With no move, draw from the boneyard.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DominoTile from '../components/DominoTile'
 import { EndActions } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, BigAction, Flash, LogList, Panel, Plates, StageLayout, useFlash, useViewKeys } from '../components/stage/hud'
 
-const FELT = 'hsl(158 30% 34%)'
 const sameTile = (t, u) => t && u && t[0] === u[0] && t[1] === u[1]
+const load = () => import('../lib/three/domino3d.js')
 
 export default function DominoGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
   const other = game.players.find((p) => p !== me)
   const [selected, setSelected] = useState(null) // tile that fits on both ends
-  const [flash, setFlash] = useState(null)
-
+  const flash = useFlash(error, errorId)
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
   useEffect(() => setSelected(null), [game.line.length, game.phase, game.handNo])
-  useEffect(() => {
-    if (error) setFlash(error)
-  }, [errorId, error])
-  useEffect(() => {
-    if (!flash) return
-    const id = setTimeout(() => setFlash(null), 2500)
-    return () => clearTimeout(id)
-  }, [flash])
 
   const myTurn = game.phase === 'playing' && game.turn === me
-  const moveOf = (t) => game.moves.find((m) => sameTile(m.tile, t))
+  const onPick = useCallback(
+    ({ kind, id }) => {
+      if (!myTurn) return
+      if (kind === 'pile') return send({ type: 'dm_draw' })
+      if (kind === 'end') return selected && send({ type: 'dm_play', tile: selected, side: id })
+      if (kind !== 'tile') return
+      const tile = id.split('-').map(Number)
+      const m = game.moves.find((x) => sameTile(x.tile, tile))
+      if (!m) return
+      // If both ends show the same number, the side doesn't matter: don't ask
+      if (m.sides.length === 1 || game.ends[0] === game.ends[1]) send({ type: 'dm_play', tile, side: m.sides[m.sides.length - 1] })
+      else setSelected((s) => (sameTile(s, tile) ? null : tile))
+    },
+    [myTurn, game.moves, game.ends, selected, send],
+  )
 
-  function choose(tile) {
-    const m = moveOf(tile)
-    if (!m) return
-    // If both ends show the same number, the side doesn't matter: don't ask
-    if (m.sides.length === 1 || game.ends[0] === game.ends[1]) send({ type: 'dm_play', tile, side: m.sides[m.sides.length - 1] })
-    else setSelected(sameTile(selected, tile) ? null : tile)
-  }
-  function place(side) {
-    if (selected) send({ type: 'dm_play', tile: selected, side })
-  }
+  const state = useMemo(() => ({ game, me, selected }), [game, me, selected])
+  const finished = game.phase === 'finished'
+  const last = game.log[game.log.length - 1]
+  let title
+  let hint = null
+  if (game.phase !== 'playing') title = finished ? (game.winner === me ? '¡Ganaste la partida!' : `${game.winner} ganó la partida`) : 'Fin de la mano'
+  else if (myTurn) {
+    title = game.mustDraw ? 'No tienes jugada: roba' : selected ? '¿En qué punta va?' : 'Te toca'
+    hint = game.mustDraw ? 'Toca el pozo (o el botón) para robar.' : selected ? 'Toca la punta que brilla.' : game.forced ? `Sales con el ${game.forced[0]}|${game.forced[1]}.` : 'Toca una ficha que brille.'
+  } else title = `Juega ${game.turn}…`
+  if (game.phase === 'playing' && !hint) hint = describe(last, me)
+
+  const plates = game.players.map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: game.scores[p],
+    max: game.goal,
+    stats: `${game.counts[p] ?? 0} fichas · meta ${game.goal}`,
+    active: game.turn === p && game.phase === 'playing',
+  }))
 
   return (
-    <div className="mt-4">
-      <Scores game={game} me={me} colorOf={colorOf} />
-
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="font-semibold" style={{ color: colorOf(other) }}>{other}</span>
-          <span className="text-sm text-muted">{game.counts[other]} {game.counts[other] === 1 ? 'ficha' : 'fichas'}</span>
-        </div>
-        {game.options.boneyard && <span className="text-sm text-muted">Pozo: <span className="font-semibold text-ink">{game.pool}</span></span>}
-      </div>
-      <OpponentHand game={game} other={other} />
-
-      <Table game={game} selected={selected} onPlace={place} />
-
-      <Status game={game} me={me} colorOf={colorOf} selected={selected} onPlace={place} send={send} />
-
-      {game.phase === 'playing' ? (
-        <section className="mt-3 rounded-[2rem] bg-paper p-4 sm:p-5">
-          <p className="text-sm font-semibold text-muted">
-            Tus fichas · {game.hands[me]?.length ?? 0}
-            {game.forced && myTurn && ` · sales con el ${game.forced[0]}|${game.forced[1]}`}
-          </p>
-          <div className="mt-3 flex flex-wrap justify-center gap-2 sm:gap-3">
-            <AnimatePresence initial={false}>
-            {(game.hands[me] ?? []).map((t, i) => {
-              const playable = myTurn && !!moveOf(t)
-              const isSel = sameTile(selected, t)
-              return (
-                // tiles are dealt one by one; a played tile flies up to the table
-                <motion.button
-                  key={`${game.handNo}-${t[0]}-${t[1]}`}
-                  layout
-                  initial={{ y: 60, opacity: 0, rotate: 12 }}
-                  animate={{ y: 0, opacity: 1, rotate: 0 }}
-                  exit={{ y: -140, opacity: 0, scale: 0.7, transition: { duration: 0.25 } }}
-                  transition={{ ...spring, delay: game.line.length ? 0 : 0.05 * i }}
-                  onClick={() => choose(t)}
-                  disabled={!playable}
-                  className={`rounded-xl transition-transform ${playable ? 'hover:-translate-y-1.5' : ''} ${isSel ? '-translate-y-2' : ''}`}
-                  aria-label={`Ficha ${t[0]} y ${t[1]}${playable ? ', se puede jugar' : ''}`}
-                >
-                  <DominoTile a={t[0]} b={t[1]} vertical unit={34} dim={myTurn && !playable} ring={isSel ? 'var(--color-ink)' : playable ? colorOf(me) : undefined} />
-                </motion.button>
-              )
-            })}
-            </AnimatePresence>
-          </div>
-        </section>
-      ) : (
-        <HandOver game={game} me={me} send={send} colorOf={colorOf} />
-      )}
-      <p role="status" className="mt-2 min-h-6 text-center text-sm font-medium text-danger">{flash}</p>
-    </div>
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#DCE8E1, #BFD3C8)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Mesa de dominó en 3D" />}
+      top={
+        <>
+          <Plates players={plates} />
+          {game.options.boneyard && (
+            <span className="rounded-xl bg-paper/90 px-2.5 py-1 text-xs font-semibold shadow-sm backdrop-blur">Pozo: {game.pool}</span>
+          )}
+        </>
+      }
+      bottom={
+        <>
+          <Banner title={title} hint={hint} color={colorOf(game.phase === 'playing' ? game.turn : game.winner)} />
+          <Flash flash={flash} />
+          {myTurn && game.mustDraw && <BigAction onClick={() => send({ type: 'dm_draw' })} color={colorOf(me)}>Robar del pozo ({game.pool})</BigAction>}
+        </>
+      }
+      aside={
+        <>
+          {game.phase !== 'playing' && <HandOver game={game} me={me} send={send} colorOf={colorOf} />}
+          <Panel title="Historial">
+            <LogList items={game.log} colorOf={colorOf} render={(l) => describe(l, me)} />
+          </Panel>
+          {other && game.phase === 'playing' && (
+            <Panel title="Cómo se juega">
+              <p className="text-sm text-muted">Pon fichas que coincidan con una de las dos puntas. Gana la mano quien se quede sin fichas; si nadie puede jugar, es tranque y gana quien tenga menos puntos.</p>
+            </Panel>
+          )}
+        </>
+      }
+    />
   )
 }
 DominoGame.showsErrors = true
-
-function Scores({ game, me, colorOf }) {
-  return (
-    <div className="grid gap-2 sm:grid-cols-2">
-      {game.players.map((p) => (
-        <div key={p} className="rounded-2xl bg-paper px-4 py-3">
-          <div className="flex items-baseline justify-between">
-            <span className="font-semibold" style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</span>
-            <span className="text-sm text-muted">
-              <AnimatedNumber value={game.scores[p]} className="font-display text-2xl font-extrabold text-ink" duration={1} /> / {game.goal}
-            </span>
-          </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line">
-            <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(100, (game.scores[p] / game.goal) * 100)}%`, background: colorOf(p) }} />
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function OpponentHand({ game, other }) {
-  const n = game.counts[other]
-  if (game.phase !== 'playing') return null
-  return (
-    <div className="mt-2 flex flex-wrap gap-1">
-      <AnimatePresence initial={false}>
-        {Array.from({ length: n }, (_, i) => (
-          <motion.span key={i} initial={{ scale: 0 }} animate={{ scale: 1 }} exit={{ y: 30, opacity: 0 }} transition={spring}>
-            <DominoTile faceDown vertical unit={14} />
-          </motion.span>
-        ))}
-      </AnimatePresence>
-    </div>
-  )
-}
-
-/* --- the table: the line snakes so it fits ----------------------------- */
-
-function useWidth(ref) {
-  const [w, setW] = useState(0)
-  useLayoutEffect(() => {
-    if (!ref.current) return
-    const ro = new ResizeObserver(([e]) => setW(e.contentRect.width))
-    ro.observe(ref.current)
-    return () => ro.disconnect()
-  }, [ref])
-  return w
-}
-
-function layoutRows(line, capacity) {
-  // Each tile takes 2 units (or 1 if it's a double, placed crosswise)
-  const rows = []
-  let row = []
-  let used = 0
-  line.forEach((t, i) => {
-    const size = t[0] === t[1] ? 1 : 2
-    if (row.length && used + size > capacity) {
-      rows.push(row)
-      row = []
-      used = 0
-    }
-    row.push({ t, i })
-    used += size
-  })
-  if (row.length) rows.push(row)
-  return rows
-}
-
-function Table({ game, selected, onPlace }) {
-  const ref = useRef(null)
-  const width = useWidth(ref)
-  const unit = width < 420 ? 20 : 26
-  const gap = 3
-  const capacity = Math.max(4, Math.floor((width - 16) / (unit + gap)))
-  const rows = layoutRows(game.line, capacity)
-  const lastIdx = game.line.length - 1
-  const lastPlay = [...game.log].reverse().find((l) => l.action === 'play')
-  const targetable = selected ? { left: true, right: true } : null
-
-  return (
-    <div ref={ref} className="mt-3 flex min-h-48 flex-col justify-center rounded-[2rem] p-4 sm:p-6" style={{ background: FELT, boxShadow: 'inset 0 2px 12px rgba(0,0,0,.25)' }}>
-      {!game.line.length && (
-        <p className="flex h-40 items-center justify-center text-center font-semibold text-white/80">
-          {game.phase === 'playing' ? `Sale ${game.turn}${game.forced ? ` con el ${game.forced[0]}|${game.forced[1]}` : ''}` : ''}
-        </p>
-      )}
-      <div className="flex flex-col gap-1.5">
-        {rows.map((row, r) => {
-          const reversed = r % 2 === 1
-          const items = reversed ? [...row].reverse() : row
-          return (
-            <div key={r} className={`flex items-center gap-[3px] ${rows.length === 1 ? 'justify-center' : reversed ? 'justify-end' : 'justify-start'}`} style={{ minHeight: unit * 2 }}>
-              {items.map(({ t, i }) => {
-                const double = t[0] === t[1]
-                const [a, b] = reversed ? [t[1], t[0]] : t
-                const isLeftEnd = i === 0
-                const isRightEnd = i === lastIdx
-                const fresh = lastPlay && sameTile([...lastPlay.tile].sort((x, y) => x - y), [...t].sort((x, y) => x - y))
-                const endSide = targetable && (isLeftEnd ? 'left' : isRightEnd ? 'right' : null)
-                const tile = (
-                  <DominoTile
-                    a={a}
-                    b={b}
-                    vertical={double}
-                    unit={unit}
-                    ring={endSide ? 'hsl(46 95% 60%)' : undefined}
-                    className={fresh ? 'dm-slap' : ''}
-                  />
-                )
-                return endSide ? (
-                  <button key={i} onClick={() => onPlace(endSide)} className="dm-target rounded-md" aria-label={`Poner en el extremo ${endSide === 'left' ? 'izquierdo' : 'derecho'}`}>
-                    {tile}
-                  </button>
-                ) : (
-                  <span key={i}>{tile}</span>
-                )
-              })}
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-/* --- status, notices and buttons ---------------------------------------- */
 
 function describe(entry, me) {
   if (!entry) return null
@@ -228,49 +103,6 @@ function describe(entry, me) {
   if (entry.action === 'play') return `${who} el ${entry.tile[0]}|${entry.tile[1]}.`
   if (entry.action === 'draw') return entry.player === me ? 'Robaste del pozo.' : `${entry.player} robó del pozo.`
   return entry.player === me ? 'No tenías jugada: pasaste.' : `${entry.player} no tenía jugada y pasó.`
-}
-
-function Status({ game, me, colorOf, selected, onPlace, send }) {
-  if (game.phase !== 'playing') return null
-  const myTurn = game.turn === me
-  const last = game.log[game.log.length - 1]
-  const draws = [...game.log].reverse()
-  let streak = 0
-  for (const l of draws) {
-    if (l.action === 'draw' && l.player === last?.player) streak += 1
-    else break
-  }
-  const lastText = last?.action === 'draw' && streak > 1
-    ? last.player === me ? `Robaste ${streak} fichas.` : `${last.player} robó ${streak} fichas.`
-    : describe(last, me)
-
-  return (
-    <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <p className="font-display text-2xl font-extrabold" style={{ color: colorOf(game.turn) }}>
-          {myTurn ? (game.mustDraw ? 'No tienes jugada: roba' : 'Te toca') : `Juega ${game.turn}…`}
-        </p>
-        <p key={game.log.length} className="pop min-h-5 text-sm text-muted">{lastText}</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {myTurn && game.mustDraw && (
-          <button onClick={() => send({ type: 'dm_draw' })} autoFocus className="rounded-2xl bg-ink px-5 py-3 font-semibold text-white">
-            Robar del pozo ({game.pool})
-          </button>
-        )}
-        {selected && (
-          <>
-            <button onClick={() => onPlace('left')} className="rounded-2xl bg-ink px-4 py-3 font-semibold text-white">
-              ← Izquierda ({game.ends[0]})
-            </button>
-            <button onClick={() => onPlace('right')} className="rounded-2xl bg-ink px-4 py-3 font-semibold text-white">
-              Derecha ({game.ends[1]}) →
-            </button>
-          </>
-        )}
-      </div>
-    </div>
-  )
 }
 
 function HandOver({ game, me, send, colorOf }) {
