@@ -104,7 +104,11 @@ export default function DrawingCanvas({ strokes, subscribe, tool, onStroke, onPo
   function down(e) {
     if (!tool) return
     e.preventDefault()
-    canvasRef.current.setPointerCapture?.(e.pointerId)
+    try {
+      canvasRef.current.setPointerCapture?.(e.pointerId)
+    } catch {
+      // events forwarded from the 3D easel have no real pointer to capture
+    }
     const s = { id: Math.random().toString(36).slice(2, 10), color: tool.color, size: tool.size, points: [point(e)] }
     drawing.current = s
     local.current.push(s)

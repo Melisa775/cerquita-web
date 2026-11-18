@@ -1,4 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Stop: while writing, a 3D letter machine with a light per filled box and a
+ * red buzzer; the answers are typed in a card over the stage.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TimerBar from '../components/TimerBar'
 import { EndActions, winnerTitle } from '../components/EndActions'
 import { useCountdown } from '../hooks/useCountdown'
@@ -6,6 +10,11 @@ import { storage } from '../lib/api'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { useRollingLetter } from '../hooks/useRollingLetter'
+import Stage3D from '../components/stage/Stage3D'
+import { Panel, Plates, StageLayout } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/stop3d.js')
 
 export default function StopGame({ room, me, send, colorOf }) {
   const game = room.game
@@ -95,87 +104,102 @@ function Sheet({ room, me, send, left, colorOf }) {
     send({ type: 'stop_call', answers: latest.current })
   }
 
-  const others = Object.keys(game.filled).filter((p) => p !== me)
-
-  return (
-    <div className="mt-4">
-      {game.phase === 'stopping' && <StopFlash game={game} me={me} colorOf={colorOf} />}
-
-      <div className="flex items-baseline justify-between text-muted">
-        <RoundLabel game={game} />
-        <span className="tabular-nums">{game.phase === 'writing' ? `${left ?? game.writeSeconds} s` : '¡Stop!'}</span>
-      </div>
-      <TimerBar seconds={game.writeSeconds} resetKey={game.round} msLeft={room.phaseEndsInMs} />
-
-      <div className="mt-6 grid gap-6 md:grid-cols-[auto_1fr] md:items-start">
-        <div className="flex items-center gap-5 md:flex-col md:items-start">
-          <LetterTile letter={game.letter} roll={game.phase === 'writing'} />
-          <ul className="space-y-2 text-sm">
-            {others.map((p) => (
-              <li key={p}>
-                <span className="font-semibold" style={{ color: colorOf(p) }}>{p}</span>
-                <span className="text-muted"> lleva {game.filled[p]} de {game.categories.length}</span>
-                <Dots filled={game.filled[p]} total={game.categories.length} color={colorOf(p)} />
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <form onSubmit={callStop}>
-          <h1 className="text-3xl font-bold">Todo con {game.letter}</h1>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {game.categories.map((c) => (
-              <label key={c.key} className="block">
-                <span className="text-sm font-semibold">{c.label}</span>
-                <input
-                  value={answers[c.key] || ''}
-                  onChange={(e) => update(c.key, e.target.value)}
-                  disabled={locked}
-                  maxLength={40}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  placeholder={`${c.label} con ${game.letter}…`}
-                  className="mt-1 w-full rounded-2xl border border-line bg-paper px-4 py-3 text-lg outline-none focus:border-ink disabled:opacity-60"
-                />
-              </label>
-            ))}
-          </div>
-          {playing && (
-            <button
-              type="submit"
-              disabled={!complete || locked}
-              className="mt-5 w-full rounded-2xl px-5 py-4 font-display text-2xl font-extrabold text-white disabled:opacity-40"
-              style={{ background: colorOf(me) }}
-            >
-              ¡Stop!
-            </button>
-          )}
-          <p className="mt-2 text-sm text-muted">
-            {!playing
-              ? 'Esta ronda empezó antes de que entraras. Juegas desde la próxima partida.'
-              : complete
-                ? 'Listo. Cántalo antes que tu pareja.'
-                : 'Llena todas las casillas para poder cantar ¡Stop!'}
-          </p>
-        </form>
-      </div>
-    </div>
+  const stageRef = useRef(null)
+  const callRef = useRef(null)
+  callRef.current = () => {
+    if (!complete || locked) return
+    clearTimeout(debounce.current)
+    send({ type: 'stop_call', answers: latest.current })
+  }
+  const onPick = useCallback(({ kind }) => kind === 'stop' && callRef.current(), [])
+  const colors = useMemo(() => Object.fromEntries(Object.keys(game.filled).map((p) => [p, cssColor(colorOf(p))])), [game.filled, colorOf])
+  const filled = useMemo(() => ({ ...game.filled, ...(playing ? { [me]: game.categories.filter((c) => (answers[c.key] || '').trim()).length } : {}) }), [game.filled, playing, me, game.categories, answers])
+  const state = useMemo(
+    () => ({ letter: game.letter, round: game.round, filled, total: game.categories.length, colors, canStop: playing && complete && !locked, stopped: game.phase === 'stopping' }),
+    [game.letter, game.round, filled, game.categories.length, colors, playing, complete, locked, game.phase],
   )
-}
+  const plates = Object.keys(game.filled).map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: filled[p],
+    max: game.categories.length,
+    stats: `Ronda ${game.round} de ${game.totalRounds}`,
+    active: game.phase === 'writing',
+  }))
 
-function Dots({ filled, total, color }) {
+  const form = (
+          <form onSubmit={callStop} className="pointer-events-auto max-h-[52dvh] w-full overflow-y-auto rounded-[2rem] bg-paper/95 p-4 shadow-xl backdrop-blur sm:p-5 lg:max-h-none lg:shadow-none">
+            <h1 className="text-xl font-bold sm:text-2xl">Todo con {game.letter}</h1>
+            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-2">
+              {game.categories.map((c) => (
+                <label key={c.key} className="block min-w-0">
+                  <span className="text-xs font-semibold sm:text-sm">{c.label}</span>
+                  <input
+                    value={answers[c.key] || ''}
+                    onChange={(e) => update(c.key, e.target.value)}
+                    disabled={locked}
+                    maxLength={40}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    placeholder={`${c.label}…`}
+                    className="mt-0.5 w-full min-w-0 rounded-xl border border-line bg-white px-3 py-2 outline-none focus:border-ink disabled:opacity-60"
+                  />
+                </label>
+              ))}
+            </div>
+            {playing && (
+              <button
+                type="submit"
+                disabled={!complete || locked}
+                className="mt-3 w-full rounded-2xl px-5 py-3 font-display text-2xl font-extrabold text-white disabled:opacity-40"
+                style={{ background: colorOf(me) }}
+              >
+                ¡Stop!
+              </button>
+            )}
+            <p className="mt-1.5 text-xs text-muted sm:text-sm">
+              {!playing
+                ? 'Esta ronda empezó antes de que entraras. Juegas desde la próxima partida.'
+                : complete
+                  ? 'Listo. Cántalo antes que tu pareja (o aprieta el botón rojo).'
+                  : 'Llena todas las casillas para poder cantar ¡Stop!'}
+            </p>
+          </form>
+  )
+
   return (
-    <span className="mt-1 flex gap-1" aria-hidden="true">
-      {Array.from({ length: total }, (_, i) => (
-        <motion.span
-          key={i}
-          className="h-2 w-4 rounded-full"
-          animate={{ background: i < filled ? color : 'var(--color-line)', scaleY: i === filled - 1 ? [1, 1.8, 1] : 1 }}
-          transition={{ duration: 0.3 }}
-        />
-      ))}
-    </span>
+    <>
+      {game.phase === 'stopping' && <StopFlash game={game} me={me} colorOf={colorOf} />}
+      <StageLayout
+        stageRef={stageRef}
+        sky="linear-gradient(#F6EDE3, #E2CDB8)"
+        stage={<Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Máquina de letras en 3D" />}
+        top={
+          <>
+            <Plates players={plates} />
+            <div className="w-24 shrink-0 rounded-2xl bg-paper/90 px-3 py-1.5 text-right shadow-sm backdrop-blur">
+              <p className="font-display text-xl font-extrabold tabular-nums leading-tight">{game.phase === 'writing' ? `${left ?? game.writeSeconds} s` : '¡Stop!'}</p>
+              <div className="mt-1"><TimerBar seconds={game.writeSeconds} resetKey={game.round} msLeft={room.phaseEndsInMs} /></div>
+            </div>
+          </>
+        }
+        bottom={<div className="w-full max-w-2xl lg:hidden">{form}</div>}
+        aside={
+          <>
+          <div className="hidden lg:block">{form}</div>
+          <Panel title="Cómo se juega">
+            <ul className="space-y-1 px-1 text-sm text-muted">
+              <li>Sale una letra: llenen cada categoría con una palabra que empiece por ella.</li>
+              <li>El primero que llene todo canta ¡Stop! y se acaba la ronda.</li>
+              <li>Respuesta única: {game.points?.unique ?? 100} · repetida: {game.points?.shared ?? 50}.</li>
+            </ul>
+          </Panel>
+          </>
+        }
+      />
+    </>
   )
 }
 

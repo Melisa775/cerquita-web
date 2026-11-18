@@ -1,9 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+/**
+ * Pinturillo in a 3D artist's corner: the drawing sits on an easel and the
+ * drawer paints straight onto it. Tools, the guess box and the word float
+ * over the stage.
+ */
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import DrawingCanvas from '../components/DrawingCanvas'
 import TimerBar from '../components/TimerBar'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Plates, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/pinturillo3d.js')
 
 const PALETTE = ['#22252E', '#8A8E99', '#E04848', '#F08A2E', '#F2C230', '#3E9460', '#0F6E6A', '#3B7DC4', '#6B4FA0', '#E87AA8', '#8A5A3B']
 const SIZES = [4, 10, 24]
@@ -75,25 +85,33 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
 
   const canvasTool = isDrawer && drawing ? tool : null
 
-  return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-        <span>
-          Turno {game.turn} de {game.totalTurns}
-        </span>
-        <div className="flex gap-2">
-          {Object.entries(game.scores).map(([p, n]) => (
-            <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} className="text-ink" />
-            </span>
-          ))}
-        </div>
-      </div>
+  // the drawing canvas lives off screen; the 3D easel shows it and passes the strokes to it
+  const paperBox = useRef(null)
+  const [surface, setSurface] = useState(null)
+  useLayoutEffect(() => setSurface(paperBox.current?.querySelector('canvas') ?? null), [])
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
+  const frame = useMemo(() => cssColor(colorOf(game.drawer)), [colorOf, game.drawer])
+  const state = useMemo(() => (surface ? { surface, canDraw: !!canvasTool, frame, turn: game.turn } : null), [surface, canvasTool, frame, game.turn])
 
-      <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-        <div className="fit-board min-w-0 [--fit-top:13rem] [--fit-ratio:1.333]">
-          <WordBar game={game} me={me} left={left} colorOf={colorOf} />
-          <div className="relative mt-3 rounded-[1.6rem] p-1.5" style={{ background: colorOf(game.drawer) }}>
+  const plates = Object.entries(game.scores).map(([p, n]) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: n,
+    max: 0,
+    stats: p === game.drawer ? 'Dibuja' : 'Adivina',
+    active: p === game.drawer,
+  }))
+
+  return (
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#F5EFE7, #E1D3C2)"
+      stage={
+        <>
+          <Stage3D ref={stageRef} load={load} state={state} label="Caballete con el dibujo en 3D" />
+          <div ref={paperBox} aria-hidden="true" className="pointer-events-none fixed -left-[9999px] top-0 w-[800px]">
             <DrawingCanvas
               strokes={game.strokes}
               subscribe={isDrawer ? localSubscribe : subscribe}
@@ -109,9 +127,21 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
               }}
               onEnd={flush}
             />
-            {game.phase === 'choosing' && <Choosing game={game} me={me} left={left} send={send} colorOf={colorOf} />}
-            {game.phase === 'turn_over' && <TurnOver game={game} me={me} left={left} send={send} colorOf={colorOf} />}
           </div>
+        </>
+      }
+      top={
+        <>
+          <Plates players={plates} />
+          <div className="min-w-0 max-w-[60%] rounded-2xl bg-paper/90 px-3 py-1.5 shadow-sm backdrop-blur">
+            <WordBar game={game} me={me} left={left} colorOf={colorOf} />
+          </div>
+        </>
+      }
+      bottom={
+        <div className="pointer-events-auto flex w-full max-w-2xl flex-col items-center gap-2">
+          {game.phase === 'choosing' && <Choosing game={game} me={me} left={left} send={send} colorOf={colorOf} />}
+          {game.phase === 'turn_over' && <TurnOver game={game} me={me} left={left} send={send} colorOf={colorOf} />}
           {isDrawer && drawing && (
             <Tools
               tool={tool}
@@ -128,10 +158,53 @@ function Play({ game, me, send, colorOf, error, errorId, subscribe }) {
               }}
             />
           )}
+          <GuessBox game={game} me={me} send={send} colorOf={colorOf} flash={flash} />
         </div>
+      }
+      aside={<Chat game={game} me={me} colorOf={colorOf} />}
+    />
+  )
+}
 
-        <Chat game={game} me={me} send={send} colorOf={colorOf} flash={flash} />
-      </div>
+/** The guess input, over the bottom of the stage (so it's at hand on phones too). */
+function GuessBox({ game, me, send, colorOf, flash }) {
+  const [text, setText] = useState('')
+  const canGuess = game.phase === 'drawing' && game.drawer !== me && game.players.includes(me)
+  if (!canGuess) return null
+  return (
+    <div className="w-full max-w-md">
+      <motion.p
+        key={flash ?? 'none'}
+        className="mb-1 min-h-5 text-center text-sm font-semibold"
+        style={{ color: 'hsl(42 82% 38%)' }}
+        role="status"
+        initial={flash ? { scale: 0.6, rotate: -6 } : false}
+        animate={{ scale: 1, rotate: 0 }}
+        transition={{ type: 'spring', stiffness: 600, damping: 12 }}
+      >
+        {flash}
+      </motion.p>
+      <form
+        className="flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (text.trim()) send({ type: 'pz_guess', text })
+          setText('')
+        }}
+      >
+        <input
+          autoFocus
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          maxLength={40}
+          autoComplete="off"
+          placeholder="¿Qué es?"
+          className="w-full min-w-0 rounded-2xl border border-line bg-paper px-4 py-3 text-lg shadow-md outline-none focus:border-ink"
+        />
+        <button type="submit" className="rounded-2xl px-5 font-semibold text-white shadow-md" style={{ background: colorOf(me) }}>
+          Enviar
+        </button>
+      </form>
     </div>
   )
 }
@@ -147,7 +220,7 @@ function WordBar({ game, me, left, colorOf }) {
             {isDrawer ? 'Dibujas tú' : `Dibuja ${game.drawer}`}
           </p>
           {drawing && (
-            <p className="flex flex-wrap gap-x-3 gap-y-1 font-display text-3xl font-extrabold uppercase tracking-[0.25em]">
+            <p className="flex flex-wrap gap-x-2 gap-y-0.5 font-display text-xl font-extrabold uppercase tracking-[0.2em] sm:text-2xl">
               {game.mask.map((ch, i) =>
                 ch === ' ' ? (
                   <span key={i} className="w-2" />
@@ -170,7 +243,7 @@ function WordBar({ game, me, left, colorOf }) {
         {drawing && left != null && (
           <motion.span
             key={left}
-            className={`font-display text-3xl font-extrabold tabular-nums ${left <= 10 ? 'text-danger' : ''}`}
+            className={`font-display text-2xl font-extrabold tabular-nums ${left <= 10 ? 'text-danger' : ''}`}
             initial={left <= 10 ? { scale: 1.5 } : false}
             animate={{ scale: 1 }}
             transition={spring}
@@ -186,7 +259,7 @@ function WordBar({ game, me, left, colorOf }) {
 
 function Tools({ tool, setTool, onUndo, onClear }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl bg-paper p-3">
+    <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-paper/95 p-2 shadow-lg backdrop-blur sm:gap-3">
       <div className="flex flex-wrap gap-1.5" role="group" aria-label="Colores">
         {PALETTE.map((c) => (
           <button
@@ -194,7 +267,7 @@ function Tools({ tool, setTool, onUndo, onClear }) {
             onClick={() => setTool({ ...tool, color: c })}
             aria-label={`Color ${c}`}
             aria-pressed={tool.color === c}
-            className={`h-8 w-8 rounded-full ${tool.color === c ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
+            className={`h-7 w-7 rounded-full sm:h-8 sm:w-8 ${tool.color === c ? 'ring-2 ring-ink ring-offset-2 ring-offset-paper' : ''}`}
             style={{ background: c }}
           />
         ))}
@@ -222,7 +295,7 @@ function Tools({ tool, setTool, onUndo, onClear }) {
       >
         Borrador
       </button>
-      <div className="ml-auto flex gap-1.5">
+      <div className="flex gap-1.5">
         <button onClick={onUndo} className="rounded-xl bg-stone px-3 py-2 text-sm font-semibold">
           Deshacer
         </button>
@@ -237,7 +310,7 @@ function Tools({ tool, setTool, onUndo, onClear }) {
 function Choosing({ game, me, left, send, colorOf }) {
   const isDrawer = game.drawer === me
   return (
-    <div className="absolute inset-1.5 flex flex-col items-center justify-center gap-4 rounded-2xl bg-paper/95 p-6 text-center">
+    <div className="flex w-full flex-col items-center justify-center gap-3 rounded-[2rem] bg-paper/95 p-5 text-center shadow-xl backdrop-blur">
       {isDrawer ? (
         <>
           <p className="font-display text-2xl font-extrabold">¿Qué quieres dibujar?</p>
@@ -276,7 +349,7 @@ function TurnOver({ game, me, left, send, colorOf }) {
   const r = game.result
   const last = game.turn >= game.totalTurns
   return (
-    <div className="pop absolute inset-x-4 bottom-4 rounded-2xl p-5 text-white shadow-lg" style={{ background: r.guesser ? colorOf(r.guesser) : 'var(--color-ink)' }}>
+    <div className="pop w-full rounded-[2rem] p-5 text-white shadow-xl" style={{ background: r.guesser ? colorOf(r.guesser) : 'var(--color-ink)' }}>
       <p className="text-sm font-semibold text-white/80">La palabra era</p>
       <p className="font-display text-3xl font-extrabold uppercase tracking-wider">{r.word}</p>
       <p className="mt-1 text-white/90">
@@ -291,21 +364,18 @@ function TurnOver({ game, me, left, send, colorOf }) {
   )
 }
 
-function Chat({ game, me, send, colorOf, flash }) {
-  const [text, setText] = useState('')
+function Chat({ game, me, colorOf }) {
   const listRef = useRef(null)
-  const canGuess = game.phase === 'drawing' && game.drawer !== me && game.players.includes(me)
-
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight })
   }, [game.guesses.length])
 
   return (
-    <aside className="flex flex-col rounded-[2rem] bg-paper p-5 lg:h-[34rem]">
+    <section className="flex flex-col rounded-[1.6rem] bg-paper p-4 lg:max-h-[34rem]">
       <h2 className="font-bold">Intentos</h2>
-      <ol ref={listRef} className="mt-3 max-h-60 flex-1 space-y-1.5 overflow-y-auto lg:max-h-none">
+      <ol ref={listRef} className="mt-2 max-h-60 flex-1 space-y-1.5 overflow-y-auto lg:max-h-none">
         {game.guesses.length === 0 && (
-          <li className="text-sm text-muted">{game.drawer === me ? 'Aquí verás lo que va diciendo tu pareja.' : 'Escribe lo que crees que es.'}</li>
+          <li className="text-sm text-muted">{game.drawer === me ? 'Aquí verás lo que va diciendo tu pareja.' : 'Escribe abajo lo que crees que es.'}</li>
         )}
         {game.guesses.map((g, i) => (
           <motion.li
@@ -331,43 +401,8 @@ function Chat({ game, me, send, colorOf, flash }) {
           </motion.li>
         ))}
       </ol>
-      <motion.p
-        key={flash ?? 'none'}
-        className="mt-2 min-h-5 text-sm font-semibold"
-        style={{ color: 'hsl(42 82% 38%)' }}
-        role="status"
-        initial={flash ? { scale: 0.6, rotate: -6 } : false}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 600, damping: 12 }}
-      >
-        {flash}
-      </motion.p>
-      {canGuess ? (
-        <form
-          className="mt-2 flex gap-2"
-          onSubmit={(e) => {
-            e.preventDefault()
-            if (text.trim()) send({ type: 'pz_guess', text })
-            setText('')
-          }}
-        >
-          <input
-            autoFocus
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={40}
-            autoComplete="off"
-            placeholder="¿Qué es?"
-            className="w-full min-w-0 rounded-xl border border-line bg-stone px-3 py-2.5 outline-none focus:border-ink"
-          />
-          <button type="submit" className="rounded-xl px-4 font-semibold text-white" style={{ background: colorOf(me) }}>
-            Enviar
-          </button>
-        </form>
-      ) : (
-        game.phase === 'drawing' && game.drawer === me && <p className="mt-2 text-xs text-muted">Tu pareja escribe aquí sus intentos.</p>
-      )}
-    </aside>
+      {game.phase === 'drawing' && game.drawer === me && <p className="mt-2 text-xs text-muted">Pinta directo sobre el caballete. Tu pareja escribe sus intentos.</p>}
+    </section>
   )
 }
 

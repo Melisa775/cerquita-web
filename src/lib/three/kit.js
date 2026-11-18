@@ -45,10 +45,16 @@ export function darker(color, f = 0.72) {
 }
 
 /** Resolves CSS colors like var(--color-p1) to something three.js understands. */
+let colorCtx = null
 export function cssColor(value) {
   const m = /var\((--[^)]+)\)/.exec(value ?? '')
-  if (!m) return value
-  return getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || '#888888'
+  const raw = m ? getComputedStyle(document.documentElement).getPropertyValue(m[1]).trim() || '#888888' : value
+  // three.js doesn't read every CSS syntax (like "hsl(207 68% 46%)"): let the browser normalize it
+  if (!raw || /^#[0-9a-f]{3,8}$/i.test(raw)) return raw
+  colorCtx ??= document.createElement('canvas').getContext('2d')
+  colorCtx.fillStyle = '#888888'
+  colorCtx.fillStyle = raw
+  return colorCtx.fillStyle
 }
 
 /* --- animations ---------------------------------------------------------- */

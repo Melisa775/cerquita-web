@@ -34,7 +34,7 @@ export function createStage(
     shadows = true,
     exposure = 1.05,
     shadowSize = 7,
-    layout = null, // (aspect, world) => ({ fitHalfWidth, fitHalfDepth }) to adapt the framing to the screen shape
+    layout = null, // (aspect, world) => ({ fitHalfWidth, fitHalfDepth, target? }) to adapt the framing to the screen shape
   } = {},
   { onPick, onHover } = {},
 ) {
@@ -45,7 +45,7 @@ export function createStage(
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = exposure
   renderer.shadowMap.enabled = shadows
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.shadowMap.type = THREE.PCFShadowMap
   Object.assign(renderer.domElement.style, { display: 'block', width: '100%', height: '100%', touchAction: 'none' })
   container.appendChild(renderer.domElement)
 
@@ -108,8 +108,11 @@ export function createStage(
     scene.fog.near = dist + 4
     scene.fog.far = dist + 28
     const t = portrait ? portraitTilt : tilt
-    controls.target.copy(baseTarget)
-    if (portrait) controls.target.z += 0.6
+    if (fitted.target) controls.target.set(...fitted.target)
+    else {
+      controls.target.copy(baseTarget)
+      if (portrait) controls.target.z += 0.6
+    }
     HOME.set(controls.target.x, dist * t, controls.target.z + dist * Math.sqrt(Math.max(0.05, 1 - t * t)))
   }
   fit()
