@@ -298,14 +298,14 @@ function RollChip({ roll }) {
     <AnimatePresence mode="popLayout">
       <motion.div
         key={roll.id}
-        className="max-w-[15rem] rounded-2xl bg-paper/92 px-3 py-1.5 text-right shadow-sm backdrop-blur"
+        className="max-w-[15rem] rounded-2xl bg-paper/92 px-2.5 py-1 text-right shadow-sm backdrop-blur sm:px-3 sm:py-1.5"
         initial={{ scale: 0.6, opacity: 0, rotate: -8 }}
         animate={{ scale: 1, opacity: 1, rotate: 0 }}
         transition={{ ...spring, delay: 0.55 }}
         aria-live="polite"
       >
-        <p className="truncate text-[0.7rem] font-semibold text-muted">{roll.who} · {roll.label}</p>
-        <p className="font-display text-lg font-extrabold tabular-nums">
+        <p className="hidden truncate text-[0.7rem] font-semibold text-muted sm:block">{roll.who} · {roll.label}</p>
+        <p className="font-display text-base font-extrabold tabular-nums sm:text-lg">
           <span className={roll.natural === 20 ? 'text-[hsl(40_90%_42%)]' : roll.natural === 1 ? 'text-danger' : ''}>🎲 {roll.natural}</span>
           <span className="text-sm text-muted"> {sign(roll.mod)} = </span>
           {roll.total}

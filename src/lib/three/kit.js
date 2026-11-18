@@ -145,7 +145,8 @@ export function textTexture(text, { size = 256, width = size, bg = null, fg = IN
 /** A flat label lying on the table, readable from the camera. */
 export function floorLabel(text, w, h, opts = {}) {
   const tex = textTexture(text, { width: Math.round(256 * (w / h)), ...opts })
-  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.8 }))
+  // polygonOffset: printed on the floor without fighting it for depth (flicker on phones)
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({ map: tex, transparent: true, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }))
   m.rotation.x = -Math.PI / 2
   return m
 }

@@ -120,7 +120,7 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
   return (
     <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_23rem] xl:grid-cols-[minmax(0,1fr)_25rem]">
       {/* --- the stage: 3D island with the HUD on top --------------------- */}
-      <section className="relative h-[min(72dvh,42rem)] min-h-[24rem] overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-30px_rgba(34,37,46,.6)] lg:h-[calc(100dvh-7.5rem)] lg:max-h-none" style={{ background: 'linear-gradient(#BFE3F2, #8FCBE8)' }}>
+      <section className="relative h-[min(72svh,42rem)] min-h-[24rem] overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-30px_rgba(34,37,46,.6)] lg:h-[calc(100svh-7.5rem)] lg:max-h-none" style={{ background: 'linear-gradient(#BFE3F2, #8FCBE8)' }}>
         <Board3D ref={board} state={sceneState} onPick={onPick} />
 
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
@@ -170,7 +170,7 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
       </section>
 
       {/* --- side panel ------------------------------------------------------ */}
-      <aside className="flex min-w-0 flex-col gap-3 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:pr-1">
+      <aside className="flex min-w-0 flex-col gap-3 lg:max-h-[calc(100svh-7.5rem)] lg:overflow-y-auto lg:pr-1">
         <Hand game={game} me={me} />
         <DevCards game={game} myTurn={myTurn} send={send} onPicker={setPicker} />
         <section className="rounded-[1.6rem] bg-paper p-1.5">
