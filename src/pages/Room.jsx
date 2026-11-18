@@ -57,26 +57,26 @@ const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, bog
 const UPCOMING = []
 // Lobby: every game with its filter group and a one-line pitch shown while the card is folded
 const LOBBY_GAMES = [
-  { Card: DeeperCard, kind: 'connect', tagline: 'Preguntas para conocerse y conectar de verdad.' },
-  { Card: ColorCard, kind: 'wits', tagline: 'Memoriza un color y recréalo.' },
-  { Card: StopCard, kind: 'words', tagline: 'Una letra, siete categorías y ¡Stop!' },
-  { Card: BoggleCard, kind: 'words', tagline: 'Une letras vecinas contra el reloj.' },
-  { Card: HangmanCard, kind: 'words', tagline: 'Adivinen la palabra antes de la horca.' },
-  { Card: WordleCard, kind: 'words', tagline: 'Cinco letras, en duelo o juntos.' },
-  { Card: WordSearchCard, kind: 'words', tagline: 'Encuentren las palabras escondidas.' },
-  { Card: CrosswordsCard, kind: 'words', tagline: 'Arma palabras en el tablero con premios.' },
-  { Card: GuessWhoCard, kind: 'wits', tagline: 'Pregunta, descarta y adivina quién es.' },
-  { Card: MurdokuCard, kind: 'wits', tagline: 'Sudoku con asesinato.' },
-  { Card: TriviaCard, kind: 'wits', tagline: 'Ruleta de preguntas y coronas.' },
-  { Card: PinturilloCard, kind: 'action', tagline: 'Uno dibuja y el otro adivina.' },
-  { Card: CharadesCard, kind: 'action', tagline: 'Actúa sin hablar frente a la cámara.' },
-  { Card: GolfCard, kind: 'action', tagline: 'Nueve hoyos, un tiro a la vez.' },
-  { Card: ChessCard, kind: 'table', tagline: 'Una partida completa, con reloj opcional.' },
-  { Card: BattleshipCard, kind: 'table', tagline: 'Hundan la flota del otro.' },
-  { Card: DominoCard, kind: 'table', tagline: 'Doble seis para dos.' },
-  { Card: ParquesCard, kind: 'table', tagline: 'A la colombiana, con dos dados.' },
-  { Card: UnaLobbyCard, kind: 'table', tagline: 'Cartas, comodines y ¡Una!' },
-  { Card: ColonosCard, kind: 'table', tagline: 'Construyan en una isla al azar.' },
+  { Card: DeeperCard, max: 2, kind: 'connect', tagline: 'Preguntas para conocerse y conectar de verdad.' },
+  { Card: ColorCard, max: 6, kind: 'wits', tagline: 'Memoriza un color y recréalo.' },
+  { Card: StopCard, max: 6, kind: 'words', tagline: 'Una letra, siete categorías y ¡Stop!' },
+  { Card: BoggleCard, max: 6, kind: 'words', tagline: 'Une letras vecinas contra el reloj.' },
+  { Card: HangmanCard, max: 6, kind: 'words', tagline: 'Adivinen la palabra antes de la horca.' },
+  { Card: WordleCard, max: 6, kind: 'words', tagline: 'Cinco letras, en duelo o juntos.' },
+  { Card: WordSearchCard, max: 6, kind: 'words', tagline: 'Encuentren las palabras escondidas.' },
+  { Card: CrosswordsCard, max: 2, kind: 'words', tagline: 'Arma palabras en el tablero con premios.' },
+  { Card: GuessWhoCard, max: 2, kind: 'wits', tagline: 'Pregunta, descarta y adivina quién es.' },
+  { Card: MurdokuCard, max: 6, kind: 'wits', tagline: 'Sudoku con asesinato.' },
+  { Card: TriviaCard, max: 6, kind: 'wits', tagline: 'Ruleta de preguntas y coronas.' },
+  { Card: PinturilloCard, max: 6, kind: 'action', tagline: 'Uno dibuja y los demás adivinan.' },
+  { Card: CharadesCard, max: 6, kind: 'action', tagline: 'Actúa sin hablar frente a la cámara.' },
+  { Card: GolfCard, max: 4, kind: 'action', tagline: 'Nueve hoyos, un tiro a la vez.' },
+  { Card: ChessCard, max: 2, kind: 'table', tagline: 'Una partida completa, con reloj opcional.' },
+  { Card: BattleshipCard, max: 2, kind: 'table', tagline: 'Hundan la flota del otro.' },
+  { Card: DominoCard, max: 2, kind: 'table', tagline: 'Doble seis para dos.' },
+  { Card: ParquesCard, max: 4, kind: 'table', tagline: 'A la colombiana, con dos dados.' },
+  { Card: UnaLobbyCard, max: 4, kind: 'table', tagline: 'Cartas, comodines y ¡Una!' },
+  { Card: ColonosCard, max: 2, kind: 'table', tagline: 'Construyan en una isla al azar.' },
 ]
 const FILTERS = [
   ['all', 'Todos'],
@@ -212,22 +212,39 @@ export default function Room({ code, name, onExit, onPlayingChange }) {
 function Lobby({ room, send }) {
   const [copied, setCopied] = useState(false)
   const [filter, setFilter] = useState(() => storage.get('cerquita:lobby:filter') || 'all')
-  const alone = room.players.length < 2
+  const count = room.players.length
+  const alone = count < 2
   const items = useMemo(
     () =>
-      LOBBY_GAMES.map(({ Card, kind, tagline }, i) => ({
-        key: i,
-        visible: filter === 'all' || kind === filter,
-        render: (collapsed, toggle) => (
-          <div className="lobby-card relative" data-collapsed={collapsed || undefined} style={{ '--tagline': JSON.stringify(tagline) }}>
-            <button onClick={toggle} className="lobby-toggle absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm hover:bg-white" aria-expanded={!collapsed}>
-              {collapsed ? 'Opciones' : 'Menos'}
-            </button>
-            <Card send={send} alone={alone} />
-          </div>
-        ),
-      })),
-    [filter, alone, send],
+      LOBBY_GAMES.map(({ Card, kind, tagline, max }, i) => {
+        const tooMany = count > max
+        return {
+          key: i,
+          visible: filter === 'all' || kind === filter,
+          render: (collapsed, toggle) => (
+            <div className="lobby-card relative" data-collapsed={collapsed || undefined} style={{ '--tagline': JSON.stringify(tagline) }}>
+              <span
+                className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-2.5 py-1 text-xs font-bold text-ink shadow-sm"
+                title={max > 2 ? `De 2 a ${max} jugadores` : 'Para 2 jugadores'}
+              >
+                👥 {max > 2 ? `2–${max}` : '2'}
+              </span>
+              <button onClick={toggle} className="lobby-toggle absolute right-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-ink shadow-sm hover:bg-white" aria-expanded={!collapsed}>
+                {collapsed ? 'Opciones' : 'Menos'}
+              </button>
+              <div className={tooMany ? 'pointer-events-none opacity-45 grayscale' : undefined} aria-disabled={tooMany || undefined}>
+                <Card send={send} alone={alone} />
+              </div>
+              {tooMany && (
+                <p className="absolute inset-x-3 bottom-3 z-10 rounded-2xl bg-ink px-3 py-2 text-center text-sm font-semibold text-white">
+                  Es para máximo {max} jugadores y en la sala hay {count}
+                </p>
+              )}
+            </div>
+          ),
+        }
+      }),
+    [filter, alone, send, count],
   )
   useEffect(() => storage.set('cerquita:lobby:filter', filter), [filter])
   const link = `${window.location.origin}${window.location.pathname}?sala=${room.code}`
@@ -246,9 +263,13 @@ function Lobby({ room, send }) {
     <div className="mt-2">
       <section className="flex flex-wrap items-center justify-between gap-4 rounded-3xl bg-paper/90 px-6 py-5 backdrop-blur sm:px-8">
         <div>
-          <h1 className="text-3xl font-bold">{alone ? 'Esperando a tu pareja' : 'Ya están los dos'}</h1>
+          <h1 className="text-3xl font-bold">{alone ? 'Esperando a tu pareja' : count === 2 ? 'Ya están los dos' : `Ya están ${count}`}</h1>
           <p className="mt-1 text-muted">
-            {alone ? 'Envíale el código o el enlace. Apenas entre, aparecerá arriba.' : 'Elijan un juego; cualquiera de los dos puede empezarlo.'}
+            {alone
+              ? 'Envíale el código o el enlace. Apenas entre, aparecerá arriba.'
+              : count === 2
+                ? 'Elijan un juego; cualquiera de los dos puede empezarlo. Pueden entrar hasta 6 con el mismo enlace.'
+                : 'Elijan un juego para todos; cualquiera puede empezarlo. Cada juego dice para cuántos es.'}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

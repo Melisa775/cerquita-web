@@ -213,7 +213,8 @@ function Turn({ game, me, left, msLeft, send, colorOf, lastUsed }) {
 function RoundOver({ game, send }) {
   const r = game.result
   const players = Object.keys(game.scores)
-  const winner = r.type === 'timeout' ? players.find((p) => p !== r.loser) : null
+  const others = r.type === 'timeout' ? players.filter((p) => p !== r.loser) : []
+  const winner = others.length === 1 ? others[0] : others.length ? 'los demás' : null
   const last = game.round >= game.totalRounds
   return (
     <motion.div

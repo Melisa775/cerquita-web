@@ -13,7 +13,6 @@ const load = () => import('../lib/three/parques3d.js')
 
 export default function ParquesGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
-  const other = game.players.find((p) => p !== me)
   const finished = game.phase === 'finished'
   const myTurn = game.turn === me && !finished
   const [die, setDie] = useState(0)
@@ -74,7 +73,7 @@ export default function ParquesGame({ room, me, send, colorOf, error, errorId })
     title = 'Mueve tus fichas'
     hint = game.moves.length ? 'Toca una ficha que brille. Con dos dados, elige primero cuál usar arriba.' : 'No tienes jugadas con estos dados.'
   }
-  if (!myTurn && !finished && game.attemptsLeft != null && game.phase === 'roll') hint = `${other} necesita pares para salir.`
+  if (!myTurn && !finished && game.attemptsLeft != null && game.phase === 'roll') hint = `${game.turn} necesita pares para salir.`
 
   const plates = game.players.map((p) => {
     const pcs = game.pieces[p]

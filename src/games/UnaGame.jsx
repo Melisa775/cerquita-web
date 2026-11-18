@@ -8,6 +8,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import PlayingCard, { CARD_COLORS } from '../components/PlayingCard'
 import { EndActions } from '../components/EndActions'
 import Stage3D from '../components/stage/Stage3D'
+import { cssColor } from '../lib/three/kit'
 import { Banner, BigAction, Flash, LogList, Panel, Plates, Sheet, StageLayout, useFlash, useViewKeys } from '../components/stage/hud'
 
 const load = () => import('../lib/three/una3d.js')
@@ -20,7 +21,6 @@ function cardName(c) {
 
 export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
-  const other = game.players.find((p) => p !== me)
   const playing = game.phase === 'playing'
   const myTurn = playing && game.turn === me
   const [wildFor, setWildFor] = useState(null)
@@ -30,7 +30,7 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
 
   const canSayUna =
     playing && !game.saidUna[me] && ((myTurn && game.hand.length === 2 && game.playable.length > 0) || (game.catchable === me && game.hand.length === 1))
-  const canCatch = playing && game.catchable === other
+  const canCatch = playing && !!game.catchable && game.catchable !== me
   const canDraw = myTurn && game.drawn == null
 
   const onPick = useCallback(
@@ -45,7 +45,8 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
     [myTurn, canDraw, game.playable, game.hand, send],
   )
 
-  const state = useMemo(() => ({ game, me }), [game, me])
+  const colors = useMemo(() => Object.fromEntries(game.players.map((p) => [p, cssColor(colorOf(p))])), [game.players, colorOf])
+  const state = useMemo(() => ({ game, me, colors }), [game, me, colors])
   const last = game.log[game.log.length - 1]
 
   let title
@@ -86,6 +87,11 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
             >
               <span className="h-5 w-5 rounded-full" style={{ background: color.fill }} />
               <span className="text-sm font-bold">{color.name}</span>
+              {game.players.length > 2 && (
+                <span className="text-base font-bold text-muted" title={game.direction === 1 ? 'La ronda va en el orden de llegada' : 'La ronda va al revés'}>
+                  {game.direction === 1 ? '↻' : '↺'}
+                </span>
+              )}
               {game.pending > 0 && <span className="rounded-full bg-ink px-2 text-sm font-extrabold text-white">+{game.pending}</span>}
             </motion.div>
           )}
@@ -101,7 +107,7 @@ export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
                 <BigAction onClick={() => send({ type: 'un_una' })} color={CARD_COLORS.r.fill}>¡Una!</BigAction>
               )}
               {canCatch && (
-                <BigAction onClick={() => send({ type: 'un_catch' })} color="#22252E">¡{other} no dijo Una! (+2)</BigAction>
+                <BigAction onClick={() => send({ type: 'un_catch' })} color="#22252E">¡{game.catchable} no dijo Una! (+2)</BigAction>
               )}
               {canDraw && (
                 <button className={secondary} onClick={() => send({ type: 'un_draw' })}>{game.pending ? `Robar ${game.pending}` : 'Robar'}</button>
@@ -185,20 +191,25 @@ function describe(l, me) {
 function RoundOver({ game, me, send, colorOf }) {
   const r = game.result
   const finished = game.phase === 'finished'
-  const loser = game.players.find((p) => p !== r.winner)
+  const losers = game.players.filter((p) => p !== r.winner)
   return (
     <section className="pop pointer-events-auto max-h-[70%] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-paper/95 p-5 shadow-xl backdrop-blur sm:p-6">
       <p className="font-display text-3xl font-extrabold" style={{ color: colorOf(r.winner) }}>
         {finished && game.options.goal ? (game.winner === me ? '¡Ganaste la partida!' : `${game.winner} ganó la partida`) : r.winner === me ? '¡Te quedaste sin cartas!' : `¡${r.winner} se quedó sin cartas!`}
       </p>
       <p className="mt-1 text-muted">
-        {r.winner === me ? 'Sumas' : 'Suma'} {r.points} puntos por las cartas que le quedaron a {loser === me ? 'ti' : loser}.
+        {r.winner === me ? 'Sumas' : 'Suma'} {r.points} puntos por las cartas que {losers.length === 1 ? `le quedaron a ${losers[0] === me ? 'ti' : losers[0]}` : 'les quedaron a los demás'}.
       </p>
-      <div className="mt-4 flex flex-wrap gap-1">
-        {(game.hands?.[loser] ?? []).map((c) => (
-          <PlayingCard key={c.id} card={c} width={46} />
-        ))}
-      </div>
+      {losers.map((p) => (
+        <div key={p} className="mt-3">
+          {losers.length > 1 && <p className="mb-1 text-sm font-semibold" style={{ color: colorOf(p) }}>{p === me ? 'Tú' : p}</p>}
+          <div className="flex flex-wrap gap-1">
+            {(game.hands?.[p] ?? []).map((c) => (
+              <PlayingCard key={c.id} card={c} width={46} />
+            ))}
+          </div>
+        </div>
+      ))}
       {finished ? (
         <EndActions send={send} replay={{ type: 'start_game', game: 'una', ...game.options }} />
       ) : (

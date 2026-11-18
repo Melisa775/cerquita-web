@@ -459,14 +459,21 @@ function Waiting({ game, me, colorOf }) {
       </p>
     )
   }
-  const other = game.players.find((p) => p !== me)
+  const others = game.players.filter((p) => p !== me)
   const mine = game.answered.includes(me)
-  const theirs = game.answered.includes(other)
+  const done = others.filter((p) => game.answered.includes(p))
+  const waiting = others.filter((p) => !game.answered.includes(p))
   return (
     <p className="mt-5 text-muted">
-      {mine ? `Respuesta enviada. ${theirs ? '' : `Esperando a ${other}…`}` : theirs ? (
+      {mine ? `Respuesta enviada. ${waiting.length ? `Esperando a ${waiting.join(', ')}…` : ''}` : done.length ? (
         <>
-          <span className="font-semibold" style={{ color: colorOf(other) }}>{other}</span> ya respondió. ¡Rápido!
+          {done.map((p, i) => (
+            <span key={p}>
+              <span className="font-semibold" style={{ color: colorOf(p) }}>{p}</span>
+              {i < done.length - 1 ? ', ' : ''}
+            </span>
+          ))}{' '}
+          {done.length === 1 ? 'ya respondió' : 'ya respondieron'}. ¡Rápido!
         </>
       ) : (
         'Mientras más rápido aciertes, más puntos (de 50 a 100).'
@@ -521,7 +528,7 @@ function Outcome({ game, me, send, colorOf }) {
               })}
           </p>
         )}
-        {passes && <p className="mt-1 text-sm text-muted">Ahora le toca a {game.players.find((p) => p !== game.last.by)}.</p>}
+        {passes && <p className="mt-1 text-sm text-muted">Ahora le toca a {game.players[(game.players.indexOf(game.last.by) + 1) % game.players.length]}.</p>}
       </div>
       <button
         onClick={() => send({ type: 'next_round', at: game.asked })}

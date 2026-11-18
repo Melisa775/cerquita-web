@@ -8,6 +8,10 @@
   --color-line: #CDCFD5;    /* borders */
   --color-p1: #0F6E6A;      /* player 1 */
   --color-p2: #B23A5A;      /* player 2 */
+  --color-p3: #D08A2E;      /* player 3 */
+  --color-p4: #3B5BA5;      /* player 4 */
+  --color-p5: #6B4FA0;      /* player 5 */
+  --color-p6: #2F8F4F;      /* player 6 */
   --color-danger: #A23B1F;
 
   --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
