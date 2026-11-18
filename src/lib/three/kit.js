@@ -343,3 +343,69 @@ export function makeCard(w, h, front, back, { thickness = 0.012, radius = 0.07, 
   g.userData.size = [w, h]
   return shadowed(g)
 }
+
+/* --- letter tiles ------------------------------------------------------------- */
+
+/** Printed face of a letter tile (cached per letter and colors). */
+export function letterTexture(ch = '', { bg = '#FBF6EA', fg = INK, small = '' } = {}) {
+  return canvasTexture(
+    192,
+    192,
+    (ctx) => {
+      ctx.fillStyle = bg
+      ctx.beginPath()
+      ctx.roundRect(0, 0, 192, 192, 26)
+      ctx.fill()
+      if (ch) {
+        ctx.fillStyle = fg
+        ctx.font = `800 ${ch.length > 1 ? 92 : 124}px "Bricolage Grotesque", system-ui, sans-serif`
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(ch.toUpperCase(), small ? 90 : 96, small ? 98 : 104)
+      }
+      if (small) {
+        ctx.fillStyle = fg
+        ctx.globalAlpha = 0.7
+        ctx.font = '700 38px "Instrument Sans", system-ui, sans-serif'
+        ctx.textAlign = 'right'
+        ctx.textBaseline = 'bottom'
+        ctx.fillText(small, 176, 182)
+      }
+    },
+    `letter|${ch}|${bg}|${fg}|${small}`,
+  )
+}
+
+const tileGeoCache = new Map()
+/**
+ * A wooden letter tile lying flat, size `s`. It has two printed faces, the
+ * top one and the one underneath (for tiles that flip over, like Wordle's).
+ * `tile.userData.setTop(ch, opts)` / `setBottom(ch, opts)` reprint them.
+ */
+export function makeLetterTile(s = 0.9, { body = '#E9DFC8', thickness = 0.16 } = {}) {
+  const key = `${s}|${thickness}`
+  if (!tileGeoCache.has(key)) tileGeoCache.set(key, [new RoundedBoxGeometry(s, thickness, s, 3, Math.min(0.06, s * 0.08)), roundedPlane(s * 0.92, s * 0.92, s * 0.1)])
+  const [boxGeo, faceGeo] = tileGeoCache.get(key)
+  const g = new THREE.Group()
+  const box = new THREE.Mesh(boxGeo, mat(body, { roughness: 0.55 }))
+  const top = new THREE.Mesh(faceGeo, new THREE.MeshStandardMaterial({ map: letterTexture(''), roughness: 0.5 }))
+  top.rotation.x = -Math.PI / 2
+  top.position.y = thickness / 2 + 0.002
+  const bottom = new THREE.Mesh(faceGeo, new THREE.MeshStandardMaterial({ map: letterTexture(''), roughness: 0.5 }))
+  bottom.rotation.x = Math.PI / 2
+  // (it reads the right way once the tile turns over on its x axis)
+  bottom.position.y = -thickness / 2 - 0.002
+  g.add(box, top, bottom)
+  const print = (m) => (ch, opts) => {
+    const tex = letterTexture(ch, opts)
+    if (m.material.map !== tex) {
+      m.material.map = tex
+      m.material.needsUpdate = true
+    }
+  }
+  g.userData.setTop = print(top)
+  g.userData.setBottom = print(bottom)
+  g.userData.body = box
+  g.userData.size = s
+  return shadowed(g)
+}

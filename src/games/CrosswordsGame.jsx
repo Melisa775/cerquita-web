@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+/**
+ * Crosswords on the 3D stage. Pick a letter in the rack and tap a square (or
+ * drag it onto the board); tap one of your yellow letters to take it back.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedNumber, Confetti, spring } from '../lib/motion'
 import { CONFETTI_COLORS } from '../components/EndActions'
 import { EndActions } from '../components/EndActions'
-import { SIZE, preview } from '../lib/crosswords'
+import { preview } from '../lib/crosswords'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, Flash, Plates, Sheet, StageLayout } from '../components/stage/hud'
 
-const PREMIUM_STYLE = {
-  TP: { bg: 'hsl(4 70% 60%)', fg: 'white', label: '3P' },
-  DP: { bg: 'hsl(345 70% 84%)', fg: 'hsl(345 50% 32%)', label: '2P' },
-  TL: { bg: 'hsl(212 62% 55%)', fg: 'white', label: '3L' },
-  DL: { bg: 'hsl(200 70% 84%)', fg: 'hsl(205 50% 30%)', label: '2L' },
-}
-const BOARD_BG = 'hsl(40 28% 92%)'
+const load = () => import('../lib/three/crosswords3d.js')
+
 const ALPHABET = 'ABCDEFGHIJKLMNÑOPQRSTUVWXYZ'.split('')
 
 export default function CrosswordsGame({ room, me, send, colorOf, error, errorId }) {
@@ -25,6 +26,7 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
   const [drag, setDrag] = useState(null) // {idx, x, y}
   const [flash, setFlash] = useState(null)
   const rackKey = game.rack.join('')
+  const stageRef = useRef(null)
 
   // If the rack changes (you played, exchanged, or it's a new game) local state resets
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
     setOrder(game.rack.map((_, i) => i))
   }, [rackKey, game.rack])
   useEffect(() => {
-    if (error) setFlash(error)
+    if (error) setFlash({ text: error, id: errorId })
   }, [errorId, error])
   useEffect(() => {
     if (!flash) return
@@ -88,98 +90,144 @@ export default function CrosswordsGame({ room, me, send, colorOf, error, errorId
       setSelected(selected === idx ? null : idx)
       return
     }
-    const el = document.elementFromPoint(e.clientX, e.clientY)?.closest?.('[data-cell]')
-    if (el) {
-      const [r, c] = el.dataset.cell.split(',').map(Number)
-      placeAt(r, c, d.idx)
-    }
+    const cell = stageRef.current?.call('cellAtScreen', e.clientX, e.clientY)
+    if (cell) placeAt(cell[0], cell[1], d.idx)
   }
 
+  const onPick = ({ kind, id }) => {
+    if (kind !== 'cell' && kind !== 'pending') return
+    const [r, c] = id.split(',').map(Number)
+    clickCell(r, c)
+  }
+  const pickRef = useRef(onPick)
+  pickRef.current = onPick
+  const stablePick = useCallback((ev) => pickRef.current(ev), [])
+  const state = useMemo(
+    () => ({ board: game.board, premiums: game.premiums, values: game.values, pending, last: game.last, canPlace: myTurn && selected != null && !used.has(selected) }),
+    [game.board, game.premiums, game.values, pending, game.last, myTurn, selected], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const finished = game.phase === 'finished'
+  let title
+  if (finished) title = game.winner ? (game.winner === me ? '¡Ganaste!' : `Ganó ${game.winner}`) : 'Empate'
+  else if (myTurn) title = selected != null ? 'Toca una casilla del tablero' : pending.length ? 'Sigue armando tu palabra' : 'Te toca: elige una letra'
+  else title = `Juega ${game.turn}…`
+  const plates = game.players.map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: game.scores[p],
+    max: 0,
+    stats: `${game.rackCounts[p]} letras`,
+    active: !finished && game.turn === p,
+  }))
+
   return (
-    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-      <div className="fit-board [--fit-top:15rem]">
-        <Board game={game} pending={pending} onCell={clickCell} canPlace={myTurn && (selected != null || pending.length > 0)} colorOf={colorOf} />
-
-        {game.phase === 'playing' && (
-          <>
-            <div className="mt-3 min-h-7 text-center text-sm font-semibold">
-              {pv?.error && <span className="text-muted">{pv.error}</span>}
-              {pv?.words && (
-                <span>
-                  {pv.words.map((w) => `${w.word} (${w.points})`).join(' + ')}
-                  {pv.bingo && ' + 50 por usar las 7'} = <span className="font-display text-lg font-extrabold">{pv.score}</span>
-                </span>
-              )}
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#EFE9DF, #D8CDBB)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} onPick={stablePick} label="Tablero de palabras cruzadas en 3D" />}
+      overlay={
+        <>
+          {game.last?.bingo && <Confetti key={game.history?.length} colors={CONFETTI_COLORS} count={45} />}
+          {drag?.moved && (
+            <div className="pointer-events-none fixed z-50" style={{ left: drag.x - 22, top: drag.y - 22 }}>
+              <Tile letter={game.rack[drag.idx]} value={game.values[game.rack[drag.idx]]} size="h-11 w-11 text-2xl" lifted />
             </div>
-            <Rack
-              game={game}
-              order={order}
-              used={used}
-              selected={selected}
-              swap={swap}
-              onSwapToggle={(i) => {
-                const next = new Set(swap)
-                next.has(i) ? next.delete(i) : next.add(i)
-                setSwap(next)
-              }}
-              onPointerDown={onRackPointerDown}
-              onPointerMove={onRackPointerMove}
-              onPointerUp={onRackPointerUp}
-              myTurn={myTurn}
-            />
-            <Controls
-              game={game}
-              myTurn={myTurn}
-              pending={pending}
-              pv={pv}
-              swap={swap}
-              onSubmit={submit}
-              onRecall={() => setPending([])}
-              onShuffle={() => setOrder([...order].sort(() => Math.random() - 0.5))}
-              onSwapStart={() => {
-                setPending([])
-                setSwap(new Set())
-              }}
-              onSwapCancel={() => setSwap(null)}
-              onSwapConfirm={() => send({ type: 'cw_exchange', letters: [...swap].map((i) => game.rack[i]) })}
-              onPass={() => send({ type: 'cw_pass' })}
-            />
-          </>
-        )}
-        <p role="status" className="mt-2 min-h-6 text-center text-sm font-medium text-danger">{flash}</p>
-      </div>
-
-      <Side game={game} me={me} colorOf={colorOf} send={send} />
-
-      {drag?.moved && (
-        <div className="pointer-events-none fixed z-50" style={{ left: drag.x - 22, top: drag.y - 22 }}>
-          <Tile letter={game.rack[drag.idx]} value={game.values[game.rack[drag.idx]]} size="h-11 w-11" lifted />
-        </div>
-      )}
-
-      {blankAsk && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setBlankAsk(null)}>
-          <div className="pop w-full max-w-sm rounded-3xl bg-paper p-5" onClick={(e) => e.stopPropagation()}>
-            <p className="font-display text-xl font-bold">¿Qué letra es el comodín?</p>
-            <div className="mt-3 grid grid-cols-7 gap-1.5">
-              {ALPHABET.map((L) => (
-                <button
-                  key={L}
-                  onClick={() => {
-                    setPending([...pending, { r: blankAsk.r, c: blankAsk.c, letter: L, blank: true, idx: blankAsk.idx }])
-                    setBlankAsk(null)
-                    setSelected(null)
-                  }}
-                  className="rounded-lg bg-stone py-2 font-display font-bold hover:bg-line"
-                >
-                  {L}
-                </button>
-              ))}
-            </div>
+          )}
+        </>
+      }
+      top={
+        <>
+          <Plates players={plates} />
+          <div className="shrink-0 rounded-2xl bg-paper/90 px-3 py-1.5 text-right shadow-sm backdrop-blur">
+            <p className="font-display text-xl font-extrabold tabular-nums leading-tight">{game.bag}</p>
+            <p className="text-xs font-semibold text-muted">en la bolsa</p>
           </div>
-        </div>
-      )}
-    </div>
+        </>
+      }
+      bottom={
+        <>
+          <Banner title={title} color={finished ? (game.winner ? colorOf(game.winner) : undefined) : colorOf(game.turn)}>
+            {game.phase === 'playing' && (pv?.error || pv?.words) && (
+              <p className="text-xs font-semibold sm:text-sm">
+                {pv?.error && <span className="text-muted">{pv.error}</span>}
+                {pv?.words && (
+                  <>
+                    {pv.words.map((w) => `${w.word} (${w.points})`).join(' + ')}
+                    {pv.bingo && ' + 50 por usar las 7'} = <span className="font-display text-base font-extrabold">{pv.score}</span>
+                  </>
+                )}
+              </p>
+            )}
+          </Banner>
+          <Flash flash={flash} />
+          {game.phase === 'playing' && (
+            <div className="pointer-events-auto flex w-full max-w-xl flex-col items-center gap-2">
+              <Rack
+                game={game}
+                order={order}
+                used={used}
+                selected={selected}
+                swap={swap}
+                onSwapToggle={(i) => {
+                  const next = new Set(swap)
+                  next.has(i) ? next.delete(i) : next.add(i)
+                  setSwap(next)
+                }}
+                onPointerDown={onRackPointerDown}
+                onPointerMove={onRackPointerMove}
+                onPointerUp={onRackPointerUp}
+                myTurn={myTurn}
+              />
+              <Controls
+                game={game}
+                myTurn={myTurn}
+                pending={pending}
+                pv={pv}
+                swap={swap}
+                onSubmit={submit}
+                onRecall={() => setPending([])}
+                onShuffle={() => setOrder([...order].sort(() => Math.random() - 0.5))}
+                onSwapStart={() => {
+                  setPending([])
+                  setSwap(new Set())
+                }}
+                onSwapCancel={() => setSwap(null)}
+                onSwapConfirm={() => send({ type: 'cw_exchange', letters: [...swap].map((i) => game.rack[i]) })}
+                onPass={() => send({ type: 'cw_pass' })}
+              />
+            </div>
+          )}
+        </>
+      }
+      aside={
+        <>
+          <Side game={game} me={me} colorOf={colorOf} send={send} />
+          <AnimatePresence>
+            {blankAsk && (
+              <Sheet onClose={() => setBlankAsk(null)}>
+                <p className="font-display text-xl font-bold">¿Qué letra es el comodín?</p>
+                <div className="mt-3 grid grid-cols-7 gap-1.5">
+                  {ALPHABET.map((L) => (
+                    <button
+                      key={L}
+                      onClick={() => {
+                        setPending([...pending, { r: blankAsk.r, c: blankAsk.c, letter: L, blank: true, idx: blankAsk.idx }])
+                        setBlankAsk(null)
+                        setSelected(null)
+                      }}
+                      className="rounded-lg bg-stone py-2 font-display font-bold hover:bg-line"
+                    >
+                      {L}
+                    </button>
+                  ))}
+                </div>
+              </Sheet>
+            )}
+          </AnimatePresence>
+        </>
+      }
+    />
   )
 }
 CrosswordsGame.showsErrors = true
@@ -207,55 +255,11 @@ function Tile({ letter, value, blank, size = 'h-full w-full', pending, fresh, fr
   )
 }
 
-function Board({ game, pending, onCell, canPlace }) {
-  const prem = useMemo(() => new Map(game.premiums.map(([r, c, k]) => [`${r},${c}`, k])), [game.premiums])
-  // the tiles of the last play drop onto the board one after another
-  const fresh = new Map((game.last?.cells ?? []).map(([r, c], i) => [`${r},${c}`, i]))
-  const ref = useRef(null)
-  return (
-    <div
-      ref={ref}
-      className="grid aspect-square w-full gap-[2px] rounded-2xl p-1.5 text-[2.6vw] shadow-sm sm:text-base"
-      style={{ background: 'hsl(40 18% 78%)', gridTemplateColumns: `repeat(${SIZE}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${SIZE}, minmax(0, 1fr))` }}
-    >
-      {Array.from({ length: SIZE * SIZE }, (_, i) => {
-        const r = Math.floor(i / SIZE)
-        const c = i % SIZE
-        const k = `${r},${c}`
-        const tile = game.board[r][c]
-        const pend = pending.find((p) => p.r === r && p.c === c)
-        const p = prem.get(k)
-        const style = p ? PREMIUM_STYLE[p] : null
-        const center = r === 7 && c === 7
-        return (
-          <button
-            key={k}
-            type="button"
-            data-cell={k}
-            onClick={() => onCell(r, c)}
-            className={`relative flex items-center justify-center overflow-hidden rounded-[3px] ${!tile && canPlace ? 'hover:brightness-95' : ''}`}
-            style={{ background: style?.bg ?? BOARD_BG }}
-            aria-label={`Fila ${r + 1}, columna ${c + 1}${tile ? `: ${tile.letter}` : ''}`}
-          >
-            {!tile && !pend && (center ? (
-              <span className="text-[0.9em]" style={{ color: style?.fg }}>★</span>
-            ) : style ? (
-              <span className="text-[0.48em] font-bold" style={{ color: style.fg }}>{style.label}</span>
-            ) : null)}
-            {tile && <Tile key={fresh.has(k) ? `f${game.moves ?? game.history?.length}` : 's'} letter={tile.letter} value={game.values[tile.letter]} blank={tile.blank} fresh={fresh.has(k)} freshIndex={fresh.get(k)} />}
-            {pend && <Tile letter={pend.letter} value={game.values[pend.letter]} blank={pend.blank} pending />}
-          </button>
-        )
-      })}
-    </div>
-  )
-}
-
 /* --- rack and buttons --------------------------------------------------- */
 
 function Rack({ game, order, used, selected, swap, onSwapToggle, onPointerDown, onPointerMove, onPointerUp, myTurn }) {
   return (
-    <div className="mt-2 flex justify-center gap-1.5 rounded-2xl bg-paper p-2.5 sm:gap-2">
+    <div className="flex justify-center gap-1.5 rounded-2xl bg-paper/90 p-2 shadow-md backdrop-blur sm:gap-2">
       {order.map((i) => {
         const letter = game.rack[i]
         if (letter === undefined) return null
@@ -288,11 +292,11 @@ function Rack({ game, order, used, selected, swap, onSwapToggle, onPointerDown, 
 }
 
 function Controls({ game, myTurn, pending, pv, swap, onSubmit, onRecall, onShuffle, onSwapStart, onSwapCancel, onSwapConfirm, onPass }) {
-  const btn = 'rounded-2xl border border-line px-3 py-2.5 text-sm font-semibold hover:border-ink disabled:opacity-40'
+  const btn = 'rounded-2xl bg-paper/95 px-3 py-2 text-sm font-semibold shadow-sm hover:bg-white disabled:opacity-40'
   if (swap) {
     return (
-      <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-        <span className="text-sm text-muted">Toca las letras que quieres cambiar.</span>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        <span className="rounded-full bg-paper/90 px-3 py-1 text-sm text-muted">Toca las letras que quieres cambiar.</span>
         <button onClick={onSwapConfirm} disabled={!swap.size} className="rounded-2xl bg-ink px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-40">
           Cambiar {swap.size || ''}
         </button>
@@ -301,7 +305,7 @@ function Controls({ game, myTurn, pending, pv, swap, onSubmit, onRecall, onShuff
     )
   }
   return (
-    <div className="mt-3 flex flex-wrap justify-center gap-2">
+    <div className="flex flex-wrap justify-center gap-1.5">
       <button onClick={onSubmit} disabled={!myTurn || !pv?.words} className="rounded-2xl bg-ink px-6 py-2.5 font-semibold text-white disabled:opacity-40">
         Jugar{pv?.words ? ` (${pv.score})` : ''}
       </button>
@@ -331,10 +335,9 @@ function Side({ game, me, colorOf, send }) {
   if (finished) title = game.winner ? (game.winner === me ? '¡Ganaste!' : `Ganó ${game.winner}`) : 'Empate'
   else title = game.turn === me ? 'Te toca' : `Juega ${game.turn}…`
   return (
-    <aside className="rounded-[2rem] bg-paper p-5">
-      {game.last?.bingo && <Confetti key={game.history?.length} colors={CONFETTI_COLORS} count={45} />}
-      <p className="font-display text-3xl font-extrabold" style={{ color: finished ? (game.winner ? colorOf(game.winner) : undefined) : colorOf(game.turn) }}>{title}</p>
-      <div className="mt-4 space-y-2">
+    <section className="rounded-[1.6rem] bg-paper p-4">
+      <p className="font-display text-2xl font-extrabold" style={{ color: finished ? (game.winner ? colorOf(game.winner) : undefined) : colorOf(game.turn) }}>{title}</p>
+      <div className="mt-3 space-y-2">
         {game.players.map((p) => (
           <div key={p} className="relative flex items-center justify-between rounded-2xl bg-stone px-4 py-2.5">
             <span className="font-semibold" style={{ color: colorOf(p) }}>
@@ -384,6 +387,6 @@ function Side({ game, me, colorOf, send }) {
         {!game.history.length && <li className="text-muted">La primera palabra pasa por la estrella del centro.</li>}
       </ol>
       {finished && <EndActions send={send} replay={{ type: 'start_game', game: 'crosswords', ...game.options }} />}
-    </aside>
+    </section>
   )
 }

@@ -1,10 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import TimerBar from '../components/TimerBar'
 import { EndActions, winnerTitle } from '../components/EndActions'
 import { useCountdown } from '../hooks/useCountdown'
 import { AnimatePresence, motion } from 'motion/react'
 import { AnimatedNumber, spring } from '../lib/motion'
 import { areNeighbors, cleanWord, findPath, pointsFor, wordFromPath } from '../lib/boggle'
+import Stage3D from '../components/stage/Stage3D'
+import { Panel, Plates, StageLayout } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/boggle3d.js')
 
 export default function BoggleGame({ room, me, send, colorOf }) {
   const game = room.game
@@ -149,10 +154,12 @@ function Play({ room, me, send, colorOf }) {
   const [typed, setTyped] = useState('')
   const [feedback, setFeedback] = useState(null) // { text, good }
   const inputRef = useRef(null)
+  const stageRef = useRef(null)
   const playing = me in game.counts
   const mine = game.mine
   const done = game.done.includes(me)
   const color = colorOf(me)
+  const color3d = useMemo(() => cssColor(color), [color])
 
   const typedWord = cleanWord(typed)
   const typedPath = useMemo(() => (typedWord ? findPath(game.board, game.size, typedWord) : null), [typedWord, game.board, game.size])
@@ -181,30 +188,59 @@ function Play({ room, me, send, colorOf }) {
     send({ type: 'boggle_word', word })
     setFeedback({ id, text: `+ ${word.toUpperCase()}`, good: true })
   }
+  const submitRef = useRef(submit)
+  submitRef.current = submit
+
+  const onPick = useCallback(
+    (ev) => {
+      if (ev.kind === 'path') {
+        setTyped('')
+        setPath(ev.path)
+      } else if (ev.kind === 'submit') submitRef.current(wordFromPath(game.board, ev.path))
+    },
+    [game.board],
+  )
 
   function onTypedSubmit(e) {
     e.preventDefault()
     submit(typedWord || wordFromPath(game.board, path))
   }
 
-  const others = Object.keys(game.counts).filter((p) => p !== me)
+  const state = useMemo(
+    () => ({ board: game.board, size: game.size, round: game.round, path: shownPath, color: color3d, interactive: playing }),
+    [game.board, game.size, game.round, shownPath, color3d, playing],
+  )
+
+  const plates = Object.keys(game.counts).map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: game.counts[p],
+    max: 0,
+    stats: game.done.includes(p) ? 'Ya terminó' : `${game.counts[p] === 1 ? 'palabra' : 'palabras'}`,
+    active: !game.done.includes(p),
+  }))
 
   return (
-    <div className="mt-4">
-      <div className="flex items-baseline justify-between text-muted">
-        <RoundLabel game={game} />
-        <span className="font-display text-xl font-bold text-ink tabular-nums">{clock(left ?? game.playSeconds)}</span>
-      </div>
-      <TimerBar seconds={game.playSeconds} resetKey={game.round} msLeft={room.phaseEndsInMs} />
-
-      <div className="mt-5 grid gap-6 md:grid-cols-[minmax(0,1fr)_17rem] md:items-start xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="fit-board [--fit-top:16rem]">
-          <div className="flex h-12 items-center justify-center" aria-live="polite">
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#F1EAF6, #D9CBE6)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Caja de dados de letras en 3D" />}
+      top={
+        <>
+          <Plates players={plates} />
+          <div className="w-28 shrink-0 rounded-2xl bg-paper/90 px-3 py-1.5 text-right shadow-sm backdrop-blur">
+            <p className="font-display text-xl font-extrabold tabular-nums leading-tight">{clock(left ?? game.playSeconds)}</p>
+            <p className="text-xs font-semibold text-muted">Ronda {game.round}/{game.totalRounds}</p>
+            <div className="mt-1"><TimerBar seconds={game.playSeconds} resetKey={game.round} msLeft={room.phaseEndsInMs} /></div>
+          </div>
+        </>
+      }
+      bottom={
+        <>
+          <div className="flex h-12 items-center justify-center rounded-2xl bg-paper/90 px-5 shadow-md backdrop-blur" aria-live="polite">
             {current ? (
-              <span
-                className={`font-display text-3xl font-extrabold tracking-wider ${buildable ? '' : 'text-danger line-through'}`}
-                style={buildable ? { color } : undefined}
-              >
+              <span className={`font-display text-3xl font-extrabold tracking-wider ${buildable ? '' : 'text-danger line-through'}`} style={buildable ? { color } : undefined}>
                 {current.toUpperCase()}
               </span>
             ) : feedback ? (
@@ -219,27 +255,11 @@ function Play({ room, me, send, colorOf }) {
                 {feedback.text}
               </motion.span>
             ) : (
-              <span className="text-muted">
-                {playing ? 'Arrastra el dedo por letras vecinas o escribe abajo' : 'Esta ronda empezó antes de que entraras'}
-              </span>
+              <span className="text-sm text-muted">{playing ? 'Arrastra por letras vecinas o escribe abajo' : 'Esta ronda empezó antes de que entraras'}</span>
             )}
           </div>
-
-          <Board
-            game={game}
-            path={shownPath}
-            color={color}
-            interactive={playing}
-            shake
-            onPath={(p) => {
-              setTyped('')
-              setPath(p)
-            }}
-            onSubmit={(p) => submit(wordFromPath(game.board, p))}
-          />
-
           {playing && (
-            <form onSubmit={onTypedSubmit} className="mt-4 flex gap-2">
+            <form onSubmit={onTypedSubmit} className="pointer-events-auto flex w-full max-w-md gap-2">
               <input
                 ref={inputRef}
                 value={typed}
@@ -253,78 +273,60 @@ function Play({ room, me, send, colorOf }) {
                 autoCapitalize="none"
                 spellCheck={false}
                 maxLength={20}
-                className="w-full min-w-0 rounded-2xl border border-line bg-paper px-4 py-3 text-lg outline-none focus:border-ink"
+                className="w-full min-w-0 rounded-2xl border border-line bg-paper/95 px-4 py-3 text-lg shadow-md outline-none focus:border-ink"
               />
               {(path.length > 0 || typed) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPath([])
-                    setTyped('')
-                  }}
-                  className="rounded-2xl border border-line px-4 font-semibold hover:border-ink"
-                >
+                <button type="button" onClick={() => { setPath([]); setTyped('') }} className="rounded-2xl bg-paper/95 px-4 font-semibold shadow-md hover:bg-white">
                   Borrar
                 </button>
               )}
-              <button type="submit" className="rounded-2xl px-5 font-semibold text-white" style={{ background: color }}>
+              <button type="submit" className="rounded-2xl px-5 font-semibold text-white shadow-md" style={{ background: color }}>
                 Enviar
               </button>
             </form>
           )}
-        </div>
-
-        <aside>
-          <h2 className="text-xl font-bold">
-            Tus palabras <span className="text-muted">(<AnimatedNumber value={mine.length} />)</span>
-          </h2>
-          <ul className="mt-3 flex flex-wrap gap-2">
-            <AnimatePresence initial={false}>
-            {[...mine].reverse().map((m) => (
-              <motion.li
-                key={m.word}
-                layout
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={spring}
-                title={m.known ? undefined : 'No está en el diccionario: al final deciden si vale'}
-                className={`rounded-xl px-2.5 py-1 text-sm font-semibold ${m.known ? 'bg-paper' : 'border border-dashed border-line text-muted'}`}
+        </>
+      }
+      aside={
+        <>
+          <Panel title={<>Tus palabras <span className="text-muted">(<AnimatedNumber value={mine.length} />)</span></>}>
+            <ul className="flex flex-wrap gap-2">
+              <AnimatePresence initial={false}>
+                {[...mine].reverse().map((m) => (
+                  <motion.li
+                    key={m.word}
+                    layout
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={spring}
+                    title={m.known ? undefined : 'No está en el diccionario: al final deciden si vale'}
+                    className={`rounded-xl px-2.5 py-1 text-sm font-semibold ${m.known ? 'bg-stone' : 'border border-dashed border-line text-muted'}`}
+                  >
+                    {m.word.toUpperCase()}
+                    <span className="ml-1.5 text-xs text-muted tabular-nums">{m.known ? pointsFor(m.word) : '?'}</span>
+                  </motion.li>
+                ))}
+              </AnimatePresence>
+              {!mine.length && <li className="text-sm text-muted">Todavía ninguna.</li>}
+            </ul>
+            {playing && (
+              <button
+                onClick={() => send({ type: 'boggle_done' })}
+                disabled={done}
+                className="mt-4 w-full rounded-2xl border border-line px-4 py-3 font-semibold hover:border-ink disabled:opacity-60"
               >
-                {m.word.toUpperCase()}
-                <span className="ml-1.5 text-xs text-muted tabular-nums">{m.known ? pointsFor(m.word) : '?'}</span>
-              </motion.li>
-            ))}
-            </AnimatePresence>
-            {!mine.length && <li className="text-sm text-muted">Todavía ninguna.</li>}
-          </ul>
-
-          <ul className="mt-6 space-y-1 text-sm">
-            {others.map((p) => (
-              <li key={p}>
-                <span className="font-semibold" style={{ color: colorOf(p) }}>{p}</span>
-                <span className="text-muted">
-                  {' '}lleva <AnimatedNumber value={game.counts[p]} className="font-semibold text-ink" /> {game.counts[p] === 1 ? 'palabra' : 'palabras'}
-                  {game.done.includes(p) && ' y ya terminó'}
-                </span>
-              </li>
-            ))}
-          </ul>
-
-          {playing && (
-            <button
-              onClick={() => send({ type: 'boggle_done' })}
-              disabled={done}
-              className="mt-5 w-full rounded-2xl border border-line px-4 py-3 font-semibold hover:border-ink disabled:opacity-60"
-            >
-              {done ? 'Esperando a tu pareja…' : 'Ya no encuentro más'}
-            </button>
-          )}
-          <p className="mt-4 text-xs text-muted">
-            Puntos: 3–4 letras 1 · 5 letras 2 · 6 letras 3 · 7 letras 5 · 8 o más 11. Las palabras que encuentren los dos no cuentan.
-          </p>
-        </aside>
-      </div>
-    </div>
+                {done ? 'Esperando a tu pareja…' : 'Ya no encuentro más'}
+              </button>
+            )}
+          </Panel>
+          <Panel title="Puntos">
+            <p className="px-1 text-sm text-muted">
+              3–4 letras 1 · 5 letras 2 · 6 letras 3 · 7 letras 5 · 8 o más 11. Las palabras que encuentren los dos no cuentan.
+            </p>
+          </Panel>
+        </>
+      }
+    />
   )
 }
 

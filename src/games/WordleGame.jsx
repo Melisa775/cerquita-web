@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Wordle on the 3D stage: wooden letter tiles that flip over to show their
+ * colors. The keyboard floats over the bottom of the stage.
+ */
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, Flash, Panel, Plates, StageLayout } from '../components/stage/hud'
+
+const load = () => import('../lib/three/wordle3d.js')
 
 export const MARK_COLORS = {
   correct: 'hsl(148 42% 38%)',
@@ -26,6 +34,7 @@ function Play({ game, me, send, colorOf, error, errorId }) {
   const myTurn = team ? game.turn === me : true
   const done = !team && (game.solved.includes(me) || myRows.length >= game.maxTries)
   const canType = playing && isPlayer && myTurn && !done
+  const stageRef = useRef(null)
 
   const [draft, setDraft] = useState('')
   const [flash, setFlash] = useState(null)
@@ -47,7 +56,7 @@ function Play({ game, me, send, colorOf, error, errorId }) {
     errorsSeen.current = errorId
     if (!error) return
     setShake((n) => n + 1)
-    setFlash(error)
+    setFlash({ text: error, id: errorId })
   }, [errorId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -66,7 +75,7 @@ function Play({ game, me, send, colorOf, error, errorId }) {
     if (key === 'enter') {
       if (draft.length < game.length) {
         setShake((n) => n + 1)
-        setFlash(`La palabra tiene ${game.length} letras`)
+        setFlash({ text: `La palabra tiene ${game.length} letras`, id: Date.now() })
         return
       }
       send({ type: 'wordle_guess', word: draft })
@@ -94,162 +103,84 @@ function Play({ game, me, send, colorOf, error, errorId }) {
   const shownDraft = team && !myTurn ? game.draft : draft
   const typerColor = team ? colorOf(game.turn) : colorOf(me)
   const others = Object.keys(game.boards).filter((p) => p !== me)
+  const state = useMemo(
+    () => ({
+      length: game.length,
+      maxTries: game.maxTries,
+      round: game.round,
+      rows: myRows,
+      draft: playing && (canType || team) ? shownDraft ?? '' : null,
+      typerColor,
+      shakeKey: shake,
+      colors: MARK_COLORS,
+    }),
+    [game.length, game.maxTries, game.round, myRows, playing, canType, team, shownDraft, typerColor, shake],
+  )
+
+  let title
+  if (!playing) title = null
+  else if (team) title = game.turn === me ? 'Te toca escribir' : `Escribe ${game.turn}`
+  else if (done) title = game.solved.includes(me) ? '¡La sacaste!' : 'Se acabaron tus intentos'
+  else title = `Adivina la palabra de ${game.length} letras`
+  const hint = !playing ? null : team && game.turn !== me ? 'Ayúdale por la videollamada.' : done ? 'Espera a tu pareja…' : `Intento ${Math.min(myRows.length + 1, game.maxTries)} de ${game.maxTries}`
+
+  const plates = team
+    ? game.players.map((p) => ({ name: p, you: p === me, color: colorOf(p), value: game.saved, max: game.totalRounds, stats: `Ronda ${game.round} de ${game.totalRounds}`, active: playing && game.turn === p }))
+    : game.players.map((p) => ({
+        name: p,
+        you: p === me,
+        color: colorOf(p),
+        value: game.scores[p] ?? 0,
+        max: game.totalRounds,
+        stats: game.solved.includes(p) ? '¡La sacó!' : `${(game.boards[p] ?? []).length} de ${game.maxTries} intentos`,
+        active: playing && !game.solved.includes(p),
+      }))
 
   return (
-    <div className="mt-4">
-      <Header game={game} colorOf={colorOf} />
-
-      <div className={`mt-4 grid gap-6 ${!team && others.length ? 'md:grid-cols-[1fr_auto]' : ''}`}>
-        <div className="flex flex-col items-center">
-          <Status game={game} me={me} done={done} colorOf={colorOf} />
-          <Grid
-            game={game}
-            rows={myRows}
-            draft={playing && (canType || team) ? shownDraft : null}
-            shakeKey={shake}
-            typerColor={typerColor}
-            colorOf={colorOf}
-          />
-          <p className="mt-3 h-6 text-center font-medium text-danger" role="alert">{flash}</p>
-          {game.phase === 'round_over' ? (
-            <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
-          ) : (
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#E8F0EA, #C9DCCF)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} label="Tablero de Wordle en 3D" />}
+      top={<Plates players={plates} />}
+      bottom={
+        game.phase === 'round_over' ? (
+          <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
+        ) : (
+          <>
+            {title && <Banner title={title} hint={hint} color={typerColor} />}
+            <Flash flash={flash} />
             <Keyboard rows={myRows} canType={canType} onPress={press} />
-          )}
-        </div>
-
-        {!team && others.length > 0 && (
-          <aside className="flex justify-center gap-6 md:flex-col md:justify-start">
-            {others.map((p) => (
-              <MiniBoard key={p} game={game} player={p} colorOf={colorOf} />
-            ))}
-          </aside>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function Header({ game, colorOf }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-      <span>Ronda {game.round} de {game.totalRounds}</span>
-      {game.mode === 'duel' ? (
-        <div className="flex gap-2">
-          {Object.entries(game.scores).map(([p, n]) => (
-            <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} className="text-ink" />
-            </span>
-          ))}
-        </div>
-      ) : (
-        game.round > 1 && (
-          <span className="rounded-full bg-paper px-3 py-1 text-sm font-semibold text-ink">
-            Sacaron {game.saved} de {game.round - (game.phase === 'round_over' ? 0 : 1)}
-          </span>
+          </>
         )
-      )}
-    </div>
+      }
+      aside={
+        <>
+          {!team &&
+            others.map((p) => (
+              <Panel key={p} title={<span style={{ color: colorOf(p) }}>Tablero de {p}</span>}>
+                <MiniBoard game={game} player={p} />
+              </Panel>
+            ))}
+          <Panel title="Cómo se juega">
+            <ul className="space-y-1 px-1 text-sm text-muted">
+              <li><span className="font-bold" style={{ color: MARK_COLORS.correct }}>Verde</span>: la letra va ahí.</li>
+              <li><span className="font-bold" style={{ color: MARK_COLORS.present }}>Amarillo</span>: está en la palabra, en otro lugar.</li>
+              <li><span className="font-bold" style={{ color: MARK_COLORS.absent }}>Gris</span>: no está.</li>
+              <li>{team ? 'Escriben por turnos una palabra cada uno.' : 'Gana quien la saque en menos intentos.'}</li>
+            </ul>
+          </Panel>
+        </>
+      }
+    />
   )
 }
 
-function Status({ game, me, done, colorOf }) {
-  if (game.phase !== 'playing') return <div className="h-7" />
-  let text
-  if (game.mode === 'team') {
-    text =
-      game.turn === me ? (
-        <span>Te toca escribir</span>
-      ) : (
-        <span>
-          Escribe <span style={{ color: colorOf(game.turn) }}>{game.turn}</span>. Ayúdale por la videollamada.
-        </span>
-      )
-  } else if (done) {
-    text = game.solved.includes(me) ? '¡La sacaste! Espera a tu pareja…' : 'Se acabaron tus intentos. Espera a tu pareja…'
-  } else {
-    text = `Adivina la palabra de ${game.length} letras`
-  }
-  return <p className="h-7 text-center font-semibold">{text}</p>
-}
-
-function tileSize(length) {
-  return length >= 6 ? 'h-12 w-12 text-2xl sm:h-14 sm:w-14' : length === 5 ? 'h-14 w-14 text-3xl sm:h-16 sm:w-16' : 'h-16 w-16 text-3xl sm:h-[4.5rem] sm:w-[4.5rem]'
-}
-
-function Grid({ game, rows, draft, shakeKey, typerColor, colorOf }) {
-  const size = tileSize(game.length)
-  const lines = []
-  for (let i = 0; i < game.maxTries; i++) {
-    const row = rows[i]
-    if (row) {
-      lines.push(
-        <div key={`r${i}-done`} className="flex gap-1.5">
-          {row.marks.map((mark, j) => (
-            // A solved row does a little wave once every tile has flipped
-            <div
-              key={j}
-              className={row.marks.every((m) => m === 'correct') ? 'wordle-win' : undefined}
-              style={{ animationDelay: `${row.marks.length * 110 + 450 + j * 90}ms` }}
-            >
-              <div
-                className={`flip flex items-center justify-center rounded-xl border-2 font-display font-extrabold uppercase ${size}`}
-                style={{ '--from': 'var(--color-paper)', '--to': MARK_COLORS[mark], animationDelay: `${j * 110}ms` }}
-              >
-                {row.word?.[j]}
-              </div>
-            </div>
-          ))}
-          {game.mode === 'team' && (
-            <span className="ml-1 h-2.5 w-2.5 self-center rounded-full" style={{ background: colorOf(row.player) }} title={row.player} />
-          )}
-        </div>,
-      )
-    } else if (i === rows.length && draft != null) {
-      lines.push(
-        <div key={`r${i}-draft-${shakeKey}`} className={`flex gap-1.5 ${shakeKey ? 'shake' : ''}`}>
-          {Array.from({ length: game.length }, (_, j) => {
-            const ch = draft[j]
-            return (
-              <div
-                key={j}
-                className={`flex items-center justify-center rounded-xl border-2 bg-paper font-display font-extrabold uppercase ${size} ${ch ? 'pop' : ''}`}
-                style={{ borderColor: ch ? typerColor : 'var(--color-line)' }}
-              >
-                {ch}
-              </div>
-            )
-          })}
-          {game.mode === 'team' && <span className="ml-1 h-2.5 w-2.5 self-center rounded-full" style={{ background: typerColor }} />}
-        </div>,
-      )
-    } else {
-      lines.push(
-        <div key={`r${i}-empty`} className="flex gap-1.5">
-          {Array.from({ length: game.length }, (_, j) => (
-            <div key={j} className={`rounded-xl border-2 border-line/70 bg-paper/50 ${size}`} />
-          ))}
-          {game.mode === 'team' && <span className="ml-1 h-2.5 w-2.5" />}
-        </div>,
-      )
-    }
-  }
-  return (
-    <div className="mt-3 flex flex-col gap-1.5" role="grid" aria-label="Tablero">
-      {lines}
-    </div>
-  )
-}
-
-function MiniBoard({ game, player, colorOf }) {
+function MiniBoard({ game, player }) {
   const rows = game.boards[player] ?? []
   const solved = game.solved.includes(player)
   return (
-    <div className="rounded-2xl bg-paper p-4">
-      <p className="mb-2 text-sm font-semibold" style={{ color: colorOf(player) }}>
-        {player}
-        <span className="font-normal text-muted"> · {solved ? '¡la sacó!' : `${rows.length} de ${game.maxTries}`}</span>
-      </p>
+    <div className="px-1">
+      <p className="mb-2 text-sm text-muted">{solved ? '¡La sacó!' : `${rows.length} de ${game.maxTries} intentos`}</p>
       <div className="flex flex-col gap-1" aria-label={`Tablero de ${player}`}>
         {Array.from({ length: game.maxTries }, (_, i) => (
           <div key={i} className="flex gap-1">
@@ -284,9 +215,9 @@ function Keyboard({ rows, canType, onPress }) {
       if (!status[ch] || RANK[mark] > RANK[status[ch]]) status[ch] = mark
     })
   }
-  const key = 'h-12 sm:h-14 rounded-xl font-display font-bold disabled:opacity-50'
+  const key = 'h-11 sm:h-12 rounded-xl font-display font-bold disabled:opacity-50'
   return (
-    <div className="mt-2 w-full max-w-xl space-y-1.5" role="group" aria-label="Teclado">
+    <div className="pointer-events-auto w-full max-w-xl space-y-1 rounded-2xl bg-paper/85 p-1.5 shadow-lg backdrop-blur sm:space-y-1.5" role="group" aria-label="Teclado">
       {ROWS.map((row, r) => (
         <div key={row} className="flex justify-center gap-1 sm:gap-1.5">
           {r === 2 && (
@@ -341,7 +272,7 @@ function RoundOver({ game, me, send, colorOf }) {
     detail = 'Ronda sin punto.'
   }
   return (
-    <div className="pop mt-2 w-full max-w-xl rounded-[2rem] p-6 text-white" style={{ background: accent }}>
+    <div className="pop pointer-events-auto w-full max-w-xl rounded-[2rem] p-6 text-white shadow-xl" style={{ background: accent }}>
       <p className="text-sm font-semibold text-white/80">La palabra era</p>
       <p className="font-display text-4xl font-extrabold uppercase tracking-widest" aria-label={game.answer}>
         {game.answer.split('').map((ch, i) => (
