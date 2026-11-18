@@ -39,7 +39,7 @@ export default function Home({ initialCode = '', onEnter }) {
     }
     run('join', async () => {
       const info = await checkRoom(c)
-      if (info.full && !info.players.includes(cleanName)) throw new Error('Esa sala ya tiene dos personas.')
+      if (info.full && !info.players.includes(cleanName)) throw new Error('Esa sala ya está llena (máximo 6 personas).')
       return c
     })
   }

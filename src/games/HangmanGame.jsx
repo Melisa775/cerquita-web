@@ -26,7 +26,7 @@ function Play({ game, me, send, colorOf }) {
   useViewKeys(stageRef)
   const choosing = game.phase === 'choosing'
   const over = game.phase === 'round_over'
-  const guesserColor = game.mode === 'turns' && game.guessers?.[0] ? colorOf(game.guessers[0]) : 'var(--color-ink)'
+  const guesserColor = game.mode === 'turns' && game.guessers?.length === 1 ? colorOf(game.guessers[0]) : 'var(--color-ink)'
   const color3d = useMemo(() => cssColor(guesserColor), [guesserColor])
   const state = useMemo(
     () => ({
@@ -172,7 +172,7 @@ function Board({ game, me, send, colorOf }) {
   const [attempt, setAttempt] = useState('')
   const guessing = game.phase === 'guessing'
   const canGuess = guessing && game.guessers.includes(me)
-  const guesserColor = game.mode === 'turns' ? colorOf(game.guessers[0]) : 'var(--color-ink)'
+  const guesserColor = game.mode === 'turns' && game.guessers.length === 1 ? colorOf(game.guessers[0]) : 'var(--color-ink)'
   const over = game.phase === 'round_over'
 
   // It can also be played with the computer keyboard
@@ -273,13 +273,19 @@ function Lives({ left, total }) {
 
 function Role({ game, me, colorOf }) {
   if (game.phase !== 'guessing') return null
-  if (game.mode === 'random') return <p className="text-muted">Adivinen juntos. Cualquiera de los dos puede tocar letras.</p>
+  if (game.mode === 'random') return <p className="text-muted">Adivinen juntos. Cualquiera puede tocar letras.</p>
   if (game.setter === me) {
-    const g = game.guessers[0]
+    const many = game.guessers.length > 1
     return (
       <p className="text-muted">
-        Es tu palabra. <span className="font-semibold" style={{ color: colorOf(g) }}>{g}</span> está adivinando; las letras
-        claras son las que le faltan.
+        Es tu palabra.{' '}
+        {game.guessers.map((g, i) => (
+          <span key={g}>
+            <span className="font-semibold" style={{ color: colorOf(g) }}>{g}</span>
+            {i < game.guessers.length - 2 ? ', ' : i === game.guessers.length - 2 ? ' y ' : ''}
+          </span>
+        ))}{' '}
+        {many ? 'están adivinando' : 'está adivinando'}; las letras claras son las que faltan.
       </p>
     )
   }
@@ -342,7 +348,7 @@ function RoundOver({ game, me, send, colorOf }) {
       ? `Con ${r.livesLeft} ${r.livesLeft === 1 ? 'vida' : 'vidas'} de sobra.`
       : 'Se acabaron las vidas. La palabra quedó arriba, en rojo lo que faltó.'
   } else if (r.won) {
-    const g = game.guessers[0]
+    const g = r.by
     title = g === me ? '¡La adivinaste!' : `¡${g} la adivinó!`
     detail = `Con ${r.livesLeft} ${r.livesLeft === 1 ? 'vida' : 'vidas'} de sobra. Punto para ${g === me ? 'ti' : g}.`
   } else {

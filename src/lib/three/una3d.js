@@ -6,7 +6,7 @@
  */
 import * as THREE from 'three'
 import { createStage } from './stage'
-import { canvasTexture, glowRing, hitBox, makeCard, makeGlow, makeTable, roundedPlane } from './kit'
+import { canvasTexture, floorLabel, glowRing, hitBox, makeCard, makeGlow, makeTable, roundedPlane } from './kit'
 import { animate } from 'animejs'
 
 const COLORS = { r: '#D7352D', y: '#F6B91C', g: '#2E9157', b: '#2D74C4' }
@@ -164,7 +164,6 @@ export function create(container, handlers) {
   let ringColor = null
 
   const mine = new Map() // card id -> mesh
-  const theirs = []
   const discards = [] // meshes on the discard pile, oldest first
   let topId = null
   let round = null
@@ -188,8 +187,8 @@ export function create(container, handlers) {
   const pileTop = () => new THREE.Vector3(PILE[0], 0.05 + pileSize * 0.022, PILE[1])
 
   /** Fan layout for n cards at depth z: x, a slight arc and the fan angle. */
-  function fan(n, i, z, dir = 1) {
-    const spread = Math.min(0.72, 7.2 / Math.max(n, 1))
+  function fan(n, i, z, dir = 1, maxSpread = null) {
+    const spread = maxSpread ?? Math.min(0.72, 7.2 / Math.max(n, 1))
     const x = (i - (n - 1) / 2) * spread
     const a = (n > 1 ? (i - (n - 1) / 2) / (n - 1) : 0) * Math.min(0.35, n * 0.04)
     return { x, z: z - dir * Math.abs(a) * 0.5, angle: -a * dir }
@@ -233,9 +232,13 @@ export function create(container, handlers) {
       mineGroup.remove(fromMine)
       mine.delete(game.top.id)
     } else if (!first && last?.action === 'play') {
-      const from = theirs[theirs.length - 1]
-      card.position.set(from ? from.position.x : 0, 1.2, THEIR_Z + 0.4)
-      card.rotation.set(Math.PI - 0.6, 0, 0)
+      // from the hand of whoever played it
+      const seat = seats.get(last.player)
+      const from = seat?.cards.at(-1)
+      if (from) from.getWorldPosition(card.position)
+      else card.position.set(0, 1.2, THEIR_Z + 0.4)
+      card.position.y = 1.2
+      card.rotation.set(Math.PI - 0.6, seat ? seat.group.rotation.y : 0, 0)
     } else {
       card.position.copy(target)
       card.rotation.set(0, r, 0)
@@ -314,26 +317,66 @@ export function create(container, handlers) {
     })
   }
 
-  function syncTheirs(count, playing) {
-    const n = playing ? Math.min(count, 24) : 0
-    while (theirs.length > n) theirGroup.remove(theirs.pop())
-    while (theirs.length < n) {
-      const m = newCard(null)
-      m.position.copy(pileTop())
-      m.rotation.set(Math.PI, 0, 0)
-      theirGroup.add(m)
-      theirs.push(m)
+  /** Seats around the table for the others, in playing order: left, across, right. */
+  const SEAT_ANGLES = { 1: [0], 2: [Math.PI / 2, -Math.PI / 2], 3: [Math.PI / 2, 0, -Math.PI / 2] }
+  const seats = new Map() // player -> { group, cards, label }
+
+  function seatFor(name, angle, color) {
+    let seat = seats.get(name)
+    if (!seat) {
+      const group = new THREE.Group()
+      theirGroup.add(group)
+      seat = { group, cards: [], label: null }
+      seats.set(name, seat)
     }
-    theirs.forEach((m, i) => {
-      const f = fan(n, i, THEIR_Z, -1)
-      // standing up, backs toward me
-      const key = `${n}|${i}`
-      if (m.userData.slot === key) return
-      const fresh = m.userData.slot === undefined
-      m.userData.slot = key
-      flyTo(m, new THREE.Vector3(-f.x, 0.75 + i * 0.004, f.z + i * 0.006), { x: Math.PI + TILT, y: f.angle, z: 0 }, { duration: fresh ? 560 : 300, height: fresh ? 0.9 : 0, delay: fresh && !current ? i * 70 : 0 })
+    seat.group.rotation.y = angle
+    if (!seat.label || seat.label.userData.color !== color) {
+      if (seat.label) seat.group.remove(seat.label)
+      seat.label = floorLabel(name, 2.2, 0.42, { fg: color, font: '800 150px "Bricolage Grotesque", system-ui' })
+      seat.label.userData.color = color
+      seat.label.position.set(0, 0.02, THEIR_Z - 0.85) // behind their cards, by the edge of the table
+      seat.group.add(seat.label)
+    }
+    return seat
+  }
+
+  function syncTheirs(game, me, colors) {
+    const playing = game.phase === 'playing'
+    const order = game.players.slice(game.players.indexOf(me) + 1).concat(game.players.slice(0, game.players.indexOf(me)))
+    const angles = SEAT_ANGLES[order.length] ?? order.map((_, i) => Math.PI / 2 - (i * Math.PI) / Math.max(1, order.length - 1))
+    for (const [name, seat] of seats) {
+      if (!order.includes(name)) {
+        theirGroup.remove(seat.group)
+        seats.delete(name)
+      }
+    }
+    const side = order.length > 1
+    order.forEach((name, k) => {
+      const seat = seatFor(name, angles[k], colors?.[name] ?? '#FFFFFF')
+      const n = playing ? Math.min(game.counts[name] ?? 0, 24) : 0
+      const cards = seat.cards
+      while (cards.length > n) seat.group.remove(cards.pop())
+      while (cards.length < n) {
+        const m = newCard(null)
+        seat.group.add(m)
+        m.position.copy(seat.group.worldToLocal(pileTop()))
+        m.rotation.set(Math.PI, 0, 0)
+        cards.push(m)
+      }
+      cards.forEach((m, i) => {
+        // seats on the sides get a narrower fan so they don't reach my hand
+        const spread = side && Math.abs(angles[k]) > 0.1 ? Math.min(0.42, 3.6 / Math.max(n, 1)) : null
+        const f = fan(n, i, THEIR_Z, -1, spread)
+        const key = `${n}|${i}`
+        if (m.userData.slot === key) return
+        const fresh = m.userData.slot === undefined
+        m.userData.slot = key
+        // standing up, backs toward me
+        flyTo(m, new THREE.Vector3(-f.x, 0.75 + i * 0.004, f.z + i * 0.006), { x: Math.PI + TILT, y: f.angle, z: 0 }, { duration: fresh ? 560 : 300, height: fresh ? 0.9 : 0, delay: fresh && !current ? i * 70 : 0 })
+      })
     })
   }
+
 
   stage.onFrame((t) => {
     marks.children.forEach((m, i) => m.scale.setScalar(1 + Math.sin(t * 4 + i) * 0.06))
@@ -348,7 +391,7 @@ export function create(container, handlers) {
         round = game.round
         mine.forEach((m) => mineGroup.remove(m))
         mine.clear()
-        theirs.splice(0).forEach((m) => theirGroup.remove(m))
+        seats.forEach((seat) => seat.cards.splice(0).forEach((m) => seat.group.remove(m)))
         discards.splice(0).forEach((m) => discardGroup.remove(m))
         topId = null
         current = null
@@ -361,8 +404,7 @@ export function create(container, handlers) {
       syncDiscard(game, me)
       syncColor(game.color, game.pending)
       syncMine(game, myTurn)
-      const other = game.players.find((p) => p !== me)
-      syncTheirs(game.counts[other] ?? 0, game.phase === 'playing')
+      syncTheirs(game, me, state.colors)
       if (myTurn && game.drawn == null) {
         const ring = glowRing(glow, 0.95, 0.04)
         ring.position.set(PILE[0], 0.03, PILE[1])

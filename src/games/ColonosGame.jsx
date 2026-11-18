@@ -38,7 +38,9 @@ function cssColor(value) {
 
 export default function ColonosGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
-  const other = game.players.find((p) => p !== me)
+  const order = game.order ?? game.players
+  if (import.meta.env.DEV) window.__colonosGame = game // lets the browser tests read the game
+  const isBot = (p) => (game.bots ?? []).includes(p)
   const finished = game.phase === 'finished'
   useSoundOn(finished, 'fanfare') // trumpets for the winner
   const myTurn = game.turn === me && !finished
@@ -123,12 +125,26 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
 
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
           <div className="flex items-start justify-between gap-2">
-            <Plates game={game} me={me} other={other} colorOf={colorOf} />
+            <Plates game={game} me={me} order={order} isBot={isBot} colorOf={colorOf} />
             <DiceTray game={game} />
           </div>
 
           <div className="flex flex-col items-center gap-2">
-            <Banner game={game} me={me} other={other} colorOf={colorOf} mode={activeMode} />
+            <Banner game={game} me={me} colorOf={colorOf} mode={activeMode} />
+            {myTurn && game.phase === 'steal' && (
+              <div className="pointer-events-auto flex flex-wrap justify-center gap-2">
+                {(game.legal.steal ?? []).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => send({ type: 'co_steal', victim: p })}
+                    className="rounded-full px-5 py-2.5 font-bold text-white shadow-lg"
+                    style={{ background: colorOf(p) }}
+                  >
+                    Robarle a {p} ({game.playersInfo[p].cards} 🂠)
+                  </button>
+                ))}
+              </div>
+            )}
             <AnimatePresence>
               {flash && (
                 <motion.p
@@ -166,13 +182,13 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
             ))}
           </div>
           <div className="p-3">
-            {panel === 'trade' ? <Trade game={game} me={me} other={other} myTurn={myTurn} send={send} /> : <Log game={game} me={me} colorOf={colorOf} />}
+            {panel === 'trade' ? <Trade game={game} me={me} myTurn={myTurn} send={send} /> : <Log game={game} me={me} colorOf={colorOf} />}
           </div>
         </section>
       </aside>
 
       <AnimatePresence>
-        {game.offer && game.offer.from !== me && !finished && <OfferSheet key="offer" game={game} send={send} />}
+        {game.offer && game.offer.from !== me && !game.offer.rejected?.includes(me) && !finished && <OfferSheet key="offer" game={game} send={send} />}
         {game.discardNeed?.[me] > 0 && <DiscardModal key="discard" game={game} me={me} send={send} />}
         {picker && <PickerModal key="picker" kind={picker} onClose={() => setPicker(null)} send={send} />}
       </AnimatePresence>
@@ -183,11 +199,14 @@ ColonosGame.showsErrors = true
 
 /* --- HUD: players ------------------------------------------------------------- */
 
-function Plates({ game, me, other, colorOf }) {
+function Plates({ game, me, order, isBot, colorOf }) {
+  // you first, then the others in turn order
+  const list = [me, ...order.slice(order.indexOf(me) + 1), ...order.slice(0, Math.max(0, order.indexOf(me)))].filter((p) => game.playersInfo[p])
+  const many = list.length > 2
   return (
     // information only: taps go through to the board
-    <div className="flex gap-1.5">
-      {[me, other].filter(Boolean).map((p) => {
+    <div className={`flex min-w-0 gap-1.5 ${many ? 'flex-wrap' : ''}`}>
+      {list.map((p) => {
         const info = game.playersInfo[p]
         const active = game.turn === p && game.phase !== 'finished'
         const pct = Math.min(1, info.points / game.goal)
@@ -217,9 +236,9 @@ function Plates({ game, me, other, colorOf }) {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-bold" style={{ color: colorOf(p) }}>
-                {p}{p === me && ' (tú)'}
+                {p}{p === me && ' (tú)'}{isBot(p) && <span className="ml-1 rounded-full bg-stone px-1.5 text-[0.6rem] font-bold text-muted">bot</span>}
               </p>
-              <p className="hidden gap-2 text-xs text-muted sm:flex" aria-label={`${info.cards} cartas, ${info.devCount} de desarrollo, ${info.knights} soldados, camino de ${info.road}`}>
+              <p className={`hidden gap-2 text-xs text-muted ${many ? 'xl:flex' : 'sm:flex'}`} aria-label={`${info.cards} cartas, ${info.devCount} de desarrollo, ${info.knights} soldados, camino de ${info.road}`}>
                 <span title="Cartas de recurso">🂠 {info.cards}</span>
                 <span title="Cartas de desarrollo">✦ {info.devCount}</span>
                 <span title="Soldados jugados">⚔ {info.knights}</span>
@@ -241,7 +260,7 @@ function Plates({ game, me, other, colorOf }) {
 
 /* --- HUD: what to do now ----------------------------------------------------- */
 
-function phaseText(game, me, other, mode) {
+function phaseText(game, me, mode) {
   const myTurn = game.turn === me
   if (game.phase === 'finished') return [game.winner === me ? '¡Ganaste!' : `Ganó ${game.winner}`, null]
   if (game.phase === 'setup') {
@@ -250,7 +269,8 @@ function phaseText(game, me, other, mode) {
       ? ['Pon un pueblo', 'Toca un punto brillante. Los números con más puntitos salen más seguido.']
       : ['Pon un camino', 'Sale del pueblo que acabas de poner.']
   }
-  if (game.phase === 'discard') return [game.discardNeed?.[me] ? `Bota ${game.discardNeed[me]} cartas` : `${other} está botando cartas`, 'Salió 7: quien tiene más de 7 cartas bota la mitad.']
+  if (game.phase === 'discard') return [game.discardNeed?.[me] ? `Bota ${game.discardNeed[me]} cartas` : `${Object.keys(game.discardNeed ?? {}).join(' y ')} ${Object.keys(game.discardNeed ?? {}).length > 1 ? 'están' : 'está'} botando cartas`, 'Salió 7: quien tiene más de 7 cartas bota la mitad.']
+  if (game.phase === 'steal') return myTurn ? ['¿A quién le robas?', 'El ladrón quedó junto a varios: elige a quién quitarle una carta.'] : [`${game.turn} está eligiendo a quién robarle`, null]
   if (game.phase === 'robber') return myTurn ? ['Mueve el ladrón', 'Toca un hexágono brillante: deja de producir y robas una carta.'] : [`${game.turn} mueve el ladrón`, null]
   if (game.phase === 'road_building') return myTurn ? [`Pon ${game.freeRoads} ${game.freeRoads === 1 ? 'camino gratis' : 'caminos gratis'}`, null] : [`${game.turn} está construyendo`, null]
   if (game.phase === 'roll') return myTurn ? ['Te toca: lanza los dados', 'Espacio para lanzar.'] : [`Turno de ${game.turn}`, null]
@@ -258,10 +278,10 @@ function phaseText(game, me, other, mode) {
   return myTurn ? ['Construye, comercia o termina', null] : [`Juega ${game.turn}…`, null]
 }
 
-function Banner({ game, me, other, colorOf, mode }) {
-  const [title, hint] = phaseText(game, me, other, mode)
+function Banner({ game, me, colorOf, mode }) {
+  const [title, hint] = phaseText(game, me, mode)
   const who = game.phase === 'finished' ? game.winner : game.turn
-  const stolen = game.stolen?.res && game.log.at(-1)?.action === 'robber' ? game.stolen : null
+  const stolen = game.stolen?.res && game.log.at(-1)?.action === 'steal' ? game.stolen : null
   return (
     <AnimatePresence mode="popLayout">
       <motion.div
@@ -601,7 +621,8 @@ function Stepper({ value, onChange, max }) {
   )
 }
 
-function Trade({ game, me, other, myTurn, send }) {
+function Trade({ game, me, myTurn, send }) {
+  const others = game.players.filter((p) => p !== me)
   const [tab, setTab] = useState('bank')
   const [give, setGive] = useState(null)
   const [get, setGet] = useState(null)
@@ -618,7 +639,7 @@ function Trade({ game, me, other, myTurn, send }) {
   return (
     <div className="space-y-3 text-sm">
       <div className="grid grid-cols-2 gap-1 rounded-xl bg-stone p-1">
-        {[['bank', 'Banco y puertos'], ['player', `Con ${other}`]].map(([k, l]) => (
+        {[['bank', 'Banco y puertos'], ['player', others.length === 1 ? `Con ${others[0]}` : 'Con los demás']].map(([k, l]) => (
           <button key={k} onClick={() => setTab(k)} className={`rounded-lg py-1 font-semibold ${tab === k ? 'bg-paper shadow-sm' : 'text-muted'}`}>{l}</button>
         ))}
       </div>
@@ -642,9 +663,10 @@ function Trade({ game, me, other, myTurn, send }) {
         </>
       ) : myOffer ? (
         <div className="space-y-2">
-          <p>Le ofreciste a {other}:</p>
+          <p>{others.length === 1 ? `Le ofreciste a ${others[0]}:` : 'Ofreciste a todos:'}</p>
           <OfferSummary offer={myOffer} />
-          <p className="animate-pulse text-muted">Esperando su respuesta…</p>
+          {myOffer.rejected?.length > 0 && <p className="text-muted">Dijeron que no: {myOffer.rejected.join(', ')}</p>}
+          <p className="animate-pulse text-muted">{others.length === 1 ? 'Esperando su respuesta…' : 'El primero que acepte se queda con el cambio…'}</p>
           <button onClick={() => send({ type: 'co_cancel' })} className="w-full rounded-xl border border-line py-2 font-semibold">Cancelar oferta</button>
         </div>
       ) : (
@@ -714,7 +736,8 @@ function describe(l, me) {
       return parts.length ? `Produjiste ${parts.join(', ')}` : 'Esta vez no produjiste nada'
     }
     case 'discard': return `${you ? 'Botaste' : `${who}botó`} ${l.count} cartas`
-    case 'robber': return `${you ? 'Moviste' : `${who}movió`} el ladrón${l.stole ? ' y robó una carta' : ''}`
+    case 'robber': return `${you ? 'Moviste' : `${who}movió`} el ladrón`
+    case 'steal': return `${you ? 'Le robaste' : `${who}le robó`} una carta a ${l.victim === me ? 'ti' : l.victim}`
     case 'build': return `${you ? 'Construiste' : `${who}construyó`} ${WHAT[l.what]}`
     case 'bank': return `${you ? 'Cambiaste' : `${who}cambió`} ${l.rate} de ${RES_META[l.give].label.toLowerCase()} por 1 de ${RES_META[l.get].label.toLowerCase()}`
     case 'offer': return `${you ? 'Propusiste' : `${who}propuso`} un cambio`

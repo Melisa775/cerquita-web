@@ -19,4 +19,4 @@ export function inkFor(color) {
   return lum > 150 ? '#22252E' : '#FFFFFF'
 }
 
-export const PLAYER_COLORS = ['var(--color-p1)', 'var(--color-p2)']
+export const PLAYER_COLORS = ['var(--color-p1)', 'var(--color-p2)', 'var(--color-p3)', 'var(--color-p4)', 'var(--color-p5)', 'var(--color-p6)']

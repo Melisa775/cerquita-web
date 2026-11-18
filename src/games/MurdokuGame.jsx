@@ -95,7 +95,6 @@ function Play({ game, me, send, colorOf }) {
     [game, portraits, selected, canEdit, colors],
   )
 
-  const other = game.players.find((p) => p !== me)
   const placedCount = Object.keys(game.placed).length
   const allPlaced = placedCount === game.people.length
   const person = selected != null ? game.people[selected] : null
@@ -115,7 +114,7 @@ function Play({ game, me, send, colorOf }) {
     hint = 'Elige a alguien abajo y toca su casilla. Una casilla vacía se marca con ✕.'
   }
 
-  const plates = game.mode === 'race' && other
+  const plates = game.mode === 'race' && game.players.length > 1
     ? game.players.map((p) => ({
         name: p,
         you: p === me,
