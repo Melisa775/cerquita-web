@@ -232,10 +232,8 @@ function Battle({ game, me, send, colorOf, flash }) {
   const stageRef = useRef(null)
 
   // the sea follows the turn: theirs when you shoot, yours when they shoot
+  // you choose which sea to look at; it starts on the enemy's when it's your turn
   const [view, setView] = useState(myTurn ? 'enemy' : 'mine')
-  useEffect(() => {
-    if (!finished) setView(myTurn ? 'enemy' : 'mine')
-  }, [myTurn, finished])
   const showing = view
   const board = showing === 'enemy' ? game.boards[other] : game.boards[me]
 

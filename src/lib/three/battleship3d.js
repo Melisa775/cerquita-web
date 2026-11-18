@@ -68,16 +68,18 @@ export function create(container, handlers) {
     waves = { geo, base: Float32Array.from(geo.attributes.position.array) }
     const water = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: SEA, roughness: 0.3, metalness: 0.05, flatShading: true }))
     water.receiveShadow = true
+    // the waves stay between the frame (well below) and the grid lines and markers (above),
+    // so nothing flickers through the water as it moves
     sea.add(water)
     // frame around the sea, with the coordinates
     const frame = new THREE.Mesh(new RoundedBoxGeometry(n + 1.4, 0.3, n + 1.4, 3, 0.12), mat('#E9E2D2', { roughness: 0.7 }))
-    frame.position.y = -0.2
+    frame.position.y = -0.32
     frame.receiveShadow = true
     sea.add(frame)
     const lines = []
     for (let i = 0; i <= n; i++) {
       const p = i - n / 2
-      lines.push(-n / 2, 0.03, p, n / 2, 0.03, p, p, 0.03, -n / 2, p, 0.03, n / 2)
+      lines.push(-n / 2, 0.05, p, n / 2, 0.05, p, p, 0.05, -n / 2, p, 0.05, n / 2)
     }
     const lg = new THREE.BufferGeometry()
     lg.setAttribute('position', new THREE.Float32BufferAttribute(lines, 3))
@@ -86,9 +88,9 @@ export function create(container, handlers) {
       const [x] = cell(0, i)
       const [, z] = cell(i, 0)
       const col = floorLabel(COLS[i], 0.45, 0.45, { fg: '#6B6F7B', font: '800 150px "Bricolage Grotesque", system-ui' })
-      col.position.set(x, -0.04, -n / 2 - 0.4)
+      col.position.set(x, -0.165, -n / 2 - 0.4)
       const row = floorLabel(String(i + 1), 0.5, 0.45, { fg: '#6B6F7B', font: '800 140px "Bricolage Grotesque", system-ui' })
-      row.position.set(-n / 2 - 0.4, -0.04, z)
+      row.position.set(-n / 2 - 0.4, -0.165, z)
       sea.add(col, row)
     }
     // one invisible tap area per cell
@@ -154,7 +156,7 @@ export function create(container, handlers) {
     const buoy = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), mat('#F4F7FA', { roughness: 0.3 }))
     buoy.position.y = 0.06
     g.add(ring, buoy)
-    g.position.set(x, 0.04, z)
+    g.position.set(x, 0.06, z)
     return g
   }
 
@@ -189,7 +191,7 @@ export function create(container, handlers) {
       if (v === 'hit') obj = fire(x, z)
       else if (v === 'auto') {
         obj = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 14), new THREE.MeshStandardMaterial({ color: '#D6ECF8', transparent: true, opacity: 0.8 }))
-        obj.position.set(x, 0.04, z)
+        obj.position.set(x, 0.06, z)
       } else obj = splash(x, z)
       obj.userData.v = v
       shotsGroup.add(obj)
@@ -231,7 +233,7 @@ export function create(container, handlers) {
       for (let i = 0; i < pos.count; i++) {
         const x = waves.base[i * 3]
         const z = waves.base[i * 3 + 2]
-        pos.array[i * 3 + 1] = Math.sin(x * 1.3 + t * 1.4) * 0.025 + Math.cos(z * 1.1 + t * 1.1) * 0.025
+        pos.array[i * 3 + 1] = Math.sin(x * 1.3 + t * 1.4) * 0.018 + Math.cos(z * 1.1 + t * 1.1) * 0.018
       }
       pos.needsUpdate = true
       waves.geo.computeVertexNormals()

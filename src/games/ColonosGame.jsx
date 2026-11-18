@@ -13,6 +13,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { animate } from 'animejs'
 import Board3D from './colonos/Board3D'
+import { useSoundOn } from '../hooks/useSoundOn'
+import { MuteButton } from '../components/stage/hud'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { EndActions } from '../components/EndActions'
 import { DEV_META, RESOURCES, RES_META, ResourceIcon, TERRAIN } from '../lib/colonos'
@@ -38,6 +40,7 @@ export default function ColonosGame({ room, me, send, colorOf, error, errorId })
   const game = room.game
   const other = game.players.find((p) => p !== me)
   const finished = game.phase === 'finished'
+  useSoundOn(finished, 'fanfare') // trumpets for the winner
   const myTurn = game.turn === me && !finished
   const [mode, setMode] = useState(null) // build mode chosen by the player: road | settlement | city
   const [picker, setPicker] = useState(null) // year_of_plenty | monopoly
@@ -447,6 +450,7 @@ function ViewButtons({ board }) {
       <button className={btn} onClick={() => board.current?.zoom(1)} aria-label="Acercar">+</button>
       <button className={btn} onClick={() => board.current?.zoom(-1)} aria-label="Alejar">−</button>
       <button className={btn} onClick={() => board.current?.resetView()} aria-label="Centrar la vista (R)" title="Centrar la vista (R)">⟲</button>
+      <MuteButton className={btn} />
     </div>
   )
 }
