@@ -9,6 +9,7 @@ import { Confetti, spring } from '../lib/motion'
 import { CONFETTI_COLORS } from '../components/EndActions'
 import ChessPiece, { PIECE_VALUES } from '../components/ChessPiece'
 import Stage3D from '../components/stage/Stage3D'
+import { useSoundOn } from '../hooks/useSoundOn'
 import { Banner, Flash, Plates, Sheet, StageLayout, useFlash, useViewKeys } from '../components/stage/hud'
 
 const PROMOS = ['q', 'r', 'b', 'n']
@@ -21,6 +22,7 @@ export default function ChessGame({ room, me, send, colorOf: playerColor, error,
   const myColor = game.colors[me] ?? 'w'
   const opponent = game.players.find((p) => p !== me)
   const finished = game.phase === 'finished'
+  useSoundOn(finished && !!game.result?.reason?.startsWith('timeout'), 'timeUp')
   const myTurn = !finished && game.toMove === me
   const flash = useFlash(error, errorId)
   const [selected, setSelected] = useState(null)

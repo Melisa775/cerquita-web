@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { animate } from 'animejs'
 import { AnimatedNumber, softSpring, spring } from '../../lib/motion'
+import { isMuted, onMuteChange, setMuted } from '../../lib/sound'
 
 /** 3D stage on the left (with HUD on top), side panel on the right; stacked on phones. */
 export function StageLayout({ stage, top, bottom, aside, overlay, sky = 'linear-gradient(#BFE3F2, #8FCBE8)', stageRef }) {
@@ -209,11 +210,26 @@ export function DiceTray({ dice, rollId, sum = true, red, selected, used = [], o
 export function ViewButtons({ stageRef }) {
   const btn = 'flex h-9 w-9 items-center justify-center rounded-full bg-paper/90 text-lg font-bold shadow-sm backdrop-blur hover:bg-paper'
   return (
-    <div className="absolute bottom-3 left-3 hidden flex-col gap-1.5 sm:flex">
-      <button className={btn} onClick={() => stageRef.current?.call('zoom', 1)} aria-label="Acercar">+</button>
-      <button className={btn} onClick={() => stageRef.current?.call('zoom', -1)} aria-label="Alejar">−</button>
-      <button className={btn} onClick={() => stageRef.current?.call('resetView')} aria-label="Centrar la vista (R)" title="Centrar la vista (R)">⟲</button>
-    </div>
+    <>
+      <div className="absolute bottom-3 left-3 hidden flex-col gap-1.5 sm:flex">
+        <button className={btn} onClick={() => stageRef.current?.call('zoom', 1)} aria-label="Acercar">+</button>
+        <button className={btn} onClick={() => stageRef.current?.call('zoom', -1)} aria-label="Alejar">−</button>
+        <button className={btn} onClick={() => stageRef.current?.call('resetView')} aria-label="Centrar la vista (R)" title="Centrar la vista (R)">⟲</button>
+        <MuteButton className={btn} />
+      </div>
+      <MuteButton className={`${btn} absolute bottom-3 left-3 sm:hidden`} />
+    </>
+  )
+}
+
+/** Sound on/off (remembered in this browser). */
+export function MuteButton({ className }) {
+  const [muted, setMutedState] = useState(isMuted)
+  useEffect(() => onMuteChange(setMutedState), [])
+  return (
+    <button className={className} onClick={() => setMuted(!muted)} aria-pressed={muted} aria-label={muted ? 'Activar el sonido' : 'Silenciar'} title={muted ? 'Activar el sonido' : 'Silenciar'}>
+      {muted ? '🔇' : '🔊'}
+    </button>
   )
 }
 
