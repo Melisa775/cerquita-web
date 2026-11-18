@@ -4,8 +4,12 @@ import { TERRAIN, TerrainArt } from '../lib/colonos'
 const PREVIEW = ['forest', 'fields', 'hills', 'pasture', 'mountains']
 
 /** Lobby card for Colonos (Catan-style). */
-export default function ColonosCard({ send, alone }) {
+export default function ColonosCard({ send, alone, count = 1 }) {
   const [goal, setGoal] = useState(10)
+  const maxBots = Math.max(0, Math.min(3, 4 - count))
+  const [bots, setBots] = useState(alone ? 1 : 0)
+  const nBots = Math.min(bots, maxBots)
+  const canPlay = count + nBots >= 2
   const [friendly, setFriendly] = useState(false)
   return (
     <article className="flex flex-col overflow-hidden rounded-3xl bg-paper">
@@ -33,7 +37,25 @@ export default function ColonosCard({ send, alone }) {
         <p className="mt-3 text-muted">
           Al estilo Catan: una isla al azar, dados que hacen producir los terrenos y a construir caminos, pueblos y ciudades.
           Comercien con el banco, los puertos o entre ustedes, cuídense del ladrón y jueguen cartas de desarrollo.
+          De 2 a 4 jugadores, y los que falten pueden ser bots que juegan solos.
         </p>
+        <div className="mt-3">
+          <p className="text-sm font-semibold">Bots</p>
+          <div className="mt-1 grid grid-cols-4 gap-1 rounded-2xl bg-stone p-1" role="group" aria-label="Cuántos bots">
+            {[0, 1, 2, 3].map((n) => (
+              <button
+                key={n}
+                onClick={() => setBots(n)}
+                disabled={n > maxBots}
+                aria-pressed={nBots === n}
+                className={`rounded-xl px-2 py-1.5 text-sm font-semibold disabled:opacity-30 ${nBots === n ? 'bg-paper shadow-sm' : 'text-muted'}`}
+              >
+                {n === 0 ? 'Sin bots' : `${n} 🤖`}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1 text-xs text-muted">Los bots lanzan, construyen, comercian con el banco y responden tus ofertas.</p>
+        </div>
         <label className="mt-3 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={friendly} onChange={(e) => setFriendly(e.target.checked)} className="h-4 w-4 accent-[var(--color-ink)]" />
           Ladrón amable (no molesta a quien tiene 2 puntos o menos)
@@ -48,11 +70,11 @@ export default function ColonosCard({ send, alone }) {
               </select>
             </label>
             <button
-              onClick={() => send({ type: 'start_game', game: 'colonos', goal, friendly })}
-              disabled={alone}
+              onClick={() => send({ type: 'start_game', game: 'colonos', goal, friendly, bots: nBots })}
+              disabled={!canPlay}
               className="w-full rounded-2xl bg-ink px-5 py-3 font-semibold text-white disabled:opacity-40"
             >
-              {alone ? 'Esperando a tu pareja' : 'Jugar'}
+              {canPlay ? (nBots ? `Jugar con ${nBots} ${nBots === 1 ? 'bot' : 'bots'}` : 'Jugar') : 'Agrega un bot o espera a tu pareja'}
             </button>
           </div>
         </div>

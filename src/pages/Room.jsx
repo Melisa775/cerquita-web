@@ -76,7 +76,7 @@ const LOBBY_GAMES = [
   { Card: DominoCard, max: 2, kind: 'table', tagline: 'Doble seis para dos.' },
   { Card: ParquesCard, max: 4, kind: 'table', tagline: 'A la colombiana, con dos dados.' },
   { Card: UnaLobbyCard, max: 4, kind: 'table', tagline: 'Cartas, comodines y ¡Una!' },
-  { Card: ColonosCard, max: 2, kind: 'table', tagline: 'Construyan en una isla al azar.' },
+  { Card: ColonosCard, max: 4, kind: 'table', tagline: 'Construyan en una isla al azar.' },
 ]
 const FILTERS = [
   ['all', 'Todos'],
@@ -114,7 +114,14 @@ export default function Room({ code, name, onExit, onPlayingChange }) {
   }
 
   const players = room.players
-  const colorOf = (player) => PLAYER_COLORS[Math.max(0, players.findIndex((p) => p.name === player))]
+  // people keep their room color; players that only exist in the game (bots) come after them
+  const gamePlayers = Array.isArray(room.game?.players) ? room.game.players : []
+  const colorOf = (player) => {
+    const i = players.findIndex((p) => p.name === player)
+    if (i >= 0) return PLAYER_COLORS[i]
+    const j = gamePlayers.filter((p) => !players.some((q) => q.name === p)).indexOf(player)
+    return PLAYER_COLORS[j >= 0 ? Math.min(PLAYER_COLORS.length - 1, players.length + j) : 0]
+  }
   const GameView = room.game ? GAME_VIEWS[room.game.name] : null
 
   return (
@@ -233,7 +240,7 @@ function Lobby({ room, send }) {
                 {collapsed ? 'Opciones' : 'Menos'}
               </button>
               <div className={tooMany ? 'pointer-events-none opacity-45 grayscale' : undefined} aria-disabled={tooMany || undefined}>
-                <Card send={send} alone={alone} />
+                <Card send={send} alone={alone} count={count} />
               </div>
               {tooMany && (
                 <p className="absolute inset-x-3 bottom-3 z-10 rounded-2xl bg-ink px-3 py-2 text-center text-sm font-semibold text-white">
