@@ -34,6 +34,7 @@ export function createStage(
     shadows = true,
     exposure = 1.05,
     shadowSize = 7,
+    layout = null, // (aspect, world) => ({ fitHalfWidth, fitHalfDepth }) to adapt the framing to the screen shape
   } = {},
   { onPick, onHover } = {},
 ) {
@@ -49,6 +50,8 @@ export function createStage(
   container.appendChild(renderer.domElement)
 
   const scene = new THREE.Scene()
+  const world = new THREE.Group()
+  scene.add(world)
   scene.background = new THREE.Color(background)
   scene.fog = new THREE.Fog(background, 16, 40)
 
@@ -80,11 +83,10 @@ export function createStage(
   }
   scene.add(sun)
 
-  const world = new THREE.Group()
-  scene.add(world)
-
   /* -- framing --------------------------------------------------------- */
   const HOME = new THREE.Vector3()
+  const halfW = fitHalfWidth
+  const halfD = fitHalfDepth
   const baseTarget = new THREE.Vector3(...target)
   function fit() {
     const w = container.clientWidth || 1
@@ -95,6 +97,9 @@ export function createStage(
     camera.fov = portrait ? portraitFov : fov
     camera.updateProjectionMatrix()
     const halfFov = THREE.MathUtils.degToRad(camera.fov / 2)
+    const fitted = layout?.(camera.aspect, world) ?? {}
+    const fitHalfWidth = fitted.fitHalfWidth ?? halfW
+    const fitHalfDepth = fitted.fitHalfDepth ?? halfD
     // far enough for the content to fit the width (and the depth, if given)
     const byWidth = fitHalfWidth / Math.tan(Math.atan(Math.tan(halfFov) * camera.aspect))
     const byDepth = fitHalfDepth ? fitHalfDepth / Math.tan(halfFov) : 0
@@ -225,6 +230,11 @@ export function createStage(
     },
     resetView,
     zoom,
+    /** Recomputes the framing (after the content changed size) and moves the camera there. */
+    refit() {
+      fit()
+      camera.position.copy(HOME)
+    },
     /** Screen position of an object or of a pickable found by kind and id (browser tests). */
     project(objOrKind, id) {
       let obj = objOrKind

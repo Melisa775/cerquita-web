@@ -1,8 +1,18 @@
-import { useEffect, useState } from 'react'
+/**
+ * Guess Who on the 3D stage: your board is a tray of hinged frames. Tap a
+ * frame to flip it down or up again; questions and the log live in the side
+ * panel, answering and guessing happen on the stage.
+ */
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import Avatar from '../components/Avatar'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, BigAction, Flash, Plates, StageLayout, useFlash, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/guesswho3d.js')
 
 export default function GuessWhoGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
@@ -10,14 +20,19 @@ export default function GuessWhoGame({ room, me, send, colorOf, error, errorId }
   return <Play game={game} me={me} send={send} colorOf={colorOf} error={error} errorId={errorId} />
 }
 
-function Play({ game, me, send, colorOf }) {
-  const byId = Object.fromEntries(game.characters.map((c) => [c.id, c]))
+GuessWhoGame.showsErrors = true
+
+function Play({ game, me, send, colorOf, error, errorId }) {
+  const byId = useMemo(() => Object.fromEntries(game.characters.map((c) => [c.id, c])), [game.characters])
   const isPlayer = game.players.includes(me)
   const other = game.players.find((p) => p !== me)
   const playing = game.phase === 'playing'
   const myTurn = playing && game.turn === me && !game.pending
   const [guessing, setGuessing] = useState(false)
   const [picked, setPicked] = useState(null)
+  const flash = useFlash(error, errorId)
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
   // Flipping characters down feels instant; the server confirms afterwards
   const [flipped, setFlipped] = useState(() => new Set(game.flipped))
 
@@ -29,174 +44,146 @@ function Play({ game, me, send, colorOf }) {
     }
   }, [myTurn])
 
-  function onCard(id) {
-    if (!playing || !isPlayer) return
-    if (guessing) {
-      setPicked(id)
-      return
-    }
-    const next = new Set(flipped)
-    next.has(id) ? next.delete(id) : next.add(id)
-    setFlipped(next)
-    send({ type: 'gw_flip', id })
-  }
+  const onPick = useCallback(
+    ({ kind, id }) => {
+      if (kind !== 'char' || !playing || !isPlayer) return
+      if (guessing) return setPicked(id)
+      setFlipped((prev) => {
+        const next = new Set(prev)
+        next.has(id) ? next.delete(id) : next.add(id)
+        return next
+      })
+      send({ type: 'gw_flip', id })
+    },
+    [playing, isPlayer, guessing, send],
+  )
 
-  const cols = game.characters.length > 16 ? 'grid-cols-4 sm:grid-cols-6 xl:grid-cols-8' : 'grid-cols-4 xl:grid-cols-8'
+  // portraits as SVG text, for the 3D frames
+  // (drawn once by React in a hidden box, then read back as markup)
+  const portraitBox = useRef(null)
+  const [portraits, setPortraits] = useState({})
+  const castKey = game.characters.map((c) => c.id).join(',')
+  useLayoutEffect(() => {
+    const out = {}
+    portraitBox.current?.querySelectorAll('[data-id]').forEach((el) => {
+      const svg = el.querySelector('svg')
+      if (!svg) return
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      svg.setAttribute('width', '256')
+      svg.setAttribute('height', '256')
+      out[el.dataset.id] = svg.outerHTML
+    })
+    setPortraits(out)
+  }, [castKey])
+  const color = useMemo(() => cssColor(colorOf(me)), [colorOf, me])
+  const state = useMemo(
+    () => (Object.keys(portraits).length ? { characters: game.characters, portraits, flipped, picked, guessing, interactive: playing && isPlayer, secret: game.mySecret, color } : null),
+    [game.characters, portraits, flipped, picked, guessing, playing, isPlayer, game.mySecret, color],
+  )
+
+  const pend = game.pending
+  let title
+  let hint = null
+  if (game.phase === 'round_over') title = 'Ronda terminada'
+  else if (pend && pend.asker !== me) title = `${pend.asker} pregunta`
+  else if (pend) title = `Esperando la respuesta de ${other}…`
+  else if (guessing) {
+    title = picked ? `¿Es ${byId[picked].name}?` : '¿Quién es?'
+    hint = picked ? `Si fallas, la ronda es para ${other}.` : 'Toca a quien crees que es.'
+  } else if (myTurn) {
+    title = 'Te toca preguntar'
+    hint = 'Pregunta en el panel y baja a quien ya descartaste.'
+  } else title = `Pregunta ${game.turn}…`
+  if (pend && !hint) hint = pend.text
+
+  const plates = game.players.map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: game.scores[p] ?? 0,
+    max: game.totalRounds,
+    stats: playing ? `${game.remaining[p]} en pie` : `Ronda ${game.round} de ${game.totalRounds}`,
+    active: playing && game.turn === p,
+  }))
+  const secret = game.mySecret && byId[game.mySecret]
+  const soft = 'pointer-events-auto rounded-full bg-paper/95 px-5 py-2.5 font-bold shadow-md backdrop-blur hover:bg-white'
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-        <span>Ronda {game.round} de {game.totalRounds}</span>
-        <div className="flex gap-2">
-          {Object.entries(game.scores).map(([p, n]) => (
-            <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} className="text-ink" />
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_19rem] lg:grid-rows-[auto_1fr] lg:items-start lg:gap-x-6">
-        <div className="lg:col-start-1 lg:row-span-2 lg:row-start-1">
-          {guessing && (
-            <p className="mb-3 rounded-2xl bg-ink px-4 py-3 text-center font-semibold text-white">
-              Toca a quien crees que es. Si fallas, pierdes la ronda.
-            </p>
-          )}
-          <div className={`grid gap-2 sm:gap-3 ${cols}`}>
-            {game.characters.map((c, i) => (
-              <Card
-                key={c.id}
-                index={i}
-                c={c}
-                down={flipped.has(c.id)}
-                onClick={() => onCard(c.id)}
-                guessing={guessing}
-                picked={picked === c.id}
-                backColor={colorOf(me)}
-                disabled={!playing || !isPlayer}
-              />
-            ))}
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#F1EBF7, #DCCFEA)"
+      stage={
+        <>
+          <Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Tu tablero de Adivina quién en 3D" />
+          <div ref={portraitBox} hidden aria-hidden="true">
+            {game.characters.map((c) => <div key={c.id} data-id={c.id}><Avatar c={c} zoom /></div>)}
           </div>
-          {playing && isPlayer && !guessing && (
-            <p className="mt-3 text-sm text-muted">Toca un personaje para bajarlo o volverlo a subir. Solo tú ves tu tablero.</p>
+        </>
+      }
+      top={
+        <>
+          <Plates players={plates} />
+          {secret && (
+            <div className="flex shrink-0 items-center gap-2 rounded-2xl bg-paper/90 py-1 pl-1 pr-3 shadow-sm backdrop-blur">
+              <span className="h-10 w-10 overflow-hidden rounded-xl" style={{ boxShadow: `0 0 0 2px ${colorOf(me)}` }}><Avatar c={secret} className="h-full w-full" /></span>
+              <span className="leading-tight">
+                <span className="block text-[0.65rem] font-semibold text-muted">Tu personaje</span>
+                <span className="block text-sm font-bold">{secret.name}</span>
+              </span>
+            </div>
           )}
-        </div>
-
-        <aside className="order-first space-y-4 lg:order-none lg:col-start-2 lg:row-start-1">
-          {game.phase === 'round_over' ? (
+        </>
+      }
+      bottom={
+        game.phase === 'round_over' ? (
+          <div className="pointer-events-auto max-h-[75%] w-full max-w-md overflow-y-auto">
             <RoundOver game={game} me={me} byId={byId} send={send} colorOf={colorOf} />
-          ) : (
-            <>
-              {game.mySecret && <Secret c={byId[game.mySecret]} color={colorOf(me)} />}
-              {isPlayer && (
-                <TurnPanel
-                  key={`${game.pending ? `q${game.log.length}` : ''}-${game.turn}-${guessing}`}
-                  game={game}
-                  me={me}
-                  other={other}
-                  myTurn={myTurn}
-                  guessing={guessing}
-                  setGuessing={setGuessing}
-                  picked={picked ? byId[picked] : null}
-                  setPicked={setPicked}
-                  send={send}
-                  colorOf={colorOf}
-                />
-              )}
-            </>
+          </div>
+        ) : (
+          <>
+            <Banner key={`${title}${hint}`} title={title} hint={hint} color={colorOf(pend ? pend.asker : game.turn)} />
+            <Flash flash={flash} />
+            {isPlayer && pend && pend.asker !== me && (
+              <div className="pointer-events-auto flex gap-2">
+                <BigAction onClick={() => send({ type: 'gw_answer', yes: true })} color="hsl(148 42% 38%)" pulse={false}>Sí</BigAction>
+                <BigAction onClick={() => send({ type: 'gw_answer', yes: false })} color="#8A8E99" pulse={false}>No</BigAction>
+              </div>
+            )}
+            {myTurn && guessing && (
+              <div className="flex flex-wrap justify-center gap-2">
+                {picked && <BigAction onClick={() => send({ type: 'gw_guess', id: picked })} color={colorOf(me)}>Sí, es {byId[picked].name}</BigAction>}
+                <button className={soft} onClick={() => { setGuessing(false); setPicked(null) }}>Mejor sigo preguntando</button>
+              </div>
+            )}
+            {myTurn && !guessing && <button className={soft} onClick={() => setGuessing(true)}>🎯 Ya sé quién es</button>}
+          </>
+        )
+      }
+      aside={
+        <>
+          {isPlayer && playing && (
+            <TurnPanel key={`${pend ? `q${game.log.length}` : ''}-${game.turn}`} game={game} me={me} other={other} myTurn={myTurn && !guessing} send={send} colorOf={colorOf} />
           )}
-        </aside>
-        <div className="lg:col-start-2 lg:row-start-2">
           <Log game={game} me={me} colorOf={colorOf} other={other} />
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   )
 }
 
-function Card({ c, down, onClick, guessing, picked, backColor, disabled, index = 0 }) {
-  return (
-    <motion.button
-      // the board is dealt card by card at the start of each round
-      initial={{ opacity: 0, y: 30, rotate: (index % 3) - 1 }}
-      animate={{ opacity: 1, y: 0, rotate: 0, scale: picked ? 1.06 : 1 }}
-      transition={{ ...spring, delay: picked ? 0 : 0.025 * index }}
-      onClick={onClick}
-      disabled={disabled}
-      aria-pressed={down}
-      aria-label={`${c.name}${down ? ', bajado' : ''}`}
-      className="group relative aspect-[3/4] [perspective:700px] disabled:cursor-default"
-    >
-      <span
-        className="absolute inset-0 transition-transform duration-500 [transform-style:preserve-3d] [transition-timing-function:cubic-bezier(.3,1.45,.55,1)]"
-        style={{ transform: down ? 'rotateY(180deg)' : 'none' }}
-      >
-        <span
-          className={`absolute inset-0 flex flex-col overflow-hidden rounded-2xl bg-paper [backface-visibility:hidden] ${
-            picked ? 'ring-4 ring-ink ring-offset-2 ring-offset-stone' : guessing ? 'ring-2 ring-ink/40' : ''
-          }`}
-        >
-          <Avatar c={c} zoom className="min-h-0 w-full flex-1" />
-          <span className="truncate px-1 py-1 text-xs font-semibold sm:text-sm">{c.name}</span>
-        </span>
-        <span
-          className="absolute inset-0 flex items-center justify-center rounded-2xl [backface-visibility:hidden] [transform:rotateY(180deg)]"
-          style={{ background: backColor }}
-        >
-          <svg width="40%" viewBox="0 0 32 32" aria-hidden="true">
-            <circle cx="11" cy="16" r="8" fill="white" fillOpacity=".35" />
-            <circle cx="21" cy="16" r="8" fill="white" fillOpacity=".55" />
-          </svg>
-        </span>
-      </span>
-    </motion.button>
-  )
-}
-
-function Secret({ c, color }) {
-  return (
-    <div className="flex items-center gap-4 rounded-[2rem] bg-paper p-4">
-      <div className="h-20 w-20 shrink-0 overflow-hidden rounded-2xl" style={{ boxShadow: `0 0 0 3px ${color}` }}>
-        <Avatar c={c} className="h-full w-full" />
-      </div>
-      <div>
-        <p className="text-sm font-semibold text-muted">Tu personaje</p>
-        <p className="font-display text-2xl font-extrabold">{c.name}</p>
-        <p className="text-xs text-muted">Tu pareja tiene que adivinarlo.</p>
-      </div>
-    </div>
-  )
-}
-
-function TurnPanel({ game, me, other, myTurn, guessing, setGuessing, picked, setPicked, send, colorOf }) {
+function TurnPanel({ game, me, other, myTurn, send, colorOf }) {
   const [question, setQuestion] = useState('')
   const [free, setFree] = useState('')
   const asked = new Set(game.log.filter((l) => l.asker === me && l.auto).map((l) => l.text))
 
   if (game.pending) {
-    if (game.pending.asker === me) {
-      return (
-        <Panel>
-          <p className="text-muted">Le preguntaste a {other}:</p>
-          <p className="mt-1 font-display text-xl font-bold">{game.pending.text}</p>
-          <p className="mt-3 animate-pulse text-sm text-muted">Esperando su respuesta…</p>
-        </Panel>
-      )
-    }
     return (
-      <Panel accent={colorOf(game.pending.asker)}>
-        <p className="text-white/80">{game.pending.asker} pregunta:</p>
-        <p className="mt-1 font-display text-2xl font-extrabold text-white">{game.pending.text}</p>
-        <p className="mt-1 text-sm text-white/80">Responde pensando en tu personaje.</p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button onClick={() => send({ type: 'gw_answer', yes: true })} className="rounded-2xl bg-white px-4 py-3 font-bold text-ink">
-            Sí
-          </button>
-          <button onClick={() => send({ type: 'gw_answer', yes: false })} className="rounded-2xl bg-white/20 px-4 py-3 font-bold text-white">
-            No
-          </button>
-        </div>
+      <Panel accent={game.pending.asker === me ? undefined : colorOf(game.pending.asker)}>
+        <p className={game.pending.asker === me ? 'text-muted' : 'text-white/80'}>{game.pending.asker === me ? `Le preguntaste a ${other}:` : `${game.pending.asker} pregunta:`}</p>
+        <p className={`mt-1 font-display text-xl font-bold ${game.pending.asker === me ? '' : 'text-white'}`}>{game.pending.text}</p>
+        <p className={`mt-2 text-sm ${game.pending.asker === me ? 'animate-pulse text-muted' : 'text-white/80'}`}>
+          {game.pending.asker === me ? 'Esperando su respuesta…' : 'Responde con Sí o No en el tablero, pensando en tu personaje.'}
+        </p>
       </Panel>
     )
   }
@@ -212,45 +199,9 @@ function TurnPanel({ game, me, other, myTurn, guessing, setGuessing, picked, set
     )
   }
 
-  if (guessing) {
-    return (
-      <Panel>
-        {picked ? (
-          <>
-            <p className="font-display text-xl font-bold">¿Es {picked.name}?</p>
-            <p className="mt-1 text-sm text-muted">Si aciertas ganas la ronda. Si fallas, la gana {other}.</p>
-            <div className="mt-4 flex gap-2">
-              <button
-                onClick={() => send({ type: 'gw_guess', id: picked.id })}
-                className="flex-1 rounded-2xl px-4 py-3 font-semibold text-white"
-                style={{ background: colorOf(me) }}
-              >
-                Sí, es {picked.name}
-              </button>
-              <button onClick={() => setPicked(null)} className="rounded-2xl border border-line px-4 font-semibold hover:border-ink">
-                Otro
-              </button>
-            </div>
-          </>
-        ) : (
-          <p className="font-semibold">Toca a quien crees que es en el tablero.</p>
-        )}
-        <button
-          onClick={() => {
-            setGuessing(false)
-            setPicked(null)
-          }}
-          className="mt-3 text-sm font-semibold text-muted underline underline-offset-2 hover:text-ink"
-        >
-          Mejor sigo preguntando
-        </button>
-      </Panel>
-    )
-  }
-
   return (
     <Panel>
-      <p className="font-display text-xl font-bold">Te toca preguntar</p>
+      <p className="font-display text-xl font-bold">Pregunta</p>
       <form
         className="mt-3 space-y-2"
         onSubmit={(e) => {
@@ -298,14 +249,6 @@ function TurnPanel({ game, me, other, myTurn, guessing, setGuessing, picked, set
         </button>
       </form>
       <p className="mt-1 text-xs text-muted">Esta la responde {other}.</p>
-
-      <button
-        onClick={() => setGuessing(true)}
-        className="mt-5 w-full rounded-2xl px-4 py-3 font-semibold text-white"
-        style={{ background: colorOf(me) }}
-      >
-        Ya sé quién es
-      </button>
     </Panel>
   )
 }

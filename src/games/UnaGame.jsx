@@ -1,10 +1,16 @@
-import { useEffect, useState } from 'react'
+/**
+ * Una on the 3D card table. Tap a raised card to play it, the pile to draw.
+ * The buttons for "¡Una!", catching your partner and passing float over the
+ * table when they apply; a wild card asks for the color in a sheet.
+ */
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
-import { AnimatedNumber, spring } from '../lib/motion'
 import PlayingCard, { CARD_COLORS } from '../components/PlayingCard'
 import { EndActions } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, BigAction, Flash, LogList, Panel, Plates, Sheet, StageLayout, useFlash, useViewKeys } from '../components/stage/hud'
 
-const TABLE = 'hsl(222 28% 26%)'
+const load = () => import('../lib/three/una3d.js')
 
 function cardName(c) {
   if (c.color === null) return c.value === 'wild4' ? 'un +4' : 'un comodín'
@@ -15,162 +21,148 @@ function cardName(c) {
 export default function UnaGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
   const other = game.players.find((p) => p !== me)
-  const myTurn = game.phase === 'playing' && game.turn === me
+  const playing = game.phase === 'playing'
+  const myTurn = playing && game.turn === me
   const [wildFor, setWildFor] = useState(null)
-  const [flash, setFlash] = useState(null)
+  const flash = useFlash(error, errorId)
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
 
-  useEffect(() => {
-    if (error) setFlash(error)
-  }, [errorId, error])
-  useEffect(() => {
-    if (!flash) return
-    const id = setTimeout(() => setFlash(null), 2500)
-    return () => clearTimeout(id)
-  }, [flash])
-
-  const playable = new Set(game.playable)
   const canSayUna =
-    game.phase === 'playing' &&
-    !game.saidUna[me] &&
-    ((myTurn && game.hand.length === 2 && game.playable.length > 0) || (game.catchable === me && game.hand.length === 1))
-  const canCatch = game.phase === 'playing' && game.catchable === other
+    playing && !game.saidUna[me] && ((myTurn && game.hand.length === 2 && game.playable.length > 0) || (game.catchable === me && game.hand.length === 1))
+  const canCatch = playing && game.catchable === other
+  const canDraw = myTurn && game.drawn == null
 
-  function playCard(c) {
-    if (!playable.has(c.id)) return
-    if (c.color === null) setWildFor(c)
-    else send({ type: 'un_play', card: c.id })
-  }
+  const onPick = useCallback(
+    ({ kind, id }) => {
+      if (!myTurn) return
+      if (kind === 'pile') return canDraw && send({ type: 'un_draw' })
+      if (kind !== 'card' || !game.playable.includes(id)) return
+      const c = game.hand.find((x) => x.id === id)
+      if (c.color === null) setWildFor(c)
+      else send({ type: 'un_play', card: c.id })
+    },
+    [myTurn, canDraw, game.playable, game.hand, send],
+  )
+
+  const state = useMemo(() => ({ game, me }), [game, me])
+  const last = game.log[game.log.length - 1]
+
+  let title
+  if (!playing) title = null
+  else if (myTurn) title = game.pending ? `¡Te tiraron +${game.pending}! Responde o roba` : game.drawn != null ? 'Juega la que robaste o pasa' : 'Te toca'
+  else title = `Juega ${game.turn}…`
+  const hint = last ? describe(last, me) : myTurn ? 'Toca una carta que sobresalga, o el mazo para robar.' : null
+
+  const goal = game.options.goal
+  const plates = game.players.map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: goal ? game.scores[p] : game.counts[p],
+    max: goal || 0,
+    stats: `${game.counts[p]} ${game.counts[p] === 1 ? 'carta' : 'cartas'}${goal ? ` · a ${goal}` : ''}`,
+    badges: playing && game.counts[p] === 1 && game.saidUna[p] ? ['¡Una!'] : [],
+    active: playing && game.turn === p,
+  }))
+  const color = CARD_COLORS[game.color]
+  const secondary = 'pointer-events-auto rounded-full bg-paper/95 px-5 py-2.5 font-bold shadow-md backdrop-blur hover:bg-white'
 
   return (
-    <div className="mt-4">
-      <Scoreboard game={game} me={me} colorOf={colorOf} />
-
-      {/* partner's hand */}
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="font-semibold" style={{ color: colorOf(other) }}>
-          {other} <span className="text-sm font-normal text-muted">· {game.counts[other]} {game.counts[other] === 1 ? 'carta' : 'cartas'}</span>
-        </span>
-        {game.counts[other] === 1 && game.saidUna[other] && <span className="rounded-full bg-ink px-3 py-1 text-sm font-bold text-white">¡Una!</span>}
-      </div>
-      <div className="mt-2 flex justify-center">
-        <AnimatePresence initial={false}>
-          {Array.from({ length: Math.min(game.counts[other], 20) }, (_, i) => (
-            <motion.span
-              key={i}
-              layout
-              className="-ml-5 first:ml-0"
-              initial={{ y: 40, opacity: 0, scale: 0.6 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 60, opacity: 0, transition: { duration: 0.2 } }}
-              transition={spring}
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#E3E6F0, #C4CADC)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Mesa de Una en 3D" />}
+      top={
+        <>
+          <Plates players={plates} />
+          {playing && color && (
+            <motion.div
+              key={game.color}
+              className="flex shrink-0 items-center gap-2 rounded-2xl bg-paper/90 px-3 py-2 shadow-sm backdrop-blur"
+              initial={{ scale: 0.6 }}
+              animate={{ scale: 1 }}
+              transition={{ type: 'spring', stiffness: 500, damping: 16 }}
             >
-              <PlayingCard faceDown width={38} />
-            </motion.span>
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* table */}
-      <Table game={game} me={me} myTurn={myTurn} send={send} colorOf={colorOf} />
-
-      {/* buttons */}
-      {game.phase === 'playing' && (
-        <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-          {canSayUna && (
-            <button onClick={() => send({ type: 'un_una' })} className="una-call rounded-2xl px-6 py-3 font-display text-xl font-extrabold text-white" style={{ background: CARD_COLORS.r.fill }}>
-              ¡Una!
-            </button>
+              <span className="h-5 w-5 rounded-full" style={{ background: color.fill }} />
+              <span className="text-sm font-bold">{color.name}</span>
+              {game.pending > 0 && <span className="rounded-full bg-ink px-2 text-sm font-extrabold text-white">+{game.pending}</span>}
+            </motion.div>
           )}
-          {canCatch && (
-            <button onClick={() => send({ type: 'un_catch' })} className="pop rounded-2xl bg-ink px-5 py-3 font-semibold text-white">
-              ¡{other} no dijo Una! (+2)
-            </button>
-          )}
-          {myTurn && game.drawn != null && (
-            <button onClick={() => send({ type: 'un_pass' })} className="rounded-2xl border border-line px-5 py-3 font-semibold hover:border-ink">
-              Pasar
-            </button>
-          )}
-        </div>
-      )}
-
-      {game.phase === 'playing' ? (
-        <section className="mt-3 rounded-[2rem] bg-paper px-3 pb-4 pt-6 sm:px-5">
-          <div className="flex flex-wrap justify-center gap-y-3">
-            <AnimatePresence initial={false}>
-            {game.hand.map((c, i) => {
-              const ok = myTurn && playable.has(c.id)
-              return (
-                // the hand is dealt like a fan; a played card leaves upward and the rest close the gap
-                <motion.button
-                  key={c.id}
-                  layout
-                  initial={{ y: -120, x: -60, opacity: 0, rotate: -20 }}
-                  animate={{ y: 0, x: 0, opacity: 1, rotate: 0 }}
-                  exit={{ y: -180, opacity: 0, scale: 0.8, transition: { duration: 0.22 } }}
-                  transition={{ ...spring, delay: game.log.length ? 0 : 0.05 * i }}
-                  onClick={() => playCard(c)}
-                  disabled={!ok}
-                  className={`-ml-4 rounded-xl first:ml-0 sm:-ml-3 ${ok ? '-translate-y-3 hover:-translate-y-5' : ''}`}
-                  style={{ zIndex: ok ? 2 : 1 }}
-                >
-                  <PlayingCard card={c} width={68} style={{ opacity: myTurn && !ok ? 0.55 : 1, transition: 'opacity 200ms' }} />
-                </motion.button>
-              )
-            })}
-            </AnimatePresence>
-          </div>
-          {myTurn && game.drawn != null && <p className="mt-3 text-center text-sm text-muted">La carta que robaste sirve: juégala o pasa.</p>}
-        </section>
-      ) : (
-        <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
-      )}
-
-      <p role="status" className="mt-2 min-h-6 text-center text-sm font-medium text-danger">{flash}</p>
-
-      {wildFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4" onClick={() => setWildFor(null)}>
-          <div className="pop rounded-3xl bg-paper p-5 text-center" onClick={(e) => e.stopPropagation()}>
-            <p className="font-display text-xl font-bold">¿Qué color pides?</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {Object.entries(CARD_COLORS).map(([k, c]) => (
-                <button
-                  key={k}
-                  onClick={() => {
-                    send({ type: 'un_play', card: wildFor.id, color: k })
-                    setWildFor(null)
-                  }}
-                  className="h-20 w-28 rounded-2xl font-semibold text-white shadow-sm hover:brightness-110"
-                  style={{ background: c.fill }}
-                >
-                  {c.name}
-                </button>
-              ))}
+        </>
+      }
+      bottom={
+        playing ? (
+          <>
+            <Banner key={game.log.length} title={title} hint={hint} color={colorOf(game.turn)} />
+            <Flash flash={flash} />
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {canSayUna && (
+                <BigAction onClick={() => send({ type: 'un_una' })} color={CARD_COLORS.r.fill}>¡Una!</BigAction>
+              )}
+              {canCatch && (
+                <BigAction onClick={() => send({ type: 'un_catch' })} color="#22252E">¡{other} no dijo Una! (+2)</BigAction>
+              )}
+              {canDraw && (
+                <button className={secondary} onClick={() => send({ type: 'un_draw' })}>{game.pending ? `Robar ${game.pending}` : 'Robar'}</button>
+              )}
+              {myTurn && game.drawn != null && (
+                <button className={secondary} onClick={() => send({ type: 'un_pass' })}>Pasar</button>
+              )}
             </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </>
+        ) : (
+          <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
+        )
+      }
+      aside={
+        <>
+          <Panel title="Partida">
+            <p className="px-1 text-sm text-muted">
+              {goal ? `Mano ${game.round} · a ${goal} puntos` : 'Una sola mano'}
+              {game.options.stacking && ' · se acumulan +2 y +4'} · {game.pile} cartas en el mazo
+            </p>
+          </Panel>
+          <Panel title="Historial">
+            <LogList items={game.log} colorOf={colorOf} render={(l) => describe(l, me)} />
+          </Panel>
+          <Panel title="Cómo se juega">
+            <ul className="space-y-1 px-1 text-sm text-muted">
+              <li>Juega una carta del mismo color o número que la de la mesa.</li>
+              <li>Los comodines sirven siempre y eligen el color.</li>
+              <li>Con dos cartas, di «¡Una!» al jugar la penúltima, o te pueden pillar.</li>
+            </ul>
+          </Panel>
+        </>
+      }
+      overlay={
+        <AnimatePresence>
+          {wildFor && (
+            <Sheet onClose={() => setWildFor(null)} bottom>
+              <p className="text-center font-display text-xl font-bold">¿Qué color pides?</p>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                {Object.entries(CARD_COLORS).map(([k, c]) => (
+                  <button
+                    key={k}
+                    onClick={() => {
+                      send({ type: 'un_play', card: wildFor.id, color: k })
+                      setWildFor(null)
+                    }}
+                    className="h-20 rounded-2xl font-semibold text-white shadow-sm hover:brightness-110"
+                    style={{ background: c.fill }}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </Sheet>
+          )}
+        </AnimatePresence>
+      }
+    />
   )
 }
 UnaGame.showsErrors = true
-
-function Scoreboard({ game, me, colorOf }) {
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted">
-      <span>{game.options.goal ? `Mano ${game.round} · a ${game.options.goal} puntos` : 'Una mano'}{game.options.stacking && ' · se acumulan +2 y +4'}</span>
-      {game.options.goal > 0 && (
-        <div className="flex gap-2">
-          {game.players.map((p) => (
-            <span key={p} className="rounded-full bg-paper px-3 py-1 font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}{p === me && ' (tú)'}</span> <AnimatedNumber value={game.scores[p]} className="text-ink" />
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function describe(l, me) {
   const you = l.player === me
@@ -190,75 +182,12 @@ function describe(l, me) {
   }
 }
 
-function Table({ game, me, myTurn, send, colorOf }) {
-  const canDraw = myTurn && game.drawn == null
-  const last = game.log[game.log.length - 1]
-  let title
-  if (game.phase !== 'playing') title = null
-  else if (myTurn) title = game.pending ? `¡Te tiraron +${game.pending}! Responde o roba` : game.drawn != null ? 'Juega la que robaste o pasa' : 'Te toca'
-  else title = `Juega ${game.turn}…`
-  return (
-    <div className="mt-3 rounded-[2rem] p-5 sm:p-6" style={{ background: TABLE, boxShadow: 'inset 0 2px 14px rgba(0,0,0,.35)' }}>
-      <div className="flex items-center justify-center gap-6 sm:gap-10">
-        <button
-          onClick={() => canDraw && send({ type: 'un_draw' })}
-          disabled={!canDraw}
-          className={`relative rounded-xl ${canDraw ? 'transition-transform hover:-translate-y-1' : ''}`}
-          aria-label={game.pending && myTurn ? `Robar ${game.pending}` : 'Robar una carta'}
-        >
-          <PlayingCard faceDown width={82} className="absolute left-1.5 top-1.5 opacity-60" />
-          <PlayingCard faceDown width={82} className="relative" />
-          <span className="absolute -bottom-6 left-0 right-0 text-center text-xs font-semibold text-white/70">
-            {canDraw ? (game.pending ? `Robar ${game.pending}` : 'Robar') : `${game.pile} en el mazo`}
-          </span>
-        </button>
-        <div className="relative">
-          {game.top && (
-            // the card is thrown onto the pile from whoever played it
-            <motion.div
-              key={game.top.id}
-              initial={{ y: last?.action === 'play' && last.player === me ? 180 : -180, opacity: 0, rotate: (game.top.id % 9) - 4 + 25, scale: 1.15 }}
-              animate={{ y: 0, opacity: 1, rotate: (game.top.id % 9) - 4, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 320, damping: 22 }}
-            >
-              <PlayingCard card={game.top} width={96} chosen={game.top.color === null ? game.color : null} />
-            </motion.div>
-          )}
-        </div>
-        <div className="flex flex-col items-center gap-1 text-white/80">
-          <motion.span
-            key={game.color}
-            className="h-10 w-10 rounded-full"
-            style={{ background: CARD_COLORS[game.color]?.fill, boxShadow: '0 0 0 3px rgba(255,255,255,.8)' }}
-            initial={{ scale: 0.3 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', stiffness: 500, damping: 14 }}
-          />
-          <span className="text-xs font-semibold">{CARD_COLORS[game.color]?.name}</span>
-          {game.pending > 0 && <span className="mt-1 rounded-full bg-white px-2.5 py-0.5 text-sm font-extrabold text-ink">+{game.pending}</span>}
-        </div>
-      </div>
-      {title && (
-        <p className="mt-8 text-center font-display text-2xl font-extrabold" style={{ color: myTurn ? 'white' : 'rgba(255,255,255,.85)' }}>
-          {title}
-        </p>
-      )}
-      {last && (
-        <p key={game.log.length} className={`pop text-center text-sm text-white/75 ${title ? 'mt-1' : 'mt-8'}`}>
-          <span className="mr-1.5 inline-block h-2 w-2 rounded-full" style={{ background: colorOf(last.player) }} />
-          {describe(last, me)}
-        </p>
-      )}
-    </div>
-  )
-}
-
 function RoundOver({ game, me, send, colorOf }) {
   const r = game.result
   const finished = game.phase === 'finished'
   const loser = game.players.find((p) => p !== r.winner)
   return (
-    <section className="pop mt-3 rounded-[2rem] bg-paper p-5 sm:p-6">
+    <section className="pop pointer-events-auto max-h-[70%] w-full max-w-lg overflow-y-auto rounded-[2rem] bg-paper/95 p-5 shadow-xl backdrop-blur sm:p-6">
       <p className="font-display text-3xl font-extrabold" style={{ color: colorOf(r.winner) }}>
         {finished && game.options.goal ? (game.winner === me ? '¡Ganaste la partida!' : `${game.winner} ganó la partida`) : r.winner === me ? '¡Te quedaste sin cartas!' : `¡${r.winner} se quedó sin cartas!`}
       </p>

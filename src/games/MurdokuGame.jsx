@@ -1,8 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
-import { LayoutGroup, motion } from 'motion/react'
+/**
+ * Murdoku on the 3D stage: a little diorama of the crime scene. Pick a
+ * suspect in the row over the stage (or in the panel) and tap their cell;
+ * tap an empty cell to cross it out.
+ */
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import Avatar from '../components/Avatar'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Banner, Panel, Plates, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/murdoku3d.js')
 
 export const ROOM_COLORS = ['#F6E3C6', '#DCEBDD', '#DDE6F4', '#F2DCE5', '#E8E1F2', '#F4EEC9']
 const DANGER = 'var(--color-danger)'
@@ -41,274 +51,210 @@ function Play({ game, me, send, colorOf }) {
   const isPlayer = game.players.includes(me)
   const canEdit = playing && isPlayer
   const victim = game.people.find((p) => p.role === 'victim')
-  const placedAt = {}
-  for (const [pid, v] of Object.entries(game.placed)) placedAt[`${v.cell[0]}-${v.cell[1]}`] = Number(pid)
-  const objects = Object.fromEntries(game.objects.map((o) => [`${o.cell[0]}-${o.cell[1]}`, o.kind]))
-  const notes = new Set(game.notes.map(([r, c]) => `${r}-${c}`))
   const violated = new Set(game.violations)
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
 
   useEffect(() => setSelected(null), [game.round])
 
-  function onCell(r, c) {
-    if (!canEdit) return
-    const key = `${r}-${c}`
-    const kind = objects[key]
-    if (['table', 'plant', 'shelf'].includes(kind)) return
-    const who = placedAt[key]
-    if (selected != null) {
-      if (who === selected) {
+  const onPick = useCallback(
+    ({ kind, id }) => {
+      if (kind !== 'cell' || !canEdit) return
+      const [r, c] = id.split(',').map(Number)
+      const who = Object.entries(game.placed).find(([, v]) => v.cell[0] === r && v.cell[1] === c)?.[0]
+      if (selected != null) {
+        if (who != null && Number(who) === selected) return setSelected(null)
+        send({ type: 'md_place', person: selected, cell: [r, c] })
         setSelected(null)
-        return
-      }
-      send({ type: 'md_place', person: selected, cell: [r, c] })
-      setSelected(null)
-    } else if (who != null) {
-      setSelected(who)
-    } else {
-      send({ type: 'md_note', cell: [r, c] })
-    }
-  }
+      } else if (who != null) setSelected(Number(who))
+      else send({ type: 'md_note', cell: [r, c] })
+    },
+    [canEdit, game.placed, selected, send],
+  )
+
+  // portraits as SVG text for the standees (drawn by React in a hidden box)
+  const portraitBox = useRef(null)
+  const [portraits, setPortraits] = useState({})
+  const castKey = `${game.round}|${game.people.map((p) => p.name).join(',')}`
+  useLayoutEffect(() => {
+    const out = {}
+    portraitBox.current?.querySelectorAll('[data-id]').forEach((el) => {
+      const svg = el.querySelector('svg')
+      if (!svg) return
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      svg.setAttribute('width', '256')
+      svg.setAttribute('height', '256')
+      out[el.dataset.id] = svg.outerHTML
+    })
+    setPortraits(out)
+  }, [castKey])
+
+  const colors = useMemo(() => Object.fromEntries(game.players.map((p) => [p, cssColor(colorOf(p))])), [game.players, colorOf])
+  const state = useMemo(
+    () => (Object.keys(portraits).length ? { game, portraits, selected, canEdit, colors } : null),
+    [game, portraits, selected, canEdit, colors],
+  )
 
   const other = game.players.find((p) => p !== me)
-  const allPlaced = Object.keys(game.placed).length === game.people.length
+  const placedCount = Object.keys(game.placed).length
+  const allPlaced = placedCount === game.people.length
+  const person = selected != null ? game.people[selected] : null
+
+  let title
+  let hint = null
+  if (game.phase === 'round_over') title = 'Caso resuelto'
+  else if (!canEdit) title = 'Mirando el caso…'
+  else if (person) {
+    title = `¿Dónde estaba ${person.name}?`
+    hint = 'Toca su casilla. Las filas y columnas oscuras ya están ocupadas.'
+  } else if (allPlaced) {
+    title = 'Algo no cuadra'
+    hint = 'Las pistas en rojo no se cumplen.'
+  } else {
+    title = 'Ubica a cada sospechoso'
+    hint = 'Elige a alguien abajo y toca su casilla. Una casilla vacía se marca con ✕.'
+  }
+
+  const plates = game.mode === 'race' && other
+    ? game.players.map((p) => ({
+        name: p,
+        you: p === me,
+        color: colorOf(p),
+        value: p === me ? placedCount : (game.progress[p] ?? 0),
+        max: game.people.length,
+        stats: `Casos: ${game.scores?.[p] ?? 0}`,
+        active: playing,
+      }))
+    : [{ name: me, you: true, color: colorOf(me), value: placedCount, max: game.people.length, stats: `Caso ${game.round} de ${game.totalRounds}`, active: playing }]
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-        <span>
-          Caso {game.round} de {game.totalRounds} · {game.levelLabel}
-          {game.mode === 'race' && other && <> · {other} ubicó {game.progress[other] ?? 0} de {game.people.length}</>}
-        </span>
-        <span className="font-display text-xl font-bold text-ink tabular-nums">{clock(elapsed)}</span>
-      </div>
-
-      <div className="mt-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <div className="fit-board [--fit-top:11rem]">
-          <Board game={game} placedAt={placedAt} objects={objects} notes={notes} selected={selected} onCell={onCell} colorOf={colorOf} />
-          {canEdit && (
-            <QuickPick game={game} selected={selected} setSelected={setSelected} violated={violated} />
-          )}
-          {canEdit && (
-            <p className="mt-3 text-sm text-muted">
-              {selected != null
-                ? `Toca la casilla donde estaba ${game.people[selected].name}.`
-                : 'Elige a alguien de la lista y toca su casilla. Toca una casilla vacía para marcarla con una X.'}
-            </p>
-          )}
-          {canEdit && allPlaced && (
-            <p className="mt-2 rounded-2xl bg-paper px-4 py-3 font-semibold text-danger">
-              Algo no cuadra: las pistas en rojo no se cumplen.
-            </p>
-          )}
-          {game.phase === 'round_over' && <Reveal game={game} me={me} victim={victim} send={send} colorOf={colorOf} />}
-        </div>
-
-        <aside className="space-y-2">
-          <details className="rounded-2xl bg-paper px-4 py-3 text-sm" open={game.round === 1}>
-            <summary className="cursor-pointer font-semibold">Cómo se juega</summary>
-            <ul className="mt-2 list-disc space-y-1 pl-4 text-muted">
-              <li>Ubica a todos: en cada fila y en cada columna va exactamente una persona.</li>
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#F2ECE2, #DCCFBC)"
+      stage={
+        <>
+          <Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Plano de la escena en 3D" />
+          <div ref={portraitBox} hidden aria-hidden="true">
+            {game.people.map((p) => <div key={p.index} data-id={p.index}><Avatar c={p} zoom /></div>)}
+          </div>
+        </>
+      }
+      top={
+        <>
+          <Plates players={plates} />
+          <div className="shrink-0 rounded-2xl bg-paper/90 px-3 py-1.5 text-right shadow-sm backdrop-blur">
+            <p className="font-display text-xl font-extrabold tabular-nums leading-tight">{clock(elapsed)}</p>
+            <p className="text-xs font-semibold text-muted">Caso {game.round}/{game.totalRounds} · {game.levelLabel}</p>
+          </div>
+        </>
+      }
+      bottom={
+        game.phase === 'round_over' ? (
+          <div className="pointer-events-auto w-full max-w-lg">
+            <Reveal game={game} me={me} victim={victim} send={send} colorOf={colorOf} />
+          </div>
+        ) : (
+          <>
+            <Banner key={title} title={title} hint={hint} color={allPlaced && !person ? 'var(--color-danger)' : colorOf(me)}>
+              {person && (
+                <ul className="mt-1 space-y-0.5 text-left text-xs sm:text-sm">
+                  {person.clues.map((cl) => (
+                    <li key={cl.index} style={violated.has(cl.index) ? { color: DANGER, fontWeight: 600 } : undefined}>• {cl.text}</li>
+                  ))}
+                </ul>
+              )}
+            </Banner>
+            {canEdit && <Suspects game={game} selected={selected} setSelected={setSelected} violated={violated} />}
+          </>
+        )
+      }
+      aside={
+        <>
+          <Panel title="Sospechosos" right={canEdit && <button onClick={() => send({ type: 'md_clear' })} className="text-xs font-semibold text-muted underline underline-offset-2 hover:text-ink">Borrar el plano</button>}>
+            <div className="space-y-2">
+              {game.people.map((p) => {
+                const placed = game.placed[String(p.index)]
+                const isSel = selected === p.index
+                const bad = p.clues.some((cl) => violated.has(cl.index))
+                return (
+                  <div
+                    key={p.index}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => canEdit && setSelected(isSel ? null : p.index)}
+                    onKeyDown={(e) => e.key === 'Enter' && canEdit && setSelected(isSel ? null : p.index)}
+                    className={`flex gap-3 rounded-2xl bg-stone p-2.5 ${canEdit ? 'cursor-pointer hover:bg-line/60' : ''} ${isSel ? 'ring-2 ring-ink' : ''} ${bad ? 'ring-2 ring-danger/60' : ''}`}
+                  >
+                    <div className={`h-12 w-12 shrink-0 overflow-hidden rounded-xl ${p.role === 'victim' ? 'grayscale' : ''}`}>
+                      <Avatar c={p} zoom className="h-full w-full" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="flex items-center gap-2">
+                        <span className="font-bold">{p.name}</span>
+                        {p.role === 'victim' && <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-white">víctima</span>}
+                        {placed && <span className="text-xs text-muted">✓</span>}
+                      </p>
+                      <ul className="mt-0.5 space-y-0.5 text-sm">
+                        {p.clues.map((cl) => (
+                          <li key={cl.index} style={violated.has(cl.index) ? { color: DANGER, fontWeight: 600 } : undefined}>{cl.text}</li>
+                        ))}
+                      </ul>
+                      {placed && canEdit && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            send({ type: 'md_place', person: p.index, cell: null })
+                          }}
+                          className="mt-1 text-xs font-semibold text-muted underline underline-offset-2 hover:text-ink"
+                        >
+                          Quitar del plano
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </Panel>
+          <Panel title="Cómo se juega">
+            <ul className="list-disc space-y-1 pl-5 text-sm text-muted">
+              <li>En cada fila y en cada columna va exactamente una persona.</li>
               <li>Mesas, plantas y estantes no se pueden ocupar. Sillas y alfombras sí.</li>
               <li>"Junto a" es arriba, abajo o a un lado, dentro de la misma habitación.</li>
               <li>El asesino es el único que quedó en la misma habitación que la víctima.</li>
             </ul>
-          </details>
-          {game.people.map((p) => {
-            const placed = game.placed[String(p.index)]
-            const isSel = selected === p.index
-            return (
-              <div
-                key={p.index}
-                role="button"
-                tabIndex={0}
-                onClick={() => canEdit && setSelected(isSel ? null : p.index)}
-                onKeyDown={(e) => e.key === 'Enter' && canEdit && setSelected(isSel ? null : p.index)}
-                className={`flex gap-3 rounded-2xl bg-paper p-3 ${canEdit ? 'cursor-pointer' : ''} ${isSel ? 'ring-2 ring-ink' : ''}`}
-              >
-                <div className={`h-14 w-14 shrink-0 overflow-hidden rounded-xl ${p.role === 'victim' ? 'grayscale' : ''}`}>
-                  <Avatar c={p} zoom className="h-full w-full" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2">
-                    <span className="font-bold">{p.name}</span>
-                    {p.role === 'victim' && <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-white">víctima</span>}
-                    {placed && <span className="text-xs text-muted">✓ ubicad{p.gender === 'woman' ? 'a' : 'o'}</span>}
-                  </p>
-                  <ul className="mt-0.5 space-y-0.5 text-sm">
-                    {p.clues.map((cl) => (
-                      <li key={cl.index} style={violated.has(cl.index) ? { color: DANGER, fontWeight: 600 } : undefined}>
-                        {cl.text}
-                      </li>
-                    ))}
-                  </ul>
-                  {placed && canEdit && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        send({ type: 'md_place', person: p.index, cell: null })
-                      }}
-                      className="mt-1 text-xs font-semibold text-muted underline underline-offset-2 hover:text-ink"
-                    >
-                      Quitar del plano
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-          {canEdit && (
-            <button onClick={() => send({ type: 'md_clear' })} className="text-sm font-semibold text-muted underline underline-offset-2 hover:text-ink">
-              Borrar todo el plano
-            </button>
-          )}
-        </aside>
-      </div>
-    </div>
+          </Panel>
+        </>
+      }
+    />
   )
 }
 
-/** On phones: the suspects in a row below the floor plan, so there's no need to scroll. */
-function QuickPick({ game, selected, setSelected, violated }) {
-  const person = selected != null ? game.people[selected] : null
+/** The suspects in a row over the stage: tap one, then tap their cell. */
+function Suspects({ game, selected, setSelected, violated }) {
   return (
-    <div className="mt-3 lg:hidden">
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {game.people.map((p) => {
-          const placed = game.placed[String(p.index)]
-          return (
-            <button
-              key={p.index}
-              onClick={() => setSelected(selected === p.index ? null : p.index)}
-              aria-pressed={selected === p.index}
-              aria-label={p.name}
-              className={`relative h-12 w-12 shrink-0 overflow-hidden rounded-xl ${p.role === 'victim' ? 'grayscale' : ''} ${
-                selected === p.index ? 'ring-2 ring-ink ring-offset-2 ring-offset-stone' : ''
-              } ${placed ? 'opacity-50' : ''}`}
-            >
-              <Avatar c={p} zoom className="h-full w-full" />
-            </button>
-          )
-        })}
-      </div>
-      {person && (
-        <div className="mt-2 rounded-2xl bg-paper px-4 py-3 text-sm">
-          <p className="font-bold">{person.name}{person.role === 'victim' && ' (víctima)'}</p>
-          {person.clues.map((cl) => (
-            <motion.p
-              key={`${cl.index}-${violated.has(cl.index)}`}
-              style={violated.has(cl.index) ? { color: DANGER, fontWeight: 600 } : undefined}
-              initial={violated.has(cl.index) ? { x: 0 } : false}
-              animate={violated.has(cl.index) ? { x: [0, -6, 6, -3, 0] } : undefined}
-              transition={{ duration: 0.4 }}
-            >
-              {cl.text}
-            </motion.p>
-          ))}
-        </div>
-      )}
+    <div className="pointer-events-auto flex max-w-full gap-1.5 overflow-x-auto rounded-2xl bg-paper/90 p-1.5 shadow-md backdrop-blur">
+      {game.people.map((p) => {
+        const placed = game.placed[String(p.index)]
+        const bad = p.clues.some((cl) => violated.has(cl.index))
+        return (
+          <motion.button
+            key={p.index}
+            onClick={() => setSelected(selected === p.index ? null : p.index)}
+            aria-pressed={selected === p.index}
+            aria-label={p.name}
+            title={p.name}
+            animate={{ y: selected === p.index ? -6 : 0, scale: selected === p.index ? 1.08 : 1 }}
+            transition={spring}
+            className={`relative h-11 w-11 shrink-0 overflow-hidden rounded-xl sm:h-12 sm:w-12 ${p.role === 'victim' ? 'grayscale' : ''} ${
+              selected === p.index ? 'ring-2 ring-ink ring-offset-2' : bad ? 'ring-2 ring-danger' : ''
+            } ${placed && selected !== p.index ? 'opacity-45' : ''}`}
+          >
+            <Avatar c={p} zoom className="h-full w-full" />
+          </motion.button>
+        )
+      })}
     </div>
-  )
-}
-
-function Board({ game, placedAt, objects, notes, selected, onCell, colorOf }) {
-  const n = game.size
-  const rooms = game.rooms
-  const labelCell = {}
-  rooms.forEach((row, r) =>
-    row.forEach((k, c) => {
-      if (!(k in labelCell)) labelCell[k] = `${r}-${c}`
-    }),
-  )
-  const usedRows = new Set()
-  const usedCols = new Set()
-  Object.entries(placedAt).forEach(([key, pid]) => {
-    if (pid === selected) return
-    const [r, c] = key.split('-').map(Number)
-    usedRows.add(r)
-    usedCols.add(c)
-  })
-  const over = game.phase === 'round_over'
-  const victimIndex = game.people.length - 1
-  const murderer = game.result?.murderer
-
-  return (
-    <LayoutGroup id={`plan-${game.round}`}>
-    <div
-      className="grid aspect-square w-full overflow-hidden rounded-2xl border-[3px] border-ink bg-ink"
-      style={{ gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${n}, minmax(0, 1fr))` }}
-      role="grid"
-      aria-label="Plano de la escena"
-    >
-      {rooms.flatMap((row, r) =>
-        row.map((k, c) => {
-          const key = `${r}-${c}`
-          const thick = '3px solid var(--color-ink)'
-          const thin = '1px solid rgb(34 37 46 / 0.15)'
-          const style = {
-            background: ROOM_COLORS[k % ROOM_COLORS.length],
-            borderTop: r > 0 && rooms[r - 1][c] !== k ? thick : r > 0 ? thin : 'none',
-            borderLeft: c > 0 && rooms[r][c - 1] !== k ? thick : c > 0 ? thin : 'none',
-          }
-          const pid = placedAt[key]
-          const person = pid != null ? game.people[pid] : null
-          const kind = objects[key]
-          const dim = selected != null && pid == null && (usedRows.has(r) || usedCols.has(c))
-          const placedBy = game.placed[String(pid)]?.by
-          const highlight = over && (pid === murderer || pid === victimIndex)
-          return (
-            <button
-              key={key}
-              onClick={() => onCell(r, c)}
-              className="relative flex min-h-0 min-w-0 items-center justify-center"
-              style={style}
-              aria-label={`Fila ${r + 1}, columna ${c + 1}, ${game.roomNames[k]}${kind ? `, ${kind}` : ''}${person ? `, ${person.name}` : ''}`}
-            >
-              {dim && <span className="absolute inset-0 bg-ink/10" />}
-              {labelCell[k] === key && (
-                <span className="pointer-events-none absolute left-1 top-0.5 truncate text-[9px] font-bold uppercase tracking-wide text-ink/55 sm:text-[11px]">
-                  {game.roomNames[k]}
-                </span>
-              )}
-              {kind && (
-                <motion.span
-                  className="absolute inset-0"
-                  initial={{ scale: 0, rotate: -20 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ ...spring, delay: 0.15 + 0.03 * (r * n + c) }}
-                >
-                  <FurnitureIcon kind={kind} />
-                </motion.span>
-              )}
-              {notes.has(key) && !person && (
-                <motion.span className="font-display text-2xl font-bold text-ink/35" initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={spring}>
-                  ✕
-                </motion.span>
-              )}
-              {person && (
-                // the same person glides from cell to cell when moved
-                <motion.span
-                  layoutId={`person-${pid}`}
-                  initial={{ scale: 0.3, opacity: 0, y: -12 }}
-                  animate={{ scale: 1, opacity: 1, y: 0 }}
-                  transition={spring}
-                  className={`absolute inset-[8%] overflow-hidden rounded-xl ${pid === victimIndex ? 'grayscale' : ''} ${highlight && pid === murderer ? 'murdoku-culprit' : ''}`}
-                  style={{
-                    boxShadow: highlight
-                      ? `0 0 0 3px ${pid === murderer ? DANGER : 'var(--color-ink)'}`
-                      : placedBy
-                        ? `0 0 0 2.5px ${colorOf(placedBy)}`
-                        : '0 0 0 2px white',
-                  }}
-                >
-                  <Avatar c={person} zoom className="h-full w-full" />
-                </motion.span>
-              )}
-            </button>
-          )
-        }),
-      )}
-    </div>
-    </LayoutGroup>
   )
 }
 
@@ -372,7 +318,7 @@ function Reveal({ game, me, victim, send, colorOf }) {
   const last = game.round >= game.totalRounds
   const winner = game.result.winner
   return (
-    <div className="pop mt-5 flex gap-4 rounded-[2rem] p-5 text-white" style={{ background: winner ? colorOf(winner) : 'var(--color-ink)' }}>
+    <div className="pop flex gap-4 rounded-[2rem] p-5 text-white shadow-xl" style={{ background: winner ? colorOf(winner) : 'var(--color-ink)' }}>
       <motion.div
         className="relative h-24 w-24 shrink-0 rounded-2xl ring-4 ring-white/40"
         initial={{ scale: 0.5, rotate: -10 }}

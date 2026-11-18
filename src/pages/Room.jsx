@@ -51,7 +51,7 @@ const ColonosGame = lazy(() => import('../games/ColonosGame'))
 const DeeperGame = lazy(() => import('../games/DeeperGame'))
 
 // Games that show server errors themselves, inside their own layout
-const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch'])
+const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch', 'guesswho'])
 
 const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame }
 const UPCOMING = []
