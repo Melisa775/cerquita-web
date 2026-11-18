@@ -1,7 +1,15 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Word search on the 3D stage: drag across the sheet (or tap both ends).
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Flash, Panel, Plates, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/wordsearch3d.js')
 
 export default function WordSearchGame({ room, me, send, colorOf, error, errorId }) {
   const game = room.game
@@ -9,8 +17,6 @@ export default function WordSearchGame({ room, me, send, colorOf, error, errorId
   return <Play game={game} me={me} send={send} colorOf={colorOf} error={error} errorId={errorId} />
 }
 WordSearchGame.showsErrors = true
-
-const same = (a, b) => a && b && a[0] === b[0] && a[1] === b[1]
 
 function clock(ms) {
   const s = Math.floor(ms / 1000)
@@ -38,11 +44,13 @@ function Play({ game, me, send, colorOf, error, errorId }) {
   const seen = useRef(errorId)
   const playing = game.phase === 'playing'
   const isPlayer = game.players.includes(me)
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
 
   useEffect(() => {
     if (errorId === seen.current) return
     seen.current = errorId
-    if (error) setFlash(error)
+    if (error) setFlash({ text: error, id: errorId })
   }, [errorId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
@@ -51,243 +59,111 @@ function Play({ game, me, send, colorOf, error, errorId }) {
     return () => clearTimeout(id)
   }, [flash])
 
+  const onPick = useCallback(
+    (ev) => {
+      if (ev.kind === 'select') send({ type: 'ws_select', start: ev.start, end: ev.end })
+      else if (ev.kind === 'mark') send({ type: 'ws_mark', start: ev.start, end: ev.end })
+    },
+    [send],
+  )
+  const colors = useMemo(() => Object.fromEntries(game.players.map((p) => [p, cssColor(colorOf(p))])), [game.players, colorOf])
+  const state = useMemo(
+    () => ({ grid: game.grid, size: game.size, round: game.round, found: game.found, missing: game.missing, selecting: game.selecting, colors, me, interactive: playing && isPlayer }),
+    [game.grid, game.size, game.round, game.found, game.missing, game.selecting, colors, me, playing, isPlayer],
+  )
+
   const foundCount = Object.keys(game.found).length
+  const plates = game.mode === 'race'
+    ? game.players.map((p) => ({
+        name: p,
+        you: p === me,
+        color: colorOf(p),
+        value: Object.values(game.found).filter((f) => f.player === p).length,
+        max: game.words.length,
+        stats: `Total: ${game.scores[p] ?? 0}`,
+        active: playing,
+      }))
+    : [{ name: 'Juntos', color: colorOf(me), value: foundCount, max: game.words.length, stats: `${foundCount} de ${game.words.length} palabras`, active: playing }]
 
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-        <span>
-          Ronda {game.round} de {game.totalRounds} · {game.levelLabel}
-        </span>
-        <span className="font-display text-xl font-bold text-ink tabular-nums">{clock(elapsed)}</span>
-      </div>
-
-      <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,1fr)_16rem] md:items-start xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="fit-board [--fit-top:10rem]">
-          <Board game={game} me={me} send={send} colorOf={colorOf} interactive={playing && isPlayer} />
-          <p className="mt-2 h-6 text-center font-medium text-danger" role="alert">{flash}</p>
-        </div>
-
-        <aside>
-          <p className="text-sm font-semibold text-muted">Categoría</p>
-          <h1 className="text-2xl font-extrabold">{game.theme}</h1>
-          <p className="mt-1 text-sm text-muted">
-            {foundCount} de {game.words.length} palabras
-          </p>
-
-          {game.mode === 'race' && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {Object.entries(game.scores).map(([p, n]) => (
-                <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-                  <span style={{ color: colorOf(p) }}>{p}</span> <AnimatedNumber value={n} />
-                </span>
-              ))}
-            </div>
-          )}
-
-          <ul className="mt-4 grid grid-cols-2 gap-x-3 gap-y-1.5 md:grid-cols-1">
-            {game.words.map((w) => {
-              const f = game.found[w]
-              const missed = !f && game.phase === 'round_over'
-              return (
-                <li key={w} className="flex items-center gap-2">
-                  <motion.span
-                    className="h-2.5 w-2.5 shrink-0 rounded-full"
-                    initial={false}
-                    animate={{ background: f ? colorOf(f.player) : missed ? 'var(--color-muted)' : 'var(--color-line)', scale: f ? [1, 2, 1] : 1 }}
-                    transition={{ duration: 0.4 }}
-                  />
-                  <span
-                    className={`font-display font-bold uppercase tracking-wide ${f ? 'text-muted line-through' : missed ? 'text-danger' : ''}`}
-                  >
-                    {w}
-                  </span>
-                </li>
-              )
-            })}
-          </ul>
-
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#EEEAE2, #D6CFC2)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} onPick={onPick} label="Sopa de letras en 3D" />}
+      top={
+        <>
+          <Plates players={plates} />
+          <div className="shrink-0 rounded-2xl bg-paper/90 px-3 py-1.5 text-right shadow-sm backdrop-blur">
+            <p className="font-display text-xl font-extrabold tabular-nums leading-tight">{clock(elapsed)}</p>
+            <p className="text-xs font-semibold text-muted">Ronda {game.round}/{game.totalRounds} · {game.levelLabel}</p>
+          </div>
+        </>
+      }
+      bottom={
+        game.phase === 'round_over' ? (
+          <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
+        ) : (
+          <>
+            <Flash flash={flash} />
+            <WordChips game={game} colorOf={colorOf} />
+          </>
+        )
+      }
+      aside={
+        <>
+          <Panel title={game.theme} right={<span className="text-xs font-semibold text-muted">{foundCount} de {game.words.length}</span>}>
+            <ul className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-1">
+              {game.words.map((w) => {
+                const f = game.found[w]
+                const missed = !f && game.phase === 'round_over'
+                return (
+                  <li key={w} className="flex items-center gap-2">
+                    <motion.span
+                      className="h-2.5 w-2.5 shrink-0 rounded-full"
+                      initial={false}
+                      animate={{ background: f ? colorOf(f.player) : missed ? 'var(--color-muted)' : 'var(--color-line)', scale: f ? [1, 2, 1] : 1 }}
+                      transition={{ duration: 0.4 }}
+                    />
+                    <span className={`font-display font-bold uppercase tracking-wide ${f ? 'text-muted line-through' : missed ? 'text-danger' : ''}`}>{w}</span>
+                  </li>
+                )
+              })}
+            </ul>
+          </Panel>
           {playing && isPlayer && (
-            <>
-              <p className="mt-5 text-xs text-muted">
-                Arrastra desde la primera letra hasta la última, o toca las dos puntas.
-              </p>
-              <button
-                onClick={() => send({ type: 'ws_give_up' })}
-                className="mt-4 text-sm font-semibold text-muted underline underline-offset-2 hover:text-ink"
-              >
+            <Panel title="Cómo se juega">
+              <p className="px-1 text-sm text-muted">Arrastra desde la primera letra hasta la última, o toca las dos puntas.</p>
+              <button onClick={() => send({ type: 'ws_give_up' })} className="mt-3 px-1 text-sm font-semibold text-muted underline underline-offset-2 hover:text-ink">
                 Rendirse y ver la solución
               </button>
-            </>
+            </Panel>
           )}
-        </aside>
-      </div>
-
-      {game.phase === 'round_over' && <RoundOver game={game} me={me} send={send} colorOf={colorOf} />}
-    </div>
+        </>
+      }
+    />
   )
 }
 
-function Board({ game, me, send, colorOf, interactive }) {
-  const size = game.size
-  const inner = useRef(null)
-  const drag = useRef(null) // { start, end, moved }
-  const [sel, setSel] = useState(null) // own selection in progress
-  const [anchor, setAnchor] = useState(null) // first endpoint in "tap" mode
-  const sent = useRef(null)
-
-  function cellAt(e) {
-    const rect = inner.current.getBoundingClientRect()
-    const c = Math.floor(((e.clientX - rect.left) / rect.width) * size)
-    const r = Math.floor(((e.clientY - rect.top) / rect.height) * size)
-    return [Math.min(size - 1, Math.max(0, r)), Math.min(size - 1, Math.max(0, c))]
-  }
-
-  // Snaps the end to the nearest line: horizontal, vertical or diagonal
-  function snap(start, cell) {
-    let dr = cell[0] - start[0]
-    let dc = cell[1] - start[1]
-    if (Math.abs(dr) > 2 * Math.abs(dc)) dc = 0
-    else if (Math.abs(dc) > 2 * Math.abs(dr)) dr = 0
-    else {
-      const d = Math.max(Math.abs(dr), Math.abs(dc))
-      dr = Math.sign(dr) * d
-      dc = Math.sign(dc) * d
-    }
-    let steps = Math.max(Math.abs(dr), Math.abs(dc))
-    const sr = Math.sign(dr)
-    const sc = Math.sign(dc)
-    while (steps > 0) {
-      const r = start[0] + sr * steps
-      const c = start[1] + sc * steps
-      if (r >= 0 && r < size && c >= 0 && c < size) return [r, c]
-      steps -= 1
-    }
-    return start
-  }
-
-  function share(start, end) {
-    const key = start ? `${start}-${end}` : 'none'
-    if (sent.current === key) return
-    sent.current = key
-    send({ type: 'ws_select', start, end })
-  }
-
-  function mark(start, end) {
-    setSel(null)
-    setAnchor(null)
-    sent.current = 'none'
-    send({ type: 'ws_mark', start, end })
-  }
-
-  function down(e) {
-    e.preventDefault()
-    inner.current.setPointerCapture?.(e.pointerId)
-    const cell = cellAt(e)
-    if (anchor && !same(anchor, cell)) {
-      mark(anchor, snap(anchor, cell))
-      return
-    }
-    drag.current = { start: cell, end: cell, moved: false }
-    setSel({ start: cell, end: cell })
-    share(cell, cell)
-  }
-
-  function move(e) {
-    const d = drag.current
-    if (!d) return
-    const end = snap(d.start, cellAt(e))
-    if (same(end, d.end)) return
-    d.end = end
-    d.moved = d.moved || !same(end, d.start)
-    setSel({ start: d.start, end })
-    share(d.start, end)
-  }
-
-  function up() {
-    const d = drag.current
-    drag.current = null
-    if (!d) return
-    if (d.moved && !same(d.start, d.end)) {
-      mark(d.start, d.end)
-    } else if (anchor && same(anchor, d.start)) {
-      setAnchor(null) // tapping the same letter again cancels
-      setSel(null)
-      share(null, null)
-    } else {
-      setAnchor(d.start)
-    }
-  }
-
-  const center = ([r, c]) => [c + 0.5, r + 0.5]
-  const capsule = (start, end, color, key, extra = {}) => {
-    const [x1, y1] = center(start)
-    const [x2, y2] = center(end)
-    if (extra.draw) {
-      // found words: the highlight is drawn from the first letter to the last
-      return (
-        <motion.line
-          key={key}
-          x1={x1} y1={y1} x2={x2} y2={y2}
-          stroke={color} strokeWidth="0.78" strokeLinecap="round"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-        />
-      )
-    }
-    return (
-      <line key={key} x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth="0.78" strokeLinecap="round" {...extra} />
-    )
-  }
-
-  const text = size >= 14 ? 'text-base sm:text-lg' : size >= 12 ? 'text-lg sm:text-xl' : 'text-xl sm:text-2xl'
-  const mine = sel ?? (anchor ? { start: anchor, end: anchor } : null)
-  const foundCells = new Set(Object.values(game.found).flatMap((f) => f.cells.map(([r, c]) => `${r}-${c}`)))
-
+/** The words still to find, as chips over the bottom of the stage. */
+function WordChips({ game, colorOf }) {
   return (
-    <div className="rounded-[2rem] bg-paper p-3 sm:p-4">
-      <div
-        ref={inner}
-        className={`relative aspect-square w-full touch-none select-none ${interactive ? 'cursor-pointer' : ''}`}
-        onPointerDown={interactive ? down : undefined}
-        onPointerMove={interactive ? move : undefined}
-        onPointerUp={interactive ? up : undefined}
-        onPointerCancel={interactive ? up : undefined}
-        role="grid"
-        aria-label="Sopa de letras"
-      >
-        <svg className="pointer-events-none absolute inset-0 h-full w-full" viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-          <g opacity="0.32">
-            {Object.entries(game.found).map(([w, f]) => capsule(f.cells[0], f.cells.at(-1), colorOf(f.player), w, { draw: true }))}
-            {game.missing.map((m) => capsule(m.cells[0], m.cells.at(-1), 'var(--color-muted)', `m-${m.word}`, { draw: true }))}
-          </g>
-          {Object.entries(game.selecting).map(([p, s]) =>
-            capsule(s.start, s.end, colorOf(p), `s-${p}`, { opacity: 0.22, strokeDasharray: '0.25 0.18', strokeWidth: 0.7 }),
-          )}
-          {mine && capsule(mine.start, mine.end, colorOf(me), 'mine', { opacity: 0.4 })}
-        </svg>
-        <div
-          className="relative grid h-full w-full"
-          style={{ gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${size}, minmax(0, 1fr))` }}
-        >
-          {game.grid.flatMap((row, r) =>
-            row.split('').map((ch, c) => (
-              // letters ripple in from the top-left corner; found letters jump once
-              <motion.span
-                key={`${r}-${c}`}
-                className={`flex items-center justify-center font-display font-bold ${text}`}
-                initial={{ opacity: 0, scale: 0.4 }}
-                animate={{ opacity: 1, scale: foundCells.has(`${r}-${c}`) ? [1, 1.4, 1] : 1 }}
-                transition={foundCells.has(`${r}-${c}`) ? { duration: 0.4 } : { ...spring, delay: (r + c) * 0.018 }}
-              >
-                {ch}
-              </motion.span>
-            )),
-          )}
-        </div>
-      </div>
-    </div>
+    <ul className="flex max-w-full flex-wrap justify-center gap-1.5">
+      {game.words.map((w) => {
+        const f = game.found[w]
+        return (
+          <motion.li
+            key={w}
+            layout
+            className={`rounded-full px-2.5 py-1 font-display text-xs font-bold uppercase tracking-wide shadow-sm backdrop-blur sm:text-sm ${f ? 'text-white' : 'bg-paper/90'}`}
+            style={f ? { background: colorOf(f.player) } : undefined}
+            animate={{ scale: f ? [1, 1.25, 1] : 1, opacity: f ? 0.75 : 1 }}
+            transition={{ duration: 0.4 }}
+          >
+            {f ? <s>{w}</s> : w}
+          </motion.li>
+        )
+      })}
+    </ul>
   )
 }
 
@@ -315,7 +191,7 @@ function RoundOver({ game, me, send, colorOf }) {
     if (!tie) accent = colorOf(ranking[0])
   }
   return (
-    <div className="pop mt-6 rounded-[2rem] p-6 text-white" style={{ background: accent }}>
+    <div className="pop pointer-events-auto w-full max-w-lg rounded-[2rem] p-6 text-white shadow-xl" style={{ background: accent }}>
       <p className="font-display text-3xl font-extrabold">{title}</p>
       <p className="mt-1 text-white/85">{detail}</p>
       <button onClick={() => send({ type: 'next_round' })} className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-ink">
