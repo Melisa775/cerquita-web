@@ -1,8 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+/**
+ * Hangman on the 3D stage: the gallows, the doll and the word tiles are 3D;
+ * the keyboard and the forms float over the bottom of the stage.
+ */
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring } from '../lib/motion'
-import HangmanDrawing from '../components/HangmanDrawing'
 import { EndActions, winnerTitle } from '../components/EndActions'
+import Stage3D from '../components/stage/Stage3D'
+import { Panel, Plates, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/hangman3d.js')
 
 const ROWS = ['QWERTYUIOP', 'ASDFGHJKLÑ', 'ZXCVBNM']
 const VALID_WORD = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑáéíóúüñ \-]*$/
@@ -10,41 +18,70 @@ const VALID_WORD = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ][A-Za-zÁÉÍÓÚÜÑá
 export default function HangmanGame({ room, me, send, colorOf }) {
   const game = room.game
   if (game.phase === 'finished') return <Final game={game} me={me} send={send} colorOf={colorOf} />
-  return (
-    <div className="mt-4">
-      <Header game={game} colorOf={colorOf} />
-      {game.phase === 'choosing' ? (
-        <Choosing key={game.round} game={game} me={me} send={send} colorOf={colorOf} />
-      ) : (
-        <Board game={game} me={me} send={send} colorOf={colorOf} />
-      )}
-    </div>
-  )
+  return <Play game={game} me={me} send={send} colorOf={colorOf} />
 }
 
-function Header({ game, colorOf }) {
+function Play({ game, me, send, colorOf }) {
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
+  const choosing = game.phase === 'choosing'
+  const over = game.phase === 'round_over'
+  const guesserColor = game.mode === 'turns' && game.guessers?.[0] ? colorOf(game.guessers[0]) : 'var(--color-ink)'
+  const color3d = useMemo(() => cssColor(guesserColor), [guesserColor])
+  const state = useMemo(
+    () => ({
+      round: game.round,
+      slots: choosing ? [] : game.slots,
+      misses: choosing ? 0 : game.misses,
+      lives: game.lives,
+      over,
+      won: over && game.result?.won,
+      isSetter: game.setter === me,
+      color: color3d,
+    }),
+    [game.round, choosing, game.slots, game.misses, game.lives, over, game.result, game.setter, me, color3d],
+  )
+
+  const plates =
+    game.mode === 'turns'
+      ? Object.entries(game.scores).map(([p, n]) => ({ name: p, you: p === me, color: colorOf(p), value: n, max: game.totalRounds, stats: `Ronda ${game.round} de ${game.totalRounds}`, active: game.guessers?.includes(p) && game.phase === 'guessing' }))
+      : [{ name: 'Juntos', color: colorOf(me), value: game.saved, max: game.totalRounds, stats: `Ronda ${game.round} de ${game.totalRounds}`, active: true }]
+  const left = choosing ? game.lives : game.lives - game.misses
+
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-      <span>Ronda {game.round} de {game.totalRounds}</span>
-      {game.mode === 'turns' ? (
-        <div className="flex gap-2">
-          {Object.entries(game.scores).map(([p, n]) => (
-            <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <span className="text-ink tabular-nums">{n}</span>
-            </span>
-          ))}
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#EEF2F5, #CFD9E1)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} label="Ahorcado en 3D" />}
+      top={
+        <>
+          <Plates players={plates} />
+          <div className="shrink-0 rounded-2xl bg-paper/90 px-3 py-2 shadow-sm backdrop-blur">
+            <Lives left={left} total={game.lives} />
+          </div>
+        </>
+      }
+      bottom={
+        <div className="pointer-events-auto w-full max-w-2xl">
+          {choosing ? <Choosing key={game.round} game={game} me={me} send={send} colorOf={colorOf} /> : <Board game={game} me={me} send={send} colorOf={colorOf} />}
         </div>
-      ) : (
-        (() => {
-          const done = game.round - (game.phase === 'round_over' ? 0 : 1)
-          return done > 0 ? (
-            <span className="rounded-full bg-paper px-3 py-1 text-sm font-semibold text-ink">
-              Salvaron {game.saved} de {done}
-            </span>
-          ) : null
-        })()
-      )}
-    </div>
+      }
+      aside={
+        <Panel title="Cómo se juega">
+          <ul className="space-y-1 px-1 text-sm text-muted">
+            <li>Toquen letras: cada error dibuja una parte del muñeco.</li>
+            <li>Pueden arriesgar la palabra completa; si fallan, pierden una vida.</li>
+            <li>{game.mode === 'turns' ? 'Por turnos, uno elige la palabra y el otro adivina.' : 'Adivinen juntos la palabra.'}</li>
+          </ul>
+          {!choosing && (game.wrong.length > 0 || game.wrongSolves.length > 0) && (
+            <p className="mt-3 px-1 text-sm text-muted">
+              No están: <span className="font-semibold tracking-widest text-ink">{game.wrong.join(' ').toUpperCase()}</span>
+              {game.wrongSolves.length > 0 && <> · Intentaron: {game.wrongSolves.join(', ')}</>}
+            </p>
+          )}
+        </Panel>
+      }
+    />
   )
 }
 
@@ -65,12 +102,9 @@ function Choosing({ game, me, send, colorOf }) {
 
   if (!mine) {
     return (
-      <div className="mt-6 grid items-center gap-6 rounded-[2rem] bg-paper p-6 sm:grid-cols-[12rem_1fr] sm:p-8">
-        <div className="mx-auto h-44 w-40 opacity-60">
-          <HangmanDrawing misses={0} lives={game.lives} />
-        </div>
+      <div className="rounded-[2rem] bg-paper/95 p-5 shadow-xl backdrop-blur sm:p-6">
         <div>
-          <h1 className="text-3xl font-bold">
+          <h1 className="text-2xl font-bold sm:text-3xl">
             <span style={{ color: colorOf(game.setter) }}>{game.setter}</span> está pensando una palabra
             <span className="inline-flex w-8 justify-start" aria-hidden="true">
               <span className="animate-pulse">…</span>
@@ -84,18 +118,18 @@ function Choosing({ game, me, send, colorOf }) {
 
   return (
     <form
-      className="mt-6 rounded-[2rem] bg-paper p-6 sm:p-8"
+      className="max-h-[70vh] overflow-y-auto rounded-[2rem] bg-paper/95 p-5 shadow-xl backdrop-blur sm:p-6"
       onSubmit={(e) => {
         e.preventDefault()
         if (clean && !problem) send({ type: 'hangman_word', word: clean, hint })
       }}
     >
-      <h1 className="text-3xl font-bold">Te toca elegir la palabra</h1>
-      <p className="mt-2 max-w-xl text-muted">
+      <h1 className="text-2xl font-bold sm:text-3xl">Te toca elegir la palabra</h1>
+      <p className="mt-1 max-w-xl text-sm text-muted">
         Tu pareja la va a adivinar letra por letra. Puede ser una frase corta: un apodo, un lugar al que fueron, algo que
         solo ustedes entienden.
       </p>
-      <label className="mt-6 block">
+      <label className="mt-4 block">
         <span className="text-sm font-semibold">Palabra o frase</span>
         <input
           value={word}
@@ -123,7 +157,7 @@ function Choosing({ game, me, send, colorOf }) {
       <button
         type="submit"
         disabled={!clean || !!problem}
-        className="mt-6 w-full rounded-2xl px-5 py-4 text-lg font-semibold text-white disabled:opacity-40 sm:w-auto"
+        className="mt-4 w-full rounded-2xl px-5 py-3.5 text-lg font-semibold text-white disabled:opacity-40 sm:w-auto"
         style={{ background: colorOf(me) }}
       >
         Listo, que adivine
@@ -136,20 +170,10 @@ function Choosing({ game, me, send, colorOf }) {
 function Board({ game, me, send, colorOf }) {
   const [solving, setSolving] = useState(false)
   const [attempt, setAttempt] = useState('')
-  const [shakeKey, setShakeKey] = useState(0)
-  const lastMisses = useRef(game.misses)
   const guessing = game.phase === 'guessing'
   const canGuess = guessing && game.guessers.includes(me)
-  const isSetter = game.setter === me
   const guesserColor = game.mode === 'turns' ? colorOf(game.guessers[0]) : 'var(--color-ink)'
   const over = game.phase === 'round_over'
-  const state = over ? (game.result.won ? 'won' : 'lost') : 'playing'
-
-  // Each mistake shakes the word a little
-  useEffect(() => {
-    if (game.misses > lastMisses.current) setShakeKey((k) => k + 1)
-    lastMisses.current = game.misses
-  }, [game.misses])
 
   // It can also be played with the computer keyboard
   useEffect(() => {
@@ -164,124 +188,60 @@ function Board({ game, me, send, colorOf }) {
   }, [canGuess, solving, game.guessed, send])
 
   return (
-    <div className="mt-4 grid gap-6 md:grid-cols-[minmax(0,17rem)_1fr] md:items-start xl:grid-cols-[minmax(0,24rem)_1fr]">
-      <div className="rounded-[2rem] bg-paper p-4">
-        <div className="mx-auto aspect-[200/220] w-full max-w-[15rem]">
-          <HangmanDrawing misses={game.misses} lives={game.lives} state={state} color={guesserColor} />
+    <div className="space-y-2">
+      {(game.phase === 'guessing' || game.hint || game.category) && (
+        <div className="rounded-2xl bg-paper/90 px-4 py-2 text-center shadow-md backdrop-blur">
+          <Role game={game} me={me} colorOf={colorOf} />
+          {(game.hint || game.category) && (
+            <p className="text-sm text-muted">
+              {game.category ? 'Categoría' : 'Pista'}: <span className="font-semibold text-ink">{game.category || game.hint}</span>
+            </p>
+          )}
         </div>
-        <Lives left={game.lives - game.misses} total={game.lives} />
-      </div>
-
-      <div className="min-w-0">
-        <Role game={game} me={me} colorOf={colorOf} />
-
-        <div key={shakeKey} className={`mt-4 flex flex-wrap gap-x-5 gap-y-4 ${shakeKey ? 'shake' : ''}`} aria-live="polite">
-          {splitWords(game.slots).map((word, wi) => (
-            <div key={wi} className="flex gap-1.5">
-              {word.map(({ slot, i }) => (
-                <Slot key={i} slot={slot} isSetter={isSetter} over={over} color={guesserColor} />
-              ))}
-            </div>
-          ))}
-        </div>
-
-        {(game.hint || game.category) && (
-          <p className="mt-5 text-muted">
-            {game.category ? 'Categoría' : 'Pista'}:{' '}
-            <span className="font-semibold text-ink">{game.category || game.hint}</span>
-          </p>
-        )}
-
-        {over ? (
-          <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
-        ) : (
-          <>
-            <Keyboard game={game} canGuess={canGuess} color={guesserColor} send={send} />
-            {(game.wrong.length > 0 || game.wrongSolves.length > 0) && (
-              <p className="mt-3 text-sm text-muted">
-                No están:{' '}
-                <span className="font-semibold tracking-widest text-ink">{game.wrong.join(' ').toUpperCase()}</span>
-                {game.wrongSolves.length > 0 && <> · Intentaron: {game.wrongSolves.join(', ')}</>}
-              </p>
-            )}
-            {canGuess &&
-              (solving ? (
-                <form
-                  className="mt-5 flex gap-2"
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    if (!attempt.trim()) return
-                    send({ type: 'hangman_solve', word: attempt })
-                    setAttempt('')
-                    setSolving(false)
-                  }}
-                >
-                  <input
-                    autoFocus
-                    value={attempt}
-                    onChange={(e) => setAttempt(e.target.value)}
-                    maxLength={30}
-                    autoComplete="off"
-                    placeholder="¿Cuál es?"
-                    className="w-full min-w-0 rounded-2xl border border-line bg-paper px-4 py-3 text-lg outline-none focus:border-ink"
-                  />
-                  <button type="submit" className="rounded-2xl px-5 font-semibold text-white" style={{ background: guesserColor }}>
-                    Probar
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSolving(false)}
-                    className="rounded-2xl border border-line px-4 font-semibold hover:border-ink"
-                  >
-                    Cancelar
-                  </button>
-                </form>
-              ) : (
-                <button
-                  onClick={() => setSolving(true)}
-                  className="mt-5 text-sm font-semibold underline underline-offset-2 hover:text-ink"
-                >
+      )}
+      {over ? (
+        <RoundOver game={game} me={me} send={send} colorOf={colorOf} />
+      ) : (
+        <>
+          <Keyboard game={game} canGuess={canGuess} color={guesserColor} send={send} />
+          {canGuess &&
+            (solving ? (
+              <form
+                className="flex gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  if (!attempt.trim()) return
+                  send({ type: 'hangman_solve', word: attempt })
+                  setAttempt('')
+                  setSolving(false)
+                }}
+              >
+                <input
+                  autoFocus
+                  value={attempt}
+                  onChange={(e) => setAttempt(e.target.value)}
+                  maxLength={30}
+                  autoComplete="off"
+                  placeholder="¿Cuál es?"
+                  className="w-full min-w-0 rounded-2xl border border-line bg-paper px-4 py-3 text-lg shadow-md outline-none focus:border-ink"
+                />
+                <button type="submit" className="rounded-2xl px-5 font-semibold text-white shadow-md" style={{ background: guesserColor }}>
+                  Probar
+                </button>
+                <button type="button" onClick={() => setSolving(false)} className="rounded-2xl bg-paper px-4 font-semibold shadow-md hover:bg-white">
+                  Cancelar
+                </button>
+              </form>
+            ) : (
+              <div className="text-center">
+                <button onClick={() => setSolving(true)} className="rounded-full bg-paper/90 px-4 py-1.5 text-sm font-semibold shadow-sm backdrop-blur hover:bg-white">
                   Arriesgar la palabra completa (si fallas, pierdes una vida)
                 </button>
-              ))}
-          </>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function splitWords(slots) {
-  const words = [[]]
-  slots.forEach((slot, i) => {
-    if (slot.char === ' ') words.push([])
-    else words.at(-1).push({ slot, i })
-  })
-  return words.filter((w) => w.length)
-}
-
-function Slot({ slot, isSetter, over, color }) {
-  if (!slot.letter) {
-    return <span className="flex h-12 w-5 items-end justify-center font-display text-3xl font-extrabold sm:h-14">{slot.char}</span>
-  }
-  const visible = slot.char != null
-  const missed = over && !slot.found // the word is revealed at the end
-  const ghost = isSetter && !slot.found && !over // whoever chose it sees the missing ones, faded
-  return (
-    <span
-      className="flex h-12 w-9 items-end justify-center border-b-4 pb-1 font-display text-3xl font-extrabold uppercase sm:h-14 sm:w-11 sm:text-4xl"
-      style={{ borderColor: slot.found ? color : 'var(--color-ink)' }}
-    >
-      {visible && (
-        <span
-          key={slot.found ? 'found' : 'shown'}
-          className={slot.found ? 'pop' : ''}
-          style={{ color: missed ? 'var(--color-danger)' : ghost ? 'var(--color-line)' : undefined }}
-        >
-          {slot.char}
-        </span>
+              </div>
+            ))}
+        </>
       )}
-    </span>
+    </div>
   )
 }
 
@@ -334,7 +294,7 @@ function Role({ game, me, colorOf }) {
 function Keyboard({ game, canGuess, color, send }) {
   const inWord = (l) => game.guessed.includes(l) && !game.wrong.includes(l)
   return (
-    <div className="mt-6 space-y-1.5" role="group" aria-label="Letras">
+    <div className="space-y-1 rounded-2xl bg-paper/85 p-1.5 shadow-lg backdrop-blur sm:space-y-1.5" role="group" aria-label="Letras">
       {ROWS.map((row, r) => (
         <div key={row} className={`flex justify-center gap-1 sm:gap-1.5 ${r === 2 ? 'px-[15%] sm:px-0' : ''}`}>
           {row.split('').map((L) => {
@@ -350,7 +310,7 @@ function Keyboard({ game, canGuess, color, send }) {
                 onClick={() => send({ type: 'hangman_guess', letter: l })}
                 disabled={!canGuess || used}
                 aria-label={`${L}${used ? (hit ? ', está' : ', no está') : ''}`}
-                className={`h-12 min-w-0 flex-1 rounded-xl font-display text-lg font-bold sm:h-14 sm:max-w-12 sm:text-xl ${
+                className={`h-11 min-w-0 flex-1 rounded-xl font-display text-lg font-bold sm:h-12 sm:max-w-12 sm:text-xl ${
                   hit
                     ? 'text-white'
                     : used
@@ -391,7 +351,7 @@ function RoundOver({ game, me, send, colorOf }) {
   }
   const accent = game.mode === 'turns' && r.winner ? colorOf(r.winner) : 'var(--color-ink)'
   return (
-    <div className="pop mt-6 rounded-[2rem] p-6 text-white" style={{ background: accent }}>
+    <div className="pop rounded-[2rem] p-6 text-white shadow-xl" style={{ background: accent }}>
       <p className="font-display text-4xl font-extrabold">{title}</p>
       <p className="mt-1 text-white/85">{detail}</p>
       <button onClick={() => send({ type: 'next_round' })} className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-ink">

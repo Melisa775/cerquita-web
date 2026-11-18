@@ -1,10 +1,19 @@
-import { useEffect } from 'react'
+/**
+ * Trivia on the 3D stage: the category wheel spins in 3D; the question card
+ * and the answers float over the bottom of the stage.
+ */
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
 import TimerBar from '../components/TimerBar'
 import { useCountdown } from '../hooks/useCountdown'
 import { EndActions } from '../components/EndActions'
 import { CATEGORIES, CATEGORY_META, CategoryIcon, CrownBadge, WHEEL } from '../lib/trivia'
+import Stage3D from '../components/stage/Stage3D'
+import { Panel, Plates, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/trivia3d.js')
 
 const OK = 'hsl(148 48% 34%)'
 const BAD = 'var(--color-danger)'
@@ -14,13 +23,97 @@ const LEVEL_LABEL = { easy: 'fácil', medium: 'medio', hard: 'difícil' }
 export default function TriviaGame({ room, me, send, colorOf }) {
   const game = room.game
   if (game.phase === 'finished') return <Final game={game} me={me} send={send} colorOf={colorOf} />
-  return (
-    <div className="mt-4">
-      <Scoreboard game={game} me={me} colorOf={colorOf} />
-      {(game.phase === 'spin' || game.phase === 'spinning') && <Spin game={game} me={me} send={send} colorOf={colorOf} />}
-      {game.phase === 'crown_pick' && <CrownPick game={game} me={me} send={send} />}
-      {(game.phase === 'question' || game.phase === 'reveal') && <Question room={room} me={me} send={send} colorOf={colorOf} />}
+  return <Play room={room} me={me} send={send} colorOf={colorOf} />
+}
+
+/** The category icons as SVG text, for the 3D wheel (drawn once in a hidden box). */
+function useIconMarkup() {
+  const box = useRef(null)
+  const [icons, setIcons] = useState({})
+  useLayoutEffect(() => {
+    const out = {}
+    box.current?.querySelectorAll('[data-cat]').forEach((el) => {
+      const svg = el.querySelector('svg')
+      if (!svg) return
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      svg.setAttribute('width', '128')
+      svg.setAttribute('height', '128')
+      out[el.dataset.cat] = svg.outerHTML
+    })
+    setIcons(out)
+  }, [])
+  const hidden = (
+    <div ref={box} hidden aria-hidden="true">
+      {WHEEL.map((c) => <span key={c} data-cat={c}><CategoryIcon category={c} /></span>)}
     </div>
+  )
+  return [icons, hidden]
+}
+
+function Play({ room, me, send, colorOf }) {
+  const game = room.game
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
+  const [icons, hiddenIcons] = useIconMarkup()
+  const colors = useMemo(() => Object.fromEntries(WHEEL.map((c) => [c, cssColor(CATEGORY_META[c].color)])), [])
+  const state = useMemo(
+    () => (Object.keys(icons).length ? { wheel: WHEEL, colors, icons, spinId: game.spinId, slot: game.slot, spinSeconds: game.spinSeconds, phase: game.phase } : null),
+    [icons, colors, game.spinId, game.slot, game.spinSeconds, game.phase],
+  )
+  const asking = game.phase === 'question' || game.phase === 'reveal'
+
+  const plates = game.players.map((p) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: game.mode === 'duel' ? game.scores[p] : (game.crowns[p] ?? []).length,
+    max: game.mode === 'duel' ? 0 : game.goal,
+    stats: game.mode === 'duel' ? `Pregunta ${Math.max(game.asked, 1)} de ${game.totalQuestions}` : `Racha ${game.streak[p] ?? 0} de ${game.streakForCrown}`,
+    active: game.mode === 'duel' ? true : game.current === p,
+  }))
+
+  return (
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#F0ECF7, #D6CDE8)"
+      stage={
+        <>
+          <Stage3D ref={stageRef} load={load} state={state} label="Ruleta de categorías en 3D" />
+          {hiddenIcons}
+        </>
+      }
+      top={<Plates players={plates} />}
+      bottom={
+        <div className={`pointer-events-auto w-full ${asking ? 'max-w-3xl' : 'max-w-xl'}`}>
+          {(game.phase === 'spin' || game.phase === 'spinning') && <Spin game={game} me={me} send={send} colorOf={colorOf} />}
+          {game.phase === 'crown_pick' && <CrownPick game={game} me={me} send={send} />}
+          {asking && <Question room={room} me={me} send={send} colorOf={colorOf} />}
+        </div>
+      }
+      aside={
+        <>
+          <Panel title="Marcador">
+            <Scoreboard game={game} me={me} colorOf={colorOf} />
+          </Panel>
+          <Panel title="Cómo se juega">
+            <ul className="space-y-1 px-1 text-sm text-muted">
+              {game.mode === 'duel' ? (
+                <>
+                  <li>Los dos responden la misma pregunta.</li>
+                  <li>Mientras más rápido aciertes, más puntos (de 50 a 100).</li>
+                </>
+              ) : (
+                <>
+                  <li>Gira y responde: si aciertas, sigues tú.</li>
+                  <li>Tres aciertos seguidos o la corona de la ruleta: juegas por una corona.</li>
+                  <li>Gana quien junte {game.goal} coronas.</li>
+                </>
+              )}
+            </ul>
+          </Panel>
+        </>
+      }
+    />
   )
 }
 
@@ -45,14 +138,14 @@ function Scoreboard({ game, me, colorOf }) {
   }
   const goalCats = game.goal === 6 ? CATEGORIES : null
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-2">
       {game.players.map((p) => {
         const active = game.current === p
         const crowns = game.crowns[p] ?? []
         return (
           <motion.div
             key={p}
-            className="rounded-3xl bg-paper p-4 transition-shadow"
+            className="rounded-2xl bg-stone p-3 transition-shadow"
             style={active ? { boxShadow: `inset 0 0 0 3px ${colorOf(p)}` } : undefined}
             animate={{ scale: active ? 1 : 0.97, opacity: active ? 1 : 0.85 }}
             transition={softSpring}
@@ -178,26 +271,23 @@ function Spin({ game, me, send, colorOf }) {
   else title = who === me ? 'Te toca girar' : `Le toca a ${who}`
 
   return (
-    <section className="mt-4 rounded-[2rem] bg-paper p-6 text-center sm:p-8">
-      <h1 className="font-display text-3xl font-extrabold sm:text-4xl" style={game.mode === 'crowns' ? { color: colorOf(who) } : undefined}>
+    <section className="rounded-[2rem] bg-paper/95 p-4 text-center shadow-xl backdrop-blur sm:p-5">
+      <h1 className="font-display text-2xl font-extrabold sm:text-3xl" style={game.mode === 'crowns' ? { color: colorOf(who) } : undefined}>
         {title}
       </h1>
       {!spinning && game.mode === 'crowns' && (
-        <p className="mt-1 text-muted">
+        <p className="mt-1 text-sm text-muted">
           {who === me
             ? 'Acierta para seguir jugando; tres seguidas y juegas por una corona.'
             : 'Mírale por la videollamada. Si falla, te toca a ti.'}
         </p>
       )}
-      <Wheel spinId={game.spinId} slot={game.slot} seconds={game.spinSeconds} className="mt-6" />
-      <div className="mt-6 h-14">
-        {canSpin && (
-          <button onClick={() => send({ type: 'tv_spin', at: game.spinId })} className="rounded-2xl bg-ink px-10 py-4 font-display text-xl font-extrabold text-white">
-            ¡Girar!
-          </button>
-        )}
-        {!canSpin && !spinning && landed == null && <p className="pt-4 text-muted">Esperando a que {who} gire…</p>}
-      </div>
+      {canSpin && (
+        <button onClick={() => send({ type: 'tv_spin', at: game.spinId })} className="mt-3 rounded-full bg-ink px-10 py-3.5 font-display text-xl font-extrabold text-white shadow-lg">
+          ¡Girar!
+        </button>
+      )}
+      {!canSpin && !spinning && landed == null && <p className="mt-2 text-muted">Esperando a que {who} gire…</p>}
     </section>
   )
 }
@@ -209,7 +299,7 @@ function CrownPick({ game, me, send }) {
   const missing = CATEGORIES.filter((c) => !(game.crowns[game.current] ?? []).includes(c))
   const viaWheel = game.slot === 'crown'
   return (
-    <section className="pop mt-4 rounded-[2rem] p-6 text-white sm:p-8" style={{ background: CATEGORY_META.crown.color }}>
+    <section className="pop max-h-[70vh] overflow-y-auto rounded-[2rem] p-5 text-white shadow-xl sm:p-6" style={{ background: CATEGORY_META.crown.color }}>
       <div className="flex items-center gap-3">
         <CategoryIcon category="crown" className="h-12 w-12" />
         <h1 className="font-display text-3xl font-extrabold sm:text-4xl">
@@ -267,8 +357,8 @@ function Question({ room, me, send, colorOf }) {
   const urgent = !reveal && left != null && left <= 5
 
   return (
-    <div className="mt-4">
-      <section className="pop overflow-hidden rounded-[2rem] bg-paper" key={`${game.asked}`}>
+    <div>
+      <section className="pop max-h-[calc(100%-1rem)] overflow-hidden rounded-[2rem] bg-paper shadow-xl" key={`${game.asked}`}>
         <div className="flex items-center justify-between gap-3 px-6 py-4 text-white sm:px-8" style={{ background: meta.color }}>
           <span className="flex items-center gap-2 font-semibold">
             <CategoryIcon category={q.category} className="h-6 w-6" />
@@ -290,10 +380,10 @@ function Question({ room, me, send, colorOf }) {
           </div>
         )}
 
-        <div className="p-6 sm:p-8">
-          <p className="font-display text-2xl font-bold leading-snug sm:text-3xl">{q.question}</p>
+        <div className="p-4 sm:p-6">
+          <p className="font-display text-xl font-bold leading-snug sm:text-2xl">{q.question}</p>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 sm:gap-3">
             {q.options.map((opt, i) => {
               const isAnswer = reveal && q.answer === i
               const pickedWrong = reveal && myChoice === i && q.answer !== i
@@ -324,7 +414,7 @@ function Question({ room, me, send, colorOf }) {
                 <button
                   disabled={!canAnswer}
                   onClick={() => send({ type: 'tv_answer', choice: i })}
-                  className={`flex min-h-16 items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-lg font-semibold transition-transform enabled:hover:-translate-y-0.5 enabled:hover:border-ink ${cls} ${isAnswer ? 'pop' : ''} ${pickedWrong ? 'shake' : ''}`}
+                  className={`flex min-h-12 items-center gap-3 rounded-2xl border-2 px-3 py-2 text-left font-semibold sm:min-h-14 sm:text-lg transition-transform enabled:hover:-translate-y-0.5 enabled:hover:border-ink ${cls} ${isAnswer ? 'pop' : ''} ${pickedWrong ? 'shake' : ''}`}
                   style={style}
                 >
                   <span

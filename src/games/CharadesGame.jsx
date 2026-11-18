@@ -1,40 +1,96 @@
-import { useEffect, useState } from 'react'
+/**
+ * Caras y gestos on the 3D card table: the actor sees the card face up, the
+ * guesser sees its back. Guessed cards fly to the right pile, passed ones to
+ * the left.
+ */
+import { useEffect, useMemo, useRef } from 'react'
 import TimerBar from '../components/TimerBar'
 import { useCountdown } from '../hooks/useCountdown'
 import { EndActions, winnerTitle } from '../components/EndActions'
-import { AnimatePresence, motion } from 'motion/react'
+import { motion } from 'motion/react'
 import { AnimatedNumber, softSpring, spring } from '../lib/motion'
+import Stage3D from '../components/stage/Stage3D'
+import { Panel, Plates, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
 
-// A guessed card flies off to the right, a passed one drops to the left
-const CARD_VARIANTS = {
-  enter: { x: 0, y: 40, scale: 0.85, opacity: 0, rotate: 0 },
-  show: { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 },
-  exit: (result) => (result === 'hit' ? { x: 360, rotate: 18, opacity: 0 } : { x: -260, y: 80, rotate: -14, opacity: 0 }),
-}
+const load = () => import('../lib/three/cards3d.js')
 
 const HIT = 'hsl(148 42% 38%)'
 
 export default function CharadesGame({ room, me, send, colorOf }) {
   const game = room.game
   if (game.phase === 'finished') return <Final game={game} me={me} send={send} colorOf={colorOf} />
+  return <Play room={room} me={me} send={send} colorOf={colorOf} />
+}
+
+function Play({ room, me, send, colorOf }) {
+  const game = room.game
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
+  const mine = game.actor === me
+  const acting = game.phase === 'acting'
+  const actorColor = useMemo(() => cssColor(colorOf(game.actor)), [colorOf, game.actor])
+  const last = game.played.at(-1)
+  const state = useMemo(() => {
+    const showWord = mine && acting && game.card
+    return {
+      key: acting ? `${game.turn}-${game.played.length}` : `ready-${game.turn}`,
+      text: showWord ? game.card.text : mine ? 'Te toca actuar' : '¿Qué está haciendo?',
+      label: showWord && game.card.category ? `${game.card.category}${game.card.level === 'hard' ? ' · difícil' : ''}` : '',
+      sub: showWord ? 'Sin hablar ni hacer sonidos' : mine ? '' : 'Adivina en voz alta',
+      bg: actorColor,
+      ink: '#FFFFFF',
+      faceDown: !showWord,
+      back: { color: actorColor, word: '?' },
+      result: last?.result,
+      hits: game.phase === 'ready' ? 0 : game.played.filter((c) => c.result === 'hit').length,
+      passes: game.phase === 'ready' ? 0 : game.played.filter((c) => c.result === 'pass').length,
+      table: '#2F4858',
+    }
+  }, [mine, acting, game.card, game.turn, game.played, game.phase, actorColor, last])
+
+  const plates = Object.entries(game.scores).map(([p, n]) => ({
+    name: p,
+    you: p === me,
+    color: colorOf(p),
+    value: n,
+    max: 0,
+    stats: `Turno ${game.turn} de ${game.totalTurns}`,
+    active: game.actor === p,
+  }))
+
   return (
-    <div className="mt-4">
-      <div className="flex flex-wrap items-center justify-between gap-3 text-muted">
-        <span>
-          Turno {game.turn} de {game.totalTurns}
-        </span>
-        <div className="flex gap-2">
-          {Object.entries(game.scores).map(([p, n]) => (
-            <span key={p} className="rounded-full bg-paper px-3 py-1 text-sm font-semibold">
-              <span style={{ color: colorOf(p) }}>{p}</span> <span className="text-ink tabular-nums">{n}</span>
-            </span>
-          ))}
+    <StageLayout
+      stageRef={stageRef}
+      sky="linear-gradient(#EFE7DF, #D8C8BA)"
+      stage={<Stage3D ref={stageRef} load={load} state={state} label="Mesa de cartas en 3D" />}
+      top={<Plates players={plates} />}
+      bottom={
+        <div className="pointer-events-auto w-full max-w-xl">
+          {game.phase === 'ready' && <Ready game={game} me={me} send={send} colorOf={colorOf} />}
+          {acting && <Acting room={room} me={me} send={send} colorOf={colorOf} />}
+          {game.phase === 'turn_over' && <TurnOver game={game} me={me} send={send} colorOf={colorOf} />}
         </div>
-      </div>
-      {game.phase === 'ready' && <Ready game={game} me={me} send={send} colorOf={colorOf} />}
-      {game.phase === 'acting' && <Acting room={room} me={me} send={send} colorOf={colorOf} />}
-      {game.phase === 'turn_over' && <TurnOver game={game} me={me} send={send} colorOf={colorOf} />}
-    </div>
+      }
+      aside={
+        <Panel title="Este turno" right={<span className="font-display text-2xl font-extrabold tabular-nums" style={{ color: HIT }}>{game.hits}</span>}>
+          <ul className="space-y-1.5 px-1">
+            {[...game.played].reverse().map((c, i) => (
+              <motion.li
+                key={game.played.length - i}
+                className={`text-sm ${c.result === 'hit' ? 'font-semibold' : 'text-muted line-through'}`}
+                initial={i === 0 ? { opacity: 0, x: c.result === 'hit' ? 16 : -16 } : false}
+                animate={{ opacity: 1, x: 0 }}
+                transition={spring}
+              >
+                {c.text}
+              </motion.li>
+            ))}
+            {!game.played.length && <li className="text-sm text-muted">Aquí aparecen las cartas que van saliendo.</li>}
+          </ul>
+        </Panel>
+      }
+    />
   )
 }
 
@@ -42,31 +98,23 @@ function Ready({ game, me, send, colorOf }) {
   const mine = game.actor === me
   const color = colorOf(game.actor)
   return (
-    <section className="mt-4 rounded-[2rem] p-6 text-white sm:p-10" style={{ background: color }}>
+    <section className="rounded-[2rem] p-5 text-white shadow-xl sm:p-6" style={{ background: color }}>
       {mine ? (
         <>
-          <h1 className="font-display text-4xl font-extrabold sm:text-5xl">Te toca actuar</h1>
-          <ul className="mt-4 max-w-xl space-y-1.5 text-white/90">
+          <h1 className="font-display text-3xl font-extrabold">Te toca actuar</h1>
+          <ul className="mt-2 space-y-1 text-sm text-white/90">
             <li>Ponte donde tu pareja te vea bien en la videollamada.</li>
             <li>Nada de hablar, hacer sonidos ni señalar letras. Se vale todo lo demás.</li>
-            <li>
-              Cuando adivine, toca <strong>¡Adivinó!</strong>; si una carta está muy difícil, <strong>Pasar</strong>.
-            </li>
             <li>Tienes {game.seconds} segundos para todas las que puedas.</li>
           </ul>
-          <button
-            onClick={() => send({ type: 'cg_start' })}
-            className="mt-6 rounded-2xl bg-white px-8 py-4 font-display text-2xl font-extrabold text-ink"
-          >
+          <button onClick={() => send({ type: 'cg_start' })} className="mt-4 rounded-2xl bg-white px-8 py-3.5 font-display text-2xl font-extrabold text-ink">
             ¡Empezar!
           </button>
         </>
       ) : (
         <>
-          <h1 className="font-display text-4xl font-extrabold sm:text-5xl">{game.actor} va a actuar</h1>
-          <p className="mt-3 max-w-xl text-white/90">
-            Mírale por la videollamada y grita lo que creas que es. Cuando le dé a empezar, corre el reloj.
-          </p>
+          <h1 className="font-display text-3xl font-extrabold">{game.actor} va a actuar</h1>
+          <p className="mt-2 text-white/90">Mírale por la videollamada y grita lo que creas que es. Cuando le dé a empezar, corre el reloj.</p>
         </>
       )}
     </section>
@@ -78,15 +126,11 @@ function Acting({ room, me, send, colorOf }) {
   const left = useCountdown(room)
   const mine = game.actor === me
   const color = colorOf(game.actor)
-  const [pop, setPop] = useState(0)
-
-  useEffect(() => setPop((n) => n + 1), [game.hits])
 
   // On desktop: Enter or space = guessed, P = pass
   useEffect(() => {
     if (!mine) return
     const onKey = (e) => {
-      // Careful: if focus is on "Pasar", Enter would trigger it; that is why the native action is cancelled
       if (e.target.closest?.('input, textarea, select')) return
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault()
@@ -98,17 +142,14 @@ function Acting({ room, me, send, colorOf }) {
   }, [mine, send])
 
   const urgent = left != null && left <= 10
-
   return (
-    <div className="mt-4 grid gap-5 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
-      <div>
-        <div className="flex items-end justify-between">
-          <p className="font-semibold" style={{ color }}>
-            {mine ? 'Actúas tú' : `Actúa ${game.actor}`}
-          </p>
+    <div className="space-y-2">
+      <div className="rounded-2xl bg-paper/95 px-4 py-2 shadow-md backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <p className="font-semibold" style={{ color }}>{mine ? 'Actúas tú' : `Actúa ${game.actor}: adivina en voz alta`}</p>
           <motion.span
             key={left}
-            className={`font-display text-5xl font-extrabold tabular-nums ${urgent ? 'text-danger' : ''}`}
+            className={`font-display text-4xl font-extrabold tabular-nums ${urgent ? 'text-danger' : ''}`}
             initial={urgent ? { scale: 1.45 } : false}
             animate={{ scale: 1 }}
             transition={spring}
@@ -117,70 +158,17 @@ function Acting({ room, me, send, colorOf }) {
           </motion.span>
         </div>
         <TimerBar seconds={game.seconds} resetKey={game.turn} msLeft={room.phaseEndsInMs} color={color} />
-
-        <div className="relative mt-4">
-        <AnimatePresence mode="popLayout" custom={game.played.at(-1)?.result} initial={false}>
-        <motion.section
-          key={`${game.played.length}-${mine ? game.card?.text : 'guess'}`}
-          custom={game.played.at(-1)?.result}
-          variants={CARD_VARIANTS}
-          initial="enter"
-          animate="show"
-          exit="exit"
-          transition={spring}
-          className="flex min-h-[18rem] flex-col items-center justify-center rounded-[2rem] p-8 text-center text-white"
-          style={{ background: color }}
-        >
-          {game.card?.category && (
-            <span className="rounded-full bg-white/20 px-4 py-1 text-sm font-semibold">
-              {game.card.category}
-              {game.card.level === 'hard' && ' · difícil'}
-            </span>
-          )}
-          {mine ? (
-            <p className="mt-4 font-display text-5xl font-extrabold leading-tight sm:text-6xl">{game.card?.text}</p>
-          ) : (
-            <>
-              <p className="mt-4 font-display text-4xl font-extrabold sm:text-5xl">¿Qué está haciendo?</p>
-              <p className="mt-2 text-white/85">Adivina en voz alta por la videollamada.</p>
-            </>
-          )}
-        </motion.section>
-        </AnimatePresence>
-        </div>
-
-        {mine && (
-          <div className="mt-4 grid grid-cols-[2fr_1fr] gap-3">
-            <button onClick={() => send({ type: 'cg_hit' })} className="rounded-2xl py-5 font-display text-2xl font-extrabold text-white" style={{ background: HIT }}>
-              ¡Adivinó!
-            </button>
-            <button onClick={() => send({ type: 'cg_pass' })} className="rounded-2xl bg-paper py-5 font-display text-xl font-bold">
-              Pasar
-            </button>
-          </div>
-        )}
-        {mine && <p className="mt-2 hidden text-xs text-muted sm:block">Atajos: Enter o espacio para ¡Adivinó!, P para pasar.</p>}
       </div>
-
-      <aside className="rounded-[2rem] bg-paper p-5">
-        <p className="text-sm font-semibold text-muted">Adivinadas en este turno</p>
-        <p key={pop} className="pop font-display text-6xl font-extrabold tabular-nums" style={{ color: HIT }}>
-          {game.hits}
-        </p>
-        <ul className="mt-3 space-y-1.5">
-          {[...game.played].reverse().map((c, i) => (
-            <motion.li
-              key={game.played.length - i}
-              className={`text-sm ${c.result === 'hit' ? 'font-semibold' : 'text-muted line-through'}`}
-              initial={i === 0 ? { opacity: 0, x: c.result === 'hit' ? 16 : -16 } : false}
-              animate={{ opacity: 1, x: 0 }}
-              transition={spring}
-            >
-              {c.text}
-            </motion.li>
-          ))}
-        </ul>
-      </aside>
+      {mine && (
+        <div className="grid grid-cols-[2fr_1fr] gap-2">
+          <button onClick={() => send({ type: 'cg_hit' })} className="rounded-2xl py-4 font-display text-2xl font-extrabold text-white shadow-lg" style={{ background: HIT }}>
+            ¡Adivinó!
+          </button>
+          <button onClick={() => send({ type: 'cg_pass' })} className="rounded-2xl bg-paper py-4 font-display text-xl font-bold shadow-lg">
+            Pasar
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -190,11 +178,11 @@ function TurnOver({ game, me, send, colorOf }) {
   const hits = game.played.filter((c) => c.result === 'hit')
   const passed = game.played.filter((c) => c.result === 'pass')
   return (
-    <section className="pop mt-4 rounded-[2rem] bg-paper p-6 sm:p-8">
+    <section className="pop max-h-[75vh] overflow-y-auto rounded-[2rem] bg-paper p-5 shadow-xl sm:p-6">
       <p className="font-semibold" style={{ color: colorOf(game.actor) }}>
         {game.actor === me ? 'Actuaste tú' : `Actuó ${game.actor}`}
       </p>
-      <h1 className="font-display text-4xl font-extrabold">
+      <h1 className="font-display text-3xl font-extrabold">
         ¡Se acabó el tiempo! {hits.length} {hits.length === 1 ? 'adivinada' : 'adivinadas'}
       </h1>
       <div className="mt-5 grid gap-5 sm:grid-cols-2">

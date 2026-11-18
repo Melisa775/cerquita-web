@@ -1,8 +1,17 @@
+/**
+ * Más cerca: the question cards are dealt on a 3D table; the level track,
+ * the buttons and the joint decisions float around it.
+ */
 import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { softSpring, spring } from '../lib/motion'
 import { EndActions } from '../components/EndActions'
 import { LEVELS, LEVEL_META, WILDCARD_META } from '../lib/deeper'
+import Stage3D from '../components/stage/Stage3D'
+import { Panel, StageLayout, useViewKeys } from '../components/stage/hud'
+import { cssColor } from '../lib/three/kit'
+
+const load = () => import('../lib/three/cards3d.js')
 
 // Short reminders for whoever is listening, so the game stays a safe space
 const LISTEN_TIPS = {
@@ -21,11 +30,9 @@ const LISTEN_TIPS = {
 
 export default function DeeperGame({ room, me, send, colorOf }) {
   const game = room.game
-  // a conversation game: the card stays at a comfortable reading width
-  let view = <Cards game={game} me={me} send={send} colorOf={colorOf} />
-  if (game.phase === 'letters') view = <Letters game={game} me={me} send={send} colorOf={colorOf} />
-  if (game.phase === 'finished') view = <Final game={game} me={me} send={send} colorOf={colorOf} />
-  return <div className="mx-auto max-w-5xl">{view}</div>
+  if (game.phase === 'letters') return <div className="mx-auto max-w-5xl"><Letters game={game} me={me} send={send} colorOf={colorOf} /></div>
+  if (game.phase === 'finished') return <div className="mx-auto max-w-5xl"><Final game={game} me={me} send={send} colorOf={colorOf} /></div>
+  return <Cards game={game} me={me} send={send} colorOf={colorOf} />
 }
 
 /* --- level track ------------------------------------------------------ */
@@ -38,7 +45,7 @@ function LevelTrack({ level }) {
         <li
           key={l}
           aria-current={i === current ? 'step' : undefined}
-          className={`rounded-full px-3 py-1 text-sm font-semibold ${i === current ? 'text-white' : i < current ? 'bg-paper text-ink' : 'bg-paper text-muted'}`}
+          className={`rounded-full px-2.5 py-1 text-xs font-semibold sm:px-3 sm:text-sm ${i === current ? 'text-white' : i < current ? 'bg-stone text-ink' : 'bg-stone text-muted'}`}
           style={i === current ? { background: LEVEL_META[l].bg } : undefined}
         >
           {i < current && '✓ '}
@@ -60,6 +67,8 @@ function Cards({ game, me, send, colorOf }) {
   const tips = LISTEN_TIPS[game.level]
   const tip = tips[game.count % tips.length]
   const next = () => send({ type: 'dp_next', at: game.count })
+  const stageRef = useRef(null)
+  useViewKeys(stageRef)
 
   // When both agree to go deeper, the new level is announced over the whole screen
   const lastLevel = useRef(game.level)
@@ -92,8 +101,24 @@ function Cards({ game, me, send, colorOf }) {
   else if (wildcard) who = answerer === me ? 'Comodín para ti' : `Comodín para ${answerer}`
   else who = answerer === me ? 'Te toca responder' : `Responde ${answerer}`
 
+  const levelColor = LEVEL_META[game.level].bg
+  const state = {
+    key: game.count,
+    text: card.text,
+    label: wildcard ? `✦ ${meta.label}` : meta.label,
+    sub: who,
+    bg: cssColor(meta.bg),
+    ink: cssColor(meta.ink),
+    faceDown: false,
+    back: { color: cssColor(levelColor), word: '♥' },
+    result: 'hit',
+    hits: Math.max(0, game.count - 1),
+    passes: 0,
+    table: '#3B2E3F',
+  }
+
   return (
-    <div className="mt-4">
+    <>
       <AnimatePresence>
         {announce && (
           <motion.div
@@ -118,76 +143,80 @@ function Cards({ game, me, send, colorOf }) {
           </motion.div>
         )}
       </AnimatePresence>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <LevelTrack level={game.level} />
-        <span className="text-sm text-muted tabular-nums">Carta {game.count}</span>
-      </div>
-
-      <section
-        key={game.count}
-        className="deeper-deal relative mt-5 flex min-h-[20rem] flex-col rounded-[2rem] p-7 shadow-[0_18px_40px_-20px_rgba(34,37,46,.55)] sm:min-h-[22rem] sm:p-10"
-        style={{ background: meta.bg, color: meta.ink }}
-        aria-live="polite"
-      >
-        <div className="flex items-center justify-between text-sm font-semibold uppercase tracking-wider opacity-80">
-          <span>{wildcard ? `✦ ${meta.label}` : meta.label}</span>
-          <button
-            onClick={() => send({ type: 'dp_save' })}
-            aria-pressed={game.savedCurrent}
-            className="rounded-full px-3 py-1 normal-case tracking-normal hover:bg-black/10"
-            title={game.savedCurrent ? 'Quitar de guardadas' : 'Guardar para volver a ella'}
-          >
-            {game.savedCurrent ? '♥ Guardada' : '♡ Guardar'}
-          </button>
-        </div>
-        <p className="my-auto py-8 text-center font-display text-2xl font-bold leading-snug text-balance sm:text-4xl">{card.text}</p>
-        <p className="text-center font-semibold">
-          {card.kind !== 'both' && (
-            <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full align-middle ring-2 ring-white/70" style={{ background: colorOf(answerer) }} />
-          )}
-          {who}
-        </p>
-      </section>
-
-      {listening && <p className="mt-4 text-center text-muted">{tip}</p>}
-
-      <div className="mt-5 flex flex-wrap justify-center gap-3">
-        <button onClick={next} className="rounded-2xl bg-ink px-6 py-3 font-semibold text-white">
-          Siguiente carta
-        </button>
-        <button
-          onClick={() => send({ type: 'dp_skip', at: game.count })}
-          className="rounded-2xl border border-line bg-paper px-5 py-3 font-semibold hover:border-ink"
-          title="Otra carta para la misma persona"
-        >
-          Otra carta
-        </button>
-      </div>
-      <p className="mt-2 hidden text-center text-xs text-muted sm:block">Atajo: Enter o → para la siguiente carta.</p>
-
-      <div className="mt-8 grid gap-3 sm:grid-cols-2">
-        {game.level !== 'deeper' && (
-          <VoteButton
-            label={`Pasar a ${LEVEL_META[LEVELS[LEVELS.indexOf(game.level) + 1]].label}`}
-            votes={game.votes.deeper}
-            me={me}
-            partner={partner}
-            onClick={() => send({ type: 'dp_deeper' })}
-            accent={LEVEL_META[LEVELS[LEVELS.indexOf(game.level) + 1]].bg}
-            waitText="cuando los dos estén listos"
-          />
-        )}
-        <VoteButton
-          label={game.options.letter ? 'Terminar y escribir la carta final' : 'Terminar'}
-          votes={game.votes.finish}
-          me={me}
-          partner={partner}
-          onClick={() => send({ type: 'dp_finish' })}
-          accent="var(--color-ink)"
-          waitText="cuando los dos quieran"
-        />
-      </div>
-    </div>
+      <StageLayout
+        stageRef={stageRef}
+        sky="linear-gradient(#EFE6EC, #D5C3CF)"
+        stage={<Stage3D ref={stageRef} load={load} state={state} label="Mesa de cartas de Más cerca en 3D" />}
+        top={
+          <>
+            <div className="pointer-events-auto rounded-2xl bg-paper/90 p-1.5 shadow-sm backdrop-blur">
+              <LevelTrack level={game.level} />
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <span className="hidden rounded-2xl bg-paper/90 px-3 py-2 text-sm font-semibold tabular-nums shadow-sm backdrop-blur sm:inline">Carta {game.count}</span>
+              <button
+                onClick={() => send({ type: 'dp_save' })}
+                aria-pressed={game.savedCurrent}
+                className="pointer-events-auto rounded-2xl bg-paper/90 px-3 py-2 text-sm font-semibold shadow-sm backdrop-blur hover:bg-white"
+                title={game.savedCurrent ? 'Quitar de guardadas' : 'Guardar para volver a ella'}
+              >
+                <span className="hidden sm:inline">{game.savedCurrent ? '♥ Guardada' : '♡ Guardar'}</span>
+                <span className="sm:hidden">{game.savedCurrent ? '♥' : '♡'}</span>
+              </button>
+            </div>
+          </>
+        }
+        bottom={
+          <>
+            {listening && <p className="max-w-md rounded-2xl bg-paper/90 px-4 py-2 text-center text-sm text-muted shadow-sm backdrop-blur">{tip}</p>}
+            <div className="pointer-events-auto flex flex-wrap justify-center gap-2">
+              <button onClick={next} className="rounded-full bg-ink px-7 py-3.5 font-display text-lg font-extrabold text-white shadow-xl">
+                Siguiente carta
+              </button>
+              <button
+                onClick={() => send({ type: 'dp_skip', at: game.count })}
+                className="rounded-full bg-paper px-5 py-3.5 font-semibold shadow-xl hover:bg-white"
+                title="Otra carta para la misma persona"
+              >
+                Otra carta
+              </button>
+            </div>
+          </>
+        }
+        aside={
+          <>
+            <Panel title="Juntos deciden">
+              <div className="grid gap-2">
+                {game.level !== 'deeper' && (
+                  <VoteButton
+                    label={`Pasar a ${LEVEL_META[LEVELS[LEVELS.indexOf(game.level) + 1]].label}`}
+                    votes={game.votes.deeper}
+                    me={me}
+                    partner={partner}
+                    onClick={() => send({ type: 'dp_deeper' })}
+                    accent={LEVEL_META[LEVELS[LEVELS.indexOf(game.level) + 1]].bg}
+                    waitText="cuando los dos estén listos"
+                  />
+                )}
+                <VoteButton
+                  label={game.options.letter ? 'Terminar y escribir la carta final' : 'Terminar'}
+                  votes={game.votes.finish}
+                  me={me}
+                  partner={partner}
+                  onClick={() => send({ type: 'dp_finish' })}
+                  accent="var(--color-ink)"
+                  waitText="cuando los dos quieran"
+                />
+              </div>
+            </Panel>
+            <Panel title="Para escuchar">
+              <p className="px-1 text-sm text-muted">{tip}</p>
+              <p className="mt-2 hidden px-1 text-xs text-muted sm:block">Atajo: Enter o → para la siguiente carta.</p>
+            </Panel>
+          </>
+        }
+      />
+    </>
   )
 }
 
@@ -202,7 +231,7 @@ function VoteButton({ label, votes, me, partner, onClick, accent, waitText }) {
     <button
       onClick={onClick}
       aria-pressed={mine}
-      className={`rounded-2xl border-2 bg-paper px-5 py-3 text-left hover:border-ink ${theirs && !mine ? 'deeper-nudge' : ''}`}
+      className={`rounded-2xl border-2 bg-paper px-4 py-2.5 text-left hover:border-ink ${theirs && !mine ? 'deeper-nudge' : ''}`}
       style={{ borderColor: mine || theirs ? accent : 'var(--color-line)', '--accent': accent }}
     >
       <span className="block font-semibold">{label}</span>
