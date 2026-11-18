@@ -350,7 +350,7 @@ function makeRobber() {
 export function createColonosScene(container, { onPick, onHover } = {}) {
   const reduce = reducedMotion()
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.05
@@ -366,7 +366,7 @@ export function createColonosScene(container, { onPick, onHover } = {}) {
   scene.background = new THREE.Color(SKY)
   scene.fog = new THREE.Fog(SKY, 16, 38)
 
-  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 100)
+  const camera = new THREE.PerspectiveCamera(34, 1, 0.5, 100) // near plane away from 0: no z-fighting flicker on phones
   const HOME = new THREE.Vector3(0, 10.5, 9.2)
   camera.position.copy(HOME)
 
@@ -762,10 +762,13 @@ export function createColonosScene(container, { onPick, onHover } = {}) {
   }
 
   /* -- camera and size ------------------------------------------------------ */
+  let lastSize = ''
   function fitCamera() {
     const w = container.clientWidth || 1
     const h = container.clientHeight || 1
-    renderer.setSize(w, h, false)
+    // resizing clears the canvas: only when the size really changed
+    if (`${w}x${h}` !== lastSize) renderer.setSize(w, h, false)
+    lastSize = `${w}x${h}`
     camera.aspect = w / h
     // narrow screens need the camera farther back to fit the whole island
     camera.fov = w / h < 0.9 ? 40 : 34
@@ -800,7 +803,11 @@ export function createColonosScene(container, { onPick, onHover } = {}) {
   }
   fitCamera()
   camera.position.copy(HOME)
-  const ro = new ResizeObserver(() => fitCamera())
+  // a resized canvas stays blank until the next frame: draw it at once so phones don't flicker
+  const ro = new ResizeObserver(() => {
+    fitCamera()
+    renderer.render(scene, camera)
+  })
   ro.observe(container)
 
   /* -- loop ----------------------------------------------------------------- */

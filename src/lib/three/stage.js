@@ -40,7 +40,7 @@ export function createStage(
 ) {
   const reduce = reducedMotion()
   const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.75))
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2)) // sharp on phones without rendering 3x
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = exposure
@@ -55,7 +55,7 @@ export function createStage(
   scene.background = new THREE.Color(background)
   scene.fog = new THREE.Fog(background, 16, 40)
 
-  const camera = new THREE.PerspectiveCamera(fov, 1, 0.1, 120)
+  const camera = new THREE.PerspectiveCamera(fov, 1, 0.5, 120) // a near plane far from 0 keeps phones from z-fighting (flicker)
   const controls = new OrbitControls(camera, renderer.domElement)
   controls.target.set(...target)
   Object.assign(controls, {
@@ -88,10 +88,15 @@ export function createStage(
   const halfW = fitHalfWidth
   const halfD = fitHalfDepth
   const baseTarget = new THREE.Vector3(...target)
+  let lastSize = ''
   function fit() {
     const w = container.clientWidth || 1
     const h = container.clientHeight || 1
-    renderer.setSize(w, h, false)
+    const size = `${w}x${h}`
+    const resized = size !== lastSize
+    lastSize = size
+    // resizing clears the canvas: only do it when the size really changed
+    if (resized) renderer.setSize(w, h, false)
     camera.aspect = w / h
     const portrait = w / h < 0.9
     camera.fov = portrait ? portraitFov : fov
@@ -117,7 +122,12 @@ export function createStage(
   }
   fit()
   camera.position.copy(HOME)
-  const ro = new ResizeObserver(fit)
+  // a resized canvas stays blank until the next frame: draw it at once so phones don't flicker
+  const ro = new ResizeObserver(() => {
+    fit()
+    controls.update()
+    renderer.render(scene, camera)
+  })
   ro.observe(container)
 
   function resetView() {

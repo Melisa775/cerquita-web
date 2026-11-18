@@ -25,6 +25,7 @@ import ColonosCard from '../components/ColonosCard'
 import LobbyBoard from '../components/LobbyBoard'
 import DeeperCard from '../components/DeeperCard'
 import MazmorrasCard from '../components/MazmorrasCard'
+import { MuteButton } from '../components/stage/hud'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
 
@@ -132,6 +133,8 @@ export default function Room({ code, name, onExit, onPlayingChange }) {
       <header className="relative z-10 mx-auto flex w-full max-w-[1600px] flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-6 lg:px-8">
         <button onClick={onExit} aria-label="Salir de la sala"><Logo small /></button>
         <div className="flex items-center gap-2">
+          {/* on phones the sound switch lives up here, so it never covers the game */}
+          {GameView && <MuteButton className="flex h-8 w-8 items-center justify-center rounded-full bg-paper text-sm shadow-sm sm:hidden" />}
           <AnimatePresence initial={false}>
             {players.map((p, i) => (
               <motion.span

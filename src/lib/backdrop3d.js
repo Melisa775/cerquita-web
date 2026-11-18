@@ -126,7 +126,7 @@ export function mountBackdrop(canvas, { reduced = false } = {}) {
   const renderer = new WebGLRenderer({ canvas, antialias: true, alpha: true, powerPreference: 'low-power' })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
   const scene = new Scene()
-  const camera = new PerspectiveCamera(40, 1, 0.1, 100)
+  const camera = new PerspectiveCamera(40, 1, 1, 100)
   camera.position.set(0, 0, 16)
 
   scene.add(new HemisphereLight('#ffffff', '#c9ccd3', 1.1))
@@ -175,12 +175,19 @@ export function mountBackdrop(canvas, { reduced = false } = {}) {
   }
   window.addEventListener('pointermove', onPointer, { passive: true })
 
+  // On phones the address bar comes and goes while scrolling and fires resize
+  // events; resizing clears the canvas (a flash). Only resize when the width
+  // changes or the height changes a lot, and redraw right away.
+  let size = [0, 0]
   const resize = () => {
     const w = window.innerWidth
     const h = window.innerHeight
+    if (w === size[0] && Math.abs(h - size[1]) < 160) return
+    size = [w, h]
     renderer.setSize(w, h, false)
     camera.aspect = w / h
     camera.updateProjectionMatrix()
+    renderer.render(scene, camera)
   }
   resize()
   window.addEventListener('resize', resize)

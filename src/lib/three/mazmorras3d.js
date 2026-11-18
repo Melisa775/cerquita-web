@@ -455,14 +455,18 @@ function floatText(text, color) {
 const signCache = new Map()
 function doorSign(text) {
   if (!signCache.has(text)) {
-    const tex = textTexture(`🚪 ${text}`, { size: 96, width: 520, bg: 'rgba(20,16,26,.85)', fg: '#FFE9C7', radius: 40, font: '800 44px "Bricolage Grotesque", system-ui, sans-serif' })
+    // as wide as the text needs, so short names stay small on phones
+    const width = Math.round(Math.min(560, 120 + text.length * 22) / 8) * 8
+    const tex = textTexture(`🚪 ${text}`, { size: 96, width, bg: 'rgba(20,16,26,.85)', fg: '#FFE9C7', radius: 40, font: '800 40px "Bricolage Grotesque", system-ui, sans-serif' })
     tex.userData.shared = true
     const m = new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false })
     m.userData.shared = true
+    m.userData.aspect = width / 96
     signCache.set(text, m)
   }
-  const s = new THREE.Sprite(signCache.get(text))
-  s.scale.set(1.6, 0.3, 1)
+  const m = signCache.get(text)
+  const s = new THREE.Sprite(m)
+  s.scale.set(0.28 * m.userData.aspect, 0.28, 1)
   s.renderOrder = 25
   return s
 }
@@ -490,10 +494,20 @@ function makeD20() {
 /* -- the stage --------------------------------------------------------------------- */
 
 export function create(container, handlers) {
-  let framing = { fitHalfWidth: 4.5, fitHalfDepth: 4, target: [0, 0, 0] }
+  let room = null // bounds of the room being shown
+  // the room fills the screen; on phones (portrait) with less margin, so the figures read well
+  const framing = (aspect) => {
+    if (!room) return { fitHalfWidth: 4.5, fitHalfDepth: 4, target: [0, 0, 0] }
+    const portrait = aspect < 0.9
+    return {
+      fitHalfWidth: Math.max(room.w / 2 + (portrait ? 0.95 : 1.4), portrait ? 2.6 : 3.6),
+      fitHalfDepth: Math.max(room.d / 2 + (portrait ? 1.0 : 1.8), portrait ? 2.6 : 3.4),
+      target: [room.cx, 0, room.cz + (portrait ? 0.45 : 0.2)],
+    }
+  }
   const stage = createStage(
     container,
-    { background: '#141119', fov: 36, tilt: 0.84, portraitTilt: 0.92, minDistance: 4, maxPolar: 1.05, shadowSize: 12, exposure: 1.15, layout: () => framing },
+    { background: '#141119', fov: 36, tilt: 0.84, portraitTilt: 0.92, minDistance: 4, maxPolar: 1.05, shadowSize: 12, exposure: 1.15, layout: (aspect) => framing(aspect) },
     handlers,
   )
   const { scene, world, camera, controls } = stage
@@ -609,8 +623,7 @@ export function create(container, handlers) {
 
   /* camera */
   function frameRoom(r, instant) {
-    const B = bounds(r)
-    framing = { fitHalfWidth: Math.max(B.w / 2 + 1.4, 3.6), fitHalfDepth: Math.max(B.d / 2 + 1.8, 3.4), target: [B.cx, 0, B.cz + 0.2] }
+    room = bounds(r)
     if (instant || stage.reduce) return stage.refit()
     const fromPos = camera.position.clone()
     const fromTarget = controls.target.clone()
@@ -905,7 +918,7 @@ export function create(container, handlers) {
         const ring = glowRing(glow, 0.36, 0.045)
         ring.position.set(door[0], 0.15, door[1])
         marks.add(ring)
-        const sign = doorSign(ex.visited ? ex.name : 'Sala sin explorar')
+        const sign = doorSign(ex.visited ? ex.name : '¿?')
         sign.position.set(door[0], 0.75, door[1])
         marks.add(sign)
         const hit = hitBox(0.9, 1.2, 0.9)

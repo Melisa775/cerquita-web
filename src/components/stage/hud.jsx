@@ -14,7 +14,7 @@ export function StageLayout({ stage, top, bottom, aside, overlay, sky = 'linear-
   return (
     <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
       <section
-        className="relative h-[min(72dvh,42rem)] min-h-[24rem] overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-30px_rgba(34,37,46,.6)] lg:h-[calc(100dvh-7.5rem)]"
+        className="relative h-[min(72svh,42rem)] min-h-[24rem] overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-30px_rgba(34,37,46,.6)] lg:h-[calc(100svh-7.5rem)]"
         style={{ background: sky }}
       >
         {stage}
@@ -25,15 +25,17 @@ export function StageLayout({ stage, top, bottom, aside, overlay, sky = 'linear-
         {stageRef && <ViewButtons stageRef={stageRef} />}
         {overlay}
       </section>
-      {aside && <aside className="flex min-w-0 flex-col gap-3 lg:max-h-[calc(100dvh-7.5rem)] lg:overflow-y-auto lg:pr-1">{aside}</aside>}
+      {aside && <aside className="flex min-w-0 flex-col gap-3 lg:max-h-[calc(100svh-7.5rem)] lg:overflow-y-auto lg:pr-1">{aside}</aside>}
     </div>
   )
 }
 
 /** Player plates: a ring that fills toward `max`, name, a stats line and badges. */
 export function Plates({ players }) {
+  // three or more players on a phone: just the rings (names come back from sm up)
+  const crowded = players.length > 2
   return (
-    <div className="flex min-w-0 gap-1.5">
+    <div className={`flex min-w-0 gap-1.5 ${crowded ? 'max-sm:gap-1' : ''}`}>
       {players.map((p) => {
         const pct = p.max ? Math.min(1, p.value / p.max) : 0
         const R = 19
@@ -41,7 +43,8 @@ export function Plates({ players }) {
           <motion.div
             key={p.name}
             layout
-            className="flex min-w-0 items-center gap-2 rounded-2xl bg-paper/90 py-1 pl-1 pr-2.5 shadow-sm backdrop-blur sm:gap-2.5 sm:py-1.5 sm:pl-1.5 sm:pr-3"
+            className={`flex min-w-0 items-center gap-2 rounded-2xl bg-paper/90 py-1 pl-1 pr-2.5 shadow-sm backdrop-blur sm:gap-2.5 sm:py-1.5 sm:pl-1.5 sm:pr-3 ${crowded ? 'max-sm:shrink-0 max-sm:rounded-full max-sm:p-0.5' : ''}`}
+            title={p.name}
             animate={{ scale: p.active ? 1 : 0.94, opacity: p.active ? 1 : 0.85 }}
             style={p.active ? { boxShadow: `0 0 0 3px ${p.color}` } : undefined}
             transition={softSpring}
@@ -60,7 +63,7 @@ export function Plates({ players }) {
                 {typeof p.value === 'number' ? <AnimatedNumber value={p.value} /> : p.value}
               </span>
             </div>
-            <div className="min-w-0">
+            <div className={`min-w-0 ${crowded ? 'max-sm:hidden' : ''}`}>
               <p className="truncate text-sm font-bold" style={{ color: p.color }}>{p.name}{p.you && ' (tú)'}</p>
               {p.stats && <p className="hidden truncate text-xs text-muted sm:block">{p.stats}</p>}
               {p.badges?.length > 0 && (
@@ -217,7 +220,6 @@ export function ViewButtons({ stageRef }) {
         <button className={btn} onClick={() => stageRef.current?.call('resetView')} aria-label="Centrar la vista (R)" title="Centrar la vista (R)">⟲</button>
         <MuteButton className={btn} />
       </div>
-      <MuteButton className={`${btn} absolute bottom-3 left-3 sm:hidden`} />
     </>
   )
 }
