@@ -36,7 +36,6 @@ The games themselves are in Spanish; the names below are the ones shown in the a
 | Una (UNO-style): original cards, action cards, wild cards, "¡Una!" with a penalty if you get caught, and optional stacking | Available |
 | Mini golf (Plato-style): pull back to shoot, nine holes with bumpers, sand, water, slopes and portals; the partner sees the aim live | Available |
 | Colonos (Catan-style): random island, build roads, settlements and cities, robber, trading and development cards | Available |
-| Anzuelo (inspired by Sounds Fishy): one player fishes and the rest are fish; everyone but the fisher sees the real answer, one fish holds the truth and the others write believable lies, and the fisher catches liars one by one without hooking the honest fish; 3 to 6 players, bots included | Available |
 | Mazmorras: cooperative fantasy role-play with a d20 (inspired by classic tabletop RPGs): pick a class, explore rooms, disarm traps and fight turn-based battles in 3D; the Dungeon Master is the system or a person, bot companions can join, and a rulebook is always one tap away | Available |
 | Más cerca: question cards to know each other better and connect, in three levels (icebreaker, deep and deeper) plus wildcards; going deeper needs both to agree, and it ends with a letter to each other that's revealed at the same time | Available |
 
@@ -117,7 +116,6 @@ src/
 - [x] Colonos
 - [x] Más cerca
 - [x] Mazmorras
-- [x] Anzuelo
 - [x] Public deployment
 
 ## Author
