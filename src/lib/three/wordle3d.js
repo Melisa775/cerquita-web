@@ -23,9 +23,10 @@ export function create(container, handlers) {
       tilt: 0.93,
       portraitTilt: 0.97,
       shadowSize: 6,
-      // the keyboard covers the bottom of the stage: keep the board in the upper part
-      layout: (aspect) => ({ fitHalfWidth: (dims.length * GAP) / 2 + 0.5, fitHalfDepth: (dims.rows * GAP) / 2 + (aspect < 0.9 ? 3.9 : 3.1) }),
-      target: [0, 0, 1.9],
+      // the board fits between the players on top and the keyboard below, whatever their size
+      autoInsets: true,
+      layout: () => ({ fitHalfWidth: (dims.length * GAP) / 2 + 0.5, fitHalfDepth: (dims.rows * GAP) / 2 + 0.45 }),
+      target: [0, 0, 0],
     },
     handlers,
   )
@@ -166,6 +167,7 @@ export function create(container, handlers) {
       return current
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,

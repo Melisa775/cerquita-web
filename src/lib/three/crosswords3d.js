@@ -196,6 +196,7 @@ export function create(container, handlers) {
       return stage.project(cells[r * SIZE + c])
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,

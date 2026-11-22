@@ -236,6 +236,7 @@ export function create(container, handlers) {
       return current
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,

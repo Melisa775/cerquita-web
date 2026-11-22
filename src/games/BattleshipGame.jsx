@@ -32,7 +32,6 @@ const onGrid = (s) => s && s.kind === 'cell' ? s.id.split(',').map(Number) : nul
 
 function Placement({ game, me, send, colorOf, flash }) {
   const { size, fleet } = game
-  const noTouch = game.options.noTouch
   const lengths = useMemo(() => Object.fromEntries(fleet.map((s) => [s.id, s.length])), [fleet])
   const mineOnServer = game.boards[me]?.ships ?? []
   const [placed, setPlaced] = useState(() => mineOnServer.map(({ id, row, col, dir }) => ({ id, row, col, dir })))
@@ -41,7 +40,7 @@ function Placement({ game, me, send, colorOf, flash }) {
   const [hover, setHover] = useState(null)
   const ready = game.ready[me]
   const other = game.players.find((p) => p !== me)
-  const bad = problems(placed, lengths, size, noTouch)
+  const bad = problems(placed, lengths, size)
   const allPlaced = placed.length === fleet.length
   const stageRef = useRef(null)
 
@@ -83,8 +82,8 @@ function Placement({ game, me, send, colorOf, flash }) {
     if (ready || !selected || !hover) return null
     const s = { id: selected, ...clampShip(hover[0], hover[1], dir, lengths[selected], size) }
     const others = placed.filter((p) => p.id !== selected)
-    return { ...s, length: lengths[selected], bad: problems([...others, s], lengths, size, noTouch).has(selected) }
-  }, [ready, selected, hover, dir, lengths, size, placed, noTouch])
+    return { ...s, length: lengths[selected], bad: problems([...others, s], lengths, size).has(selected) }
+  }, [ready, selected, hover, dir, lengths, size, placed])
 
   const state = useMemo(
     () => ({ size, lengths, ships: placed.map((s) => ({ ...s, length: lengths[s.id], sunk: false })), preview, interactive: !ready }),
@@ -99,13 +98,13 @@ function Placement({ game, me, send, colorOf, flash }) {
     hint = game.ready[other] ? 'Empieza la batalla…' : `Esperando a que ${other} termine…`
   } else if (selected) {
     title = `Ubica tu ${selName.toLowerCase()}`
-    hint = `Toca el mar. Va ${dir === 'h' ? 'horizontal ↔' : 'vertical ↕'}.${noTouch ? ' Sin tocarse, ni en diagonal.' : ''}`
+    hint = `Toca el mar. Va ${dir === 'h' ? 'horizontal ↔' : 'vertical ↕'}. Puede tocar a otros barcos.`
   } else if (allPlaced && !bad.size) {
     title = 'Todo en su lugar'
     hint = 'Toca un barco para moverlo, o confirma.'
   } else {
     title = 'Ubica tu flota'
-    hint = bad.size ? (noTouch ? 'Hay barcos encima de otros o tocándose.' : 'Hay barcos encima de otros.') : 'Elige un barco en la lista.'
+    hint = bad.size ? 'Hay barcos encima de otros.' : 'Elige un barco en la lista.'
   }
 
   const plates = game.players.map((p) => ({
@@ -136,7 +135,7 @@ function Placement({ game, me, send, colorOf, flash }) {
               <button
                 className={smallBtn}
                 onClick={() => {
-                  setPlaced(randomFleet(fleet, size, noTouch))
+                  setPlaced(randomFleet(fleet, size))
                   setSelected(null)
                 }}
               >
@@ -243,7 +242,6 @@ function Battle({ game, me, send, colorOf, flash }) {
       lengths,
       ships: board.ships,
       shots: board.shots,
-      autoWater: board.autoWater,
       lastShot: last && (showing === 'enemy' ? last.by === me : last.by !== me) ? last : null,
       interactive: showing === 'enemy' && myTurn,
       skipShot: true,
@@ -289,7 +287,7 @@ function Battle({ game, me, send, colorOf, flash }) {
       overlay={finished && game.winner === me && <Confetti colors={CONFETTI_COLORS} />}
       top={
         <>
-          <Plates players={plates} />
+          <Plates players={plates} compact />
           <div className="pointer-events-auto flex shrink-0 rounded-full bg-paper/95 p-1 text-sm font-bold shadow-md backdrop-blur" role="tablist" aria-label="Qué mar ver">
             {[
               ['enemy', '🎯 Su mar', other],

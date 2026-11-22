@@ -6,7 +6,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 're
  * returns a controller with at least `update(state)` and `dispose()`. The
  * controller is reachable through the ref (`ref.current.call('resetView')`).
  */
-const Stage3D = forwardRef(function Stage3D({ load, state, onPick, onHover, label = 'Tablero en 3D' }, ref) {
+const Stage3D = forwardRef(function Stage3D({ load, state, onPick, onHover, label = 'Tablero en 3D', insets }, ref) {
   const box = useRef(null)
   const ctrl = useRef(null)
   const handlers = useRef({ onPick, onHover })
@@ -40,6 +40,11 @@ const Stage3D = forwardRef(function Stage3D({ load, state, onPick, onHover, labe
   useEffect(() => {
     if (ctrl.current && state) ctrl.current.update(state)
   }, [state, ready])
+
+  // how much of the stage the HUD covers, so boards that care fit in the rest
+  useEffect(() => {
+    if (ctrl.current && insets) ctrl.current.setInsets?.(insets)
+  }, [insets?.top, insets?.bottom, ready]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useImperativeHandle(ref, () => ({
     call: (method, ...args) => ctrl.current?.[method]?.(...args),

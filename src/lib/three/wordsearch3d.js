@@ -27,8 +27,10 @@ export function create(container, handlers) {
       tilt: 0.97,
       portraitTilt: 0.985,
       shadowSize: 8,
-      target: [0, 0, 0.8],
-      layout: (aspect) => ({ fitHalfWidth: size / 2 + 0.6, fitHalfDepth: size / 2 + (aspect < 0.9 ? 2.0 : 1.8) }),
+      target: [0, 0, 0],
+      // the grid fits between the players and clock on top and the word list below
+      autoInsets: true,
+      layout: () => ({ fitHalfWidth: size / 2 + 0.6, fitHalfDepth: size / 2 + 0.5 }),
     },
     handlers,
   )
@@ -279,6 +281,7 @@ export function create(container, handlers) {
       return stage.project(o)
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,

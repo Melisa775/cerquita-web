@@ -39,7 +39,7 @@ function makeShip(length, sunk) {
 }
 
 export function create(container, handlers) {
-  const stage = createStage(container, { fitHalfWidth: 6.0, fitHalfDepth: 6.4, background: '#CFE6F3', tilt: 0.95, portraitTilt: 0.97, target: [0, 0, 0.1], shadowSize: 6.5 }, handlers)
+  const stage = createStage(container, { fitHalfWidth: 6.0, fitHalfDepth: 6.0, background: '#CFE6F3', tilt: 0.95, portraitTilt: 0.97, target: [0, 0, 0], shadowSize: 6.5, autoInsets: true }, handlers)
   const { world } = stage
 
   let size = 0
@@ -172,10 +172,9 @@ export function create(container, handlers) {
     return shadowed(g)
   }
 
-  function syncShots(shots, autoWater, lastShot) {
+  function syncShots(shots, lastShot) {
     const want = new Map()
     shots.forEach(([r, c, v]) => want.set(`${r},${c}`, v))
-    autoWater.forEach(([r, c]) => !want.has(`${r},${c}`) && want.set(`${r},${c}`, 'auto'))
     for (const [k, obj] of shotKeys) {
       if (want.get(k) !== obj.userData.v) {
         shotsGroup.remove(obj)
@@ -187,12 +186,7 @@ export function create(container, handlers) {
       if (shotKeys.has(k)) continue
       const [r, c] = k.split(',').map(Number)
       const [x, z] = cell(r, c)
-      let obj
-      if (v === 'hit') obj = fire(x, z)
-      else if (v === 'auto') {
-        obj = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.02, 14), new THREE.MeshStandardMaterial({ color: '#D6ECF8', transparent: true, opacity: 0.8 }))
-        obj.position.set(x, 0.06, z)
-      } else obj = splash(x, z)
+      const obj = v === 'hit' ? fire(x, z) : splash(x, z)
       obj.userData.v = v
       shotsGroup.add(obj)
       shotKeys.set(k, obj)
@@ -257,12 +251,12 @@ export function create(container, handlers) {
         instant = true
       }
       syncShips(state.ships ?? [], state.lengths)
-      syncShots(state.shots ?? [], state.autoWater ?? [], state.lastShot)
+      syncShots(state.shots ?? [], state.lastShot)
       syncPreview(state.preview)
       instant = false
       stage.clearPickables()
       if (state.interactive) {
-        const free = new Set((state.shots ?? []).map(([r, c]) => `${r},${c}`).concat((state.autoWater ?? []).map(([r, c]) => `${r},${c}`)))
+        const free = new Set((state.shots ?? []).map(([r, c]) => `${r},${c}`))
         cellsGroup.children.forEach((h) => {
           const id = h.userData.rc.join(',')
           if (!state.skipShot || !free.has(id)) stage.pickable(h, { kind: 'cell', id, marker: h })
@@ -274,6 +268,7 @@ export function create(container, handlers) {
       return current
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,
