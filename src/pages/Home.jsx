@@ -1,6 +1,7 @@
 import { motion } from 'motion/react'
 import { Appear } from '../lib/motion'
 import Credit from '../components/Credit'
+import InstallApp from '../components/InstallApp'
 import { useState } from 'react'
 import { checkRoom, createRoom, storage } from '../lib/api'
 
@@ -104,6 +105,9 @@ export default function Home({ initialCode = '', onEnter }) {
       </Appear>
 
       {error && <p key={error} role="alert" className="shake mt-5 font-medium text-danger">{error}</p>}
+      <Appear delay={0.5} className="mt-6">
+        <InstallApp className="w-full justify-center sm:w-auto" />
+      </Appear>
       <Credit className="mt-12" />
     </main>
   )
