@@ -228,20 +228,6 @@ const SOUNDS = {
   page(ac, t) {
     noise(ac, { start: t, dur: 0.18, gain: 0.12, type: 'highpass', freq: 2500, attack: 0.06 })
   },
-  /* -- Anzuelo ---------------------------------------------------------------- */
-  // a fish jumps out of the water
-  splash(ac, t) {
-    noise(ac, { start: t, dur: 0.35, gain: 0.35, type: 'lowpass', freq: 2400, to: 400, attack: 0.01 })
-    for (let i = 0; i < 4; i++) note(ac, { freq: 700 + i * 260, start: t + 0.05 + i * 0.05, dur: 0.04, type: 'sine', gain: 0.06, to: 1400 + i * 200, release: 0.06 })
-  },
-  // the reel clicks while the fisher pulls
-  reel(ac, t) {
-    for (let i = 0; i < 9; i++) noise(ac, { start: t + i * 0.045, dur: 0.02, gain: 0.16, freq: 3200, q: 8 })
-  },
-  // a bubble: someone sent their answer
-  bubble(ac, t) {
-    note(ac, { freq: 420, start: t, dur: 0.09, type: 'sine', gain: 0.14, to: 980, release: 0.05 })
-  },
   victory(ac, t) {
     SOUNDS.fanfare(ac, t)
   },
