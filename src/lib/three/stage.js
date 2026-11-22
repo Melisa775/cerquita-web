@@ -34,7 +34,7 @@ export function createStage(
     shadows = true,
     exposure = 1.05,
     shadowSize = 7,
-    layout = null, // (aspect, world) => ({ fitHalfWidth, fitHalfDepth, target? }) to adapt the framing to the screen shape
+    layout = null, // (aspect, world, freeAspect) => ({ fitHalfWidth, fitHalfDepth, target? }) to adapt the framing to the screen shape
     // Fit the content in the part of the stage the HUD leaves free (the HUD
     // reports its real height with setInsets), instead of a fixed margin.
     autoInsets = false,
@@ -112,7 +112,7 @@ export function createStage(
     const free = Math.max(h * 0.35, h - top - bottom)
     // shift the picture so the target sits in the middle of that band
     if (autoInsets) camera.setViewOffset(w, h, 0, (bottom - top) / 2, w, h)
-    const fitted = layout?.(camera.aspect, world) ?? {}
+    const fitted = layout?.(camera.aspect, world, w / free) ?? {}
     const fitHalfWidth = fitted.fitHalfWidth ?? halfW
     const fitHalfDepth = fitted.fitHalfDepth ?? halfD
     // far enough for the content to fit the width (and the depth, if given)

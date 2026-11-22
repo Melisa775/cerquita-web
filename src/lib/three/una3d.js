@@ -138,6 +138,9 @@ const backTexture = () =>
     'una|back',
   )
 
+const MAX_DISCARDS = 9
+const STEP = 0.014 // height between cards on the discard pile
+
 const blankFront = () => canvasTexture(8, 12, (ctx) => ((ctx.fillStyle = '#FFFFFF'), ctx.fillRect(0, 0, 8, 12)), 'una|blank')
 const newCard = (card) => makeCard(W, H, card ? frontTexture(card) : blankFront(), backTexture())
 
@@ -222,7 +225,16 @@ export function create(container, handlers) {
     topId = game.top.id
     const card = newCard(game.top)
     const r = ((game.top.id * 37) % 21 - 10) * 0.025
-    const target = new THREE.Vector3(DISCARD[0], 0.02 + discards.length * 0.014, DISCARD[1])
+    // keep the pile short: the oldest card goes and the rest settle one step,
+    // so the new card always lands above the last one (same height = flicker)
+    while (discards.length >= MAX_DISCARDS) {
+      discardGroup.remove(discards.shift())
+      discards.forEach((m) => {
+        m.position.y -= STEP
+        if (m.userData.target) m.userData.target.y -= STEP // still flying: land lower too
+      })
+    }
+    const target = new THREE.Vector3(DISCARD[0], 0.02 + discards.length * STEP, DISCARD[1])
     const last = game.log[game.log.length - 1]
     // the card leaves the hand of whoever played it
     const fromMine = last?.action === 'play' && last.player === me && mine.get(game.top.id)
@@ -243,11 +255,10 @@ export function create(container, handlers) {
       card.position.copy(target)
       card.rotation.set(0, r, 0)
     }
+    card.userData.target = target
     discardGroup.add(card)
     discards.push(card)
     if (card.position.distanceTo(target) > 0.01) flyTo(card, target, { x: 0, y: r + Math.PI * 2 * (fromMine ? 0 : 1), z: 0 }, { duration: 560, height: 1.1 })
-    // keep the pile short
-    while (discards.length > 9) discardGroup.remove(discards.shift())
   }
 
   function syncColor(color, pending) {
