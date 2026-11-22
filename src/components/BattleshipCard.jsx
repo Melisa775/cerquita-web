@@ -3,7 +3,6 @@ import { useState } from 'react'
 /** Lobby card for Battleship. */
 export default function BattleshipCard({ send, alone }) {
   const [size, setSize] = useState(10)
-  const [noTouch, setNoTouch] = useState(true)
   const [bonus, setBonus] = useState(true)
 
   return (
@@ -37,14 +36,10 @@ export default function BattleshipCard({ send, alone }) {
           ))}
         </div>
         <p className="mt-4 text-muted">
-          Cada uno ubica su flota en secreto. Después se turnan los disparos: agua, tocado o hundido. Gana quien hunda primero
+          Cada uno ubica su flota en secreto, donde quiera (los barcos se pueden tocar). Después se turnan los disparos: agua, tocado o hundido. Gana quien hunda primero
           todos los barcos del otro.
         </p>
         <label className="mt-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={noTouch} onChange={(e) => setNoTouch(e.target.checked)} className="h-4 w-4 accent-[var(--color-ink)]" />
-          Los barcos no se pueden tocar
-        </label>
-        <label className="mt-2 flex items-center gap-2 text-sm">
           <input type="checkbox" checked={bonus} onChange={(e) => setBonus(e.target.checked)} className="h-4 w-4 accent-[var(--color-ink)]" />
           Si aciertas, vuelves a disparar
         </label>
@@ -52,7 +47,7 @@ export default function BattleshipCard({ send, alone }) {
         <div className="mt-auto pt-6">
           <div className="border-t border-line pt-5">
             <button
-              onClick={() => send({ type: 'start_game', game: 'battleship', size, noTouch, bonus })}
+              onClick={() => send({ type: 'start_game', game: 'battleship', size, bonus })}
               disabled={alone}
               className="w-full rounded-2xl bg-ink px-5 py-3 font-semibold text-white disabled:opacity-40"
             >

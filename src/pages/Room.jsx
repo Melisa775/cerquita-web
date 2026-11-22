@@ -25,6 +25,7 @@ import ColonosCard from '../components/ColonosCard'
 import LobbyBoard from '../components/LobbyBoard'
 import DeeperCard from '../components/DeeperCard'
 import MazmorrasCard from '../components/MazmorrasCard'
+import AnzueloCard from '../components/AnzueloCard'
 import { MuteButton } from '../components/stage/hud'
 import { PLAYER_COLORS } from '../lib/color'
 import { storage } from '../lib/api'
@@ -52,11 +53,12 @@ const GolfGame = lazy(() => import('../games/GolfGame'))
 const ColonosGame = lazy(() => import('../games/ColonosGame'))
 const DeeperGame = lazy(() => import('../games/DeeperGame'))
 const MazmorrasGame = lazy(() => import('../games/MazmorrasGame'))
+const AnzueloGame = lazy(() => import('../games/AnzueloGame'))
 
 // Games that show server errors themselves, inside their own layout
-const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch', 'guesswho', 'mazmorras'])
+const SHOWS_ERRORS = new Set(['parques', 'chess', 'domino', 'una', 'wordle', 'colonos', 'pinturillo', 'crosswords', 'golf', 'battleship', 'wordsearch', 'guesswho', 'mazmorras', 'anzuelo'])
 
-const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame, mazmorras: MazmorrasGame }
+const GAME_VIEWS = { color: ColorGame, stop: StopGame, toolate: TooLateGame, boggle: BoggleGame, hangman: HangmanGame, wordle: WordleGame, wordsearch: WordSearchGame, guesswho: GuessWhoGame, pinturillo: PinturilloGame, charades: CharadesGame, murdoku: MurdokuGame, trivia: TriviaGame, chess: ChessGame, battleship: BattleshipGame, domino: DominoGame, parques: ParquesGame, crosswords: CrosswordsGame, una: UnaGame, golf: GolfGame, colonos: ColonosGame, deeper: DeeperGame, mazmorras: MazmorrasGame, anzuelo: AnzueloGame }
 const UPCOMING = []
 // Lobby: every game with its filter group and a one-line pitch shown while the card is folded
 const LOBBY_GAMES = [
@@ -71,6 +73,7 @@ const LOBBY_GAMES = [
   { Card: GuessWhoCard, max: 2, kind: 'wits', tagline: 'Pregunta, descarta y adivina quién es.' },
   { Card: MurdokuCard, max: 6, kind: 'wits', tagline: 'Sudoku con asesinato.' },
   { Card: TriviaCard, max: 6, kind: 'wits', tagline: 'Ruleta de preguntas y coronas.' },
+  { Card: AnzueloCard, max: 6, kind: 'wits', tagline: 'Pesca a los mentirosos, no al honesto.' },
   { Card: PinturilloCard, max: 6, kind: 'action', tagline: 'Uno dibuja y los demás adivinan.' },
   { Card: CharadesCard, max: 6, kind: 'action', tagline: 'Actúa sin hablar frente a la cámara.' },
   { Card: GolfCard, max: 4, kind: 'action', tagline: 'Nueve hoyos, un tiro a la vez.' },

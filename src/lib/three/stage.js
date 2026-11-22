@@ -35,6 +35,9 @@ export function createStage(
     exposure = 1.05,
     shadowSize = 7,
     layout = null, // (aspect, world) => ({ fitHalfWidth, fitHalfDepth, target? }) to adapt the framing to the screen shape
+    // Fit the content in the part of the stage the HUD leaves free (the HUD
+    // reports its real height with setInsets), instead of a fixed margin.
+    autoInsets = false,
   } = {},
   { onPick, onHover } = {},
 ) {
@@ -88,6 +91,7 @@ export function createStage(
   const halfW = fitHalfWidth
   const halfD = fitHalfDepth
   const baseTarget = new THREE.Vector3(...target)
+  let insets = { top: 0, bottom: 0 } // px covered by the HUD at the top and the bottom
   let lastSize = ''
   function fit() {
     const w = container.clientWidth || 1
@@ -102,12 +106,18 @@ export function createStage(
     camera.fov = portrait ? portraitFov : fov
     camera.updateProjectionMatrix()
     const halfFov = THREE.MathUtils.degToRad(camera.fov / 2)
+    // the free band between the HUD at the top and at the bottom
+    const top = autoInsets ? Math.min(insets.top, h * 0.4) : 0
+    const bottom = autoInsets ? Math.min(insets.bottom, h * 0.5) : 0
+    const free = Math.max(h * 0.35, h - top - bottom)
+    // shift the picture so the target sits in the middle of that band
+    if (autoInsets) camera.setViewOffset(w, h, 0, (bottom - top) / 2, w, h)
     const fitted = layout?.(camera.aspect, world) ?? {}
     const fitHalfWidth = fitted.fitHalfWidth ?? halfW
     const fitHalfDepth = fitted.fitHalfDepth ?? halfD
     // far enough for the content to fit the width (and the depth, if given)
     const byWidth = fitHalfWidth / Math.tan(Math.atan(Math.tan(halfFov) * camera.aspect))
-    const byDepth = fitHalfDepth ? fitHalfDepth / Math.tan(halfFov) : 0
+    const byDepth = fitHalfDepth ? fitHalfDepth / (Math.tan(halfFov) * (free / h)) : 0
     const dist = Math.max(byWidth * (portrait ? 1.02 : 0.95), byDepth * 0.95, minDistance + 1)
     controls.maxDistance = Math.max(22, dist + 6)
     scene.fog.near = dist + 4
@@ -116,7 +126,7 @@ export function createStage(
     if (fitted.target) controls.target.set(...fitted.target)
     else {
       controls.target.copy(baseTarget)
-      if (portrait) controls.target.z += 0.6
+      if (portrait && !autoInsets) controls.target.z += 0.6
     }
     HOME.set(controls.target.x, dist * t, controls.target.z + dist * Math.sqrt(Math.max(0.05, 1 - t * t)))
   }
@@ -243,6 +253,25 @@ export function createStage(
     },
     resetView,
     zoom,
+    /** How much of the stage the HUD covers (px). With autoInsets the content refits into the rest. */
+    setInsets(next) {
+      if (!autoInsets || !next) return
+      const moved = Math.abs(next.top - insets.top) + Math.abs(next.bottom - insets.bottom)
+      if (moved < 8) return
+      // was the camera where we left it? then follow the new framing
+      const home = camera.position.distanceTo(HOME) < 0.05
+      insets = { top: next.top, bottom: next.bottom }
+      fit()
+      if (home) {
+        const from = camera.position.clone()
+        if (reduce || from.distanceTo(HOME) < 0.01) camera.position.copy(HOME)
+        else {
+          const k = { t: 0 }
+          animate(k, { t: 1, duration: 350, ease: 'outCubic', onUpdate: () => camera.position.lerpVectors(from, HOME, k.t) })
+        }
+      }
+      renderer.render(scene, camera)
+    },
     /** Recomputes the framing (after the content changed size) and moves the camera there. */
     refit() {
       fit()

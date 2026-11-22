@@ -3,7 +3,7 @@
  * player plates, the "what now" banner, dice, view buttons, an error toast
  * and modal sheets. Purely informative pieces let taps through to the board.
  */
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'motion/react'
 import { animate } from 'animejs'
 import { AnimatedNumber, softSpring, spring } from '../../lib/motion'
@@ -11,16 +11,44 @@ import { isMuted, onMuteChange, setMuted } from '../../lib/sound'
 
 /** 3D stage on the left (with HUD on top), side panel on the right; stacked on phones. */
 export function StageLayout({ stage, top, bottom, aside, overlay, sky = 'linear-gradient(#BFE3F2, #8FCBE8)', stageRef }) {
+  // measure what the HUD really covers (it changes with the phone, the text and
+  // the buttons on screen) so the board can fit in the free part
+  const topRef = useRef(null)
+  const bottomRef = useRef(null)
+  const [insets, setInsets] = useState(null)
+  useEffect(() => {
+    const measure = () => {
+      const t = topRef.current
+      const b = bottomRef.current
+      if (!t || !b) return
+      const box = t.parentElement.getBoundingClientRect()
+      const tr = t.getBoundingClientRect()
+      const br = b.getBoundingClientRect()
+      const next = {
+        top: Math.round(tr.height ? tr.bottom - box.top + 8 : 0),
+        bottom: Math.round(br.height ? box.bottom - br.top + 8 : 0),
+      }
+      setInsets((cur) => (cur && cur.top === next.top && cur.bottom === next.bottom ? cur : next))
+    }
+    measure()
+    const ro = new ResizeObserver(measure)
+    if (topRef.current) ro.observe(topRef.current)
+    if (bottomRef.current) ro.observe(bottomRef.current)
+    return () => ro.disconnect()
+  }, [])
+  // only components get it (not a fragment or a plain tag)
+  const takesInsets = isValidElement(stage) && stage.type !== Fragment && typeof stage.type !== 'string'
+  const stageEl = takesInsets ? cloneElement(stage, { insets }) : stage
   return (
     <div className="mt-2 grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
       <section
         className="relative h-[min(72svh,42rem)] min-h-[24rem] overflow-hidden rounded-[2rem] shadow-[0_24px_60px_-30px_rgba(34,37,46,.6)] lg:h-[calc(100svh-7.5rem)]"
         style={{ background: sky }}
       >
-        {stage}
+        {stageEl}
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-3 sm:p-4">
-          <div className="flex items-start justify-between gap-2">{top}</div>
-          <div className="flex flex-col items-center gap-2">{bottom}</div>
+          <div ref={topRef} className="flex items-start justify-between gap-2">{top}</div>
+          <div ref={bottomRef} className="flex flex-col items-center gap-2">{bottom}</div>
         </div>
         {stageRef && <ViewButtons stageRef={stageRef} />}
         {overlay}
@@ -31,9 +59,9 @@ export function StageLayout({ stage, top, bottom, aside, overlay, sky = 'linear-
 }
 
 /** Player plates: a ring that fills toward `max`, name, a stats line and badges. */
-export function Plates({ players }) {
-  // three or more players on a phone: just the rings (names come back from sm up)
-  const crowded = players.length > 2
+export function Plates({ players, compact = false }) {
+  // three or more players (or little room) on a phone: just the rings (names come back from sm up)
+  const crowded = compact || players.length > 2
   return (
     <div className={`flex min-w-0 gap-1.5 ${crowded ? 'max-sm:gap-1' : ''}`}>
       {players.map((p) => {

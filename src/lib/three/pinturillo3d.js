@@ -190,6 +190,7 @@ export function create(container, handlers) {
       return { x: r.left + ((p.x + 1) / 2) * r.width, y: r.top + ((1 - p.y) / 2) * r.height }
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,

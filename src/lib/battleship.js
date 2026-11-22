@@ -10,8 +10,8 @@ export function cellsOf(ship, length) {
 
 const key = (r, c) => `${r},${c}`
 
-/** Ids of misplaced ships (out of bounds, overlapping, or touching when the rule forbids it). */
-export function problems(placed, lengths, size, noTouch) {
+/** Ids of misplaced ships (out of bounds or on top of another). Ships may touch. */
+export function problems(placed, lengths, size) {
   const owner = new Map()
   const bad = new Set()
   for (const s of placed) {
@@ -24,26 +24,11 @@ export function problems(placed, lengths, size, noTouch) {
       } else owner.set(k, s.id)
     }
   }
-  if (noTouch) {
-    for (const s of placed) {
-      for (const [r, c] of cellsOf(s, lengths[s.id])) {
-        for (let dr = -1; dr <= 1; dr++) {
-          for (let dc = -1; dc <= 1; dc++) {
-            const other = owner.get(key(r + dr, c + dc))
-            if (other && other !== s.id) {
-              bad.add(s.id)
-              bad.add(other)
-            }
-          }
-        }
-      }
-    }
-  }
   return bad
 }
 
 /** Random valid fleet (retries if it gets stuck). */
-export function randomFleet(fleet, size, noTouch) {
+export function randomFleet(fleet, size) {
   for (let attempt = 0; attempt < 200; attempt++) {
     const placed = []
     const blocked = new Set()
@@ -64,10 +49,7 @@ export function randomFleet(fleet, size, noTouch) {
       }
       const pick = options[Math.floor(Math.random() * options.length)]
       placed.push({ id: ship.id, row: pick.row, col: pick.col, dir: pick.dir })
-      for (const [r, c] of pick.cells) {
-        blocked.add(key(r, c))
-        if (noTouch) for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) blocked.add(key(r + dr, c + dc))
-      }
+      for (const [r, c] of pick.cells) blocked.add(key(r, c))
     }
     if (ok) return placed
   }

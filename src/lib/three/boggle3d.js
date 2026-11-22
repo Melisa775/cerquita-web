@@ -28,8 +28,10 @@ export function create(container, handlers) {
       tilt: 0.95,
       portraitTilt: 0.97,
       shadowSize: 5,
-      target: [0, 0, 0.9],
-      layout: (aspect) => ({ fitHalfWidth: (n * GAP) / 2 + 0.7, fitHalfDepth: (n * GAP) / 2 + (aspect < 0.9 ? 2.4 : 2.3) }),
+      target: [0, 0, 0],
+      // the board fits in whatever the HUD leaves free (players and clock on top, the word below)
+      autoInsets: true,
+      layout: () => ({ fitHalfWidth: (n * GAP) / 2 + 0.7, fitHalfDepth: (n * GAP) / 2 + 0.7 }),
     },
     handlers,
   )
@@ -197,6 +199,7 @@ export function create(container, handlers) {
       return stage.project(dice[i])
     },
     resetView: stage.resetView,
+    setInsets: stage.setInsets,
     zoom: stage.zoom,
     project: stage.project,
     pickableIds: stage.pickableIds,
