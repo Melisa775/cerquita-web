@@ -41,6 +41,7 @@ The games themselves are in Spanish; the names below are the ones shown in the a
 
 ## Technical decisions
 
+- **Installable on phones (PWA).** A web manifest, icons and a small service worker (`public/sw.js`) let people add Cerquita to their home screen and open it full screen, without the browser bars. Pages always come from the network so every deploy shows up right away; only the hashed build files are cached, and without internet a friendly offline page appears. The home page has an "Instalar" button: Chrome and Android show their install prompt, and on iPhone it explains Compartir → Agregar a inicio.
 - **The client only renders.** The server sends a full snapshot of the room state on every change; the frontend doesn't compute game rules, it only displays them. That removes a whole class of sync bugs.
 - **Automatic reconnection** with exponential backoff if the connection drops (`src/hooks/useRoom.js`).
 - **Countdowns that don't rely on the other player's clock.** The server sends how many milliseconds are left, not an absolute time, so it works even if the two computers' clocks disagree.
